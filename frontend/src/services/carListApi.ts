@@ -28,6 +28,10 @@ export interface CarRecord {
   reviewed_on: string | null;
   closed_on: string | null;
   attachment_path: string | null;
+  created_by?: string | null;
+  created_at?: string | null;
+  modified_by?: string | null;
+  modified_at?: string | null;
 }
 
 export interface AddCarFormData {
@@ -55,6 +59,7 @@ export interface AddCarFormData {
   reviewedOn?: string;
   closedOn?: string;
   attachment?: File;
+  userName?: string; // ⭐ Added for tracking
 }
 
 export interface FacilityDetails {
@@ -87,6 +92,7 @@ export interface ApiResponse<T> {
 export interface StatusUpdateRequest {
   id: number;
   status: 'open' | 'closed' | 'pending';
+  userName?: string; // ⭐ Added for tracking
 }
 
 export interface StatusUpdateResponse {
@@ -97,7 +103,15 @@ export interface StatusUpdateResponse {
     id: number;
     status: string;
     closed_on: string | null;
+    modified_by?: string | null;
+    modified_at?: string | null;
   };
+}
+
+export interface DeleteResponse {
+  success: boolean;
+  message: string;
+  affectedRows: number;
 }
 
 // =================== CONFIGURATION ===================
@@ -281,6 +295,11 @@ export const addCar = async (formData: AddCarFormData): Promise<ApiResponse<any>
     data.append('reviewed_on', formData.reviewedOn || '');
     data.append('closed_on', formData.closedOn || '');
 
+    // ⭐ Add userName for tracking
+    if (formData.userName) {
+      data.append('userName', formData.userName);
+    }
+
     // Append file if exists
     if (formData.attachment) {
       data.append('attachment', formData.attachment);
@@ -305,16 +324,37 @@ export const addCar = async (formData: AddCarFormData): Promise<ApiResponse<any>
  */
 export const updateCarStatus = async (
   id: number,
-  status: 'open' | 'closed' | 'pending'
+  status: 'open' | 'closed' | 'pending',
+  userName?: string
 ): Promise<StatusUpdateResponse> => {
   try {
-    const response = await axiosInstance.post<StatusUpdateResponse>('/update-status', {
+    const payload: StatusUpdateRequest = {
       id,
       status,
-    });
+    };
+
+    // ⭐ Add userName for tracking
+    if (userName) {
+      payload.userName = userName;
+    }
+
+    const response = await axiosInstance.post<StatusUpdateResponse>('/update-status', payload);
     return response.data;
   } catch (error) {
     console.error('Error updating car status:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete car record
+ */
+export const deleteCarRecord = async (id: number): Promise<DeleteResponse> => {
+  try {
+    const response = await axiosInstance.delete<DeleteResponse>(`/car-list/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting car record:', error);
     throw error;
   }
 };

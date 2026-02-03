@@ -1,6 +1,7 @@
 const { mysqlPool } = require("../config/database");
 const oracledb = require('oracledb');
 const path = require("path");
+const fs = require('fs');
 
 // Helper function to safely trim and truncate strings
 const safeTrim = (str, maxLength) => {
@@ -197,6 +198,9 @@ const addCar = async (req, res) => {
             closed_on,
         } = req.body;
 
+        // ⭐ Get username from request (passed from frontend)
+        const userName = req.user?.name || req.body.userName || 'System';
+
         console.log("Extracted form data:");
         console.log("- case_no:", case_no);
         console.log("- date_endorsed:", date_endorsed);
@@ -204,6 +208,7 @@ const addCar = async (req, res) => {
         console.log("- facility_name:", facility_name);
         console.log("- city:", city);
         console.log("- province:", province);
+        console.log("- userName:", userName);
 
         // Validate required fields
         const missingFields = [];
@@ -224,12 +229,16 @@ const addCar = async (req, res) => {
         const attachment_path = req.file ? `/uploads/${req.file.filename}` : null;
         console.log("Attachment path:", attachment_path);
 
+        // Get current timestamp
+        const now = new Date();
+
         const sql = `
             INSERT INTO test_nscslcom_nscsl_dashboard.list_car 
             (case_no, date_endorsed, endorsed_by, facility_code, facility_name, city, province, labno,
             repeat_field, status, number_sample, case_code, sub_code1, sub_code2, sub_code3, sub_code4,
-            remarks, frc, wrc, prepared_by, followup_on, reviewed_on, closed_on, attachment_path)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            remarks, frc, wrc, prepared_by, followup_on, reviewed_on, closed_on, attachment_path, 
+            created_by, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         // Prepare values array with proper length limits matching database schema
@@ -257,34 +266,13 @@ const addCar = async (req, res) => {
             followup_on || null,              // VARCHAR(15) - date field
             reviewed_on || null,              // VARCHAR(15) - date field
             closed_on || null,                // datetime
-            safeTrim(attachment_path, 255)    // VARCHAR(255)
+            safeTrim(attachment_path, 255),   // VARCHAR(255)
+            safeTrim(userName, 100),          // created_by
+            now                               // created_at
         ];
 
         console.log("SQL Query:", sql);
-        console.log("Values array:", values);
         console.log("Values count:", values.length);
-
-        // Field length debugging
-        console.log("\n=== FIELD LENGTH CHECK ===");
-        const fieldNames = ['case_no', 'date_endorsed', 'endorsed_by', 'facility_code', 
-            'facility_name', 'city', 'province', 'labno', 'repeat_field', 'status', 
-            'number_sample', 'case_code', 'sub_code1', 'sub_code2', 'sub_code3', 
-            'sub_code4', 'remarks', 'frc', 'wrc', 'prepared_by', 'followup_on', 
-            'reviewed_on', 'closed_on', 'attachment_path'];
-
-        values.forEach((value, index) => {
-            if (typeof value === 'string') {
-                const preview = value.length > 50 ? value.substring(0, 50) + '...' : value;
-                console.log(`${fieldNames[index]}: ${value.length} chars - "${preview}"`);
-                
-                if (value.length > 255) {
-                    console.warn(`⚠️  WARNING: ${fieldNames[index]} is ${value.length} chars (may exceed VARCHAR limit)`);
-                }
-            } else {
-                console.log(`${fieldNames[index]}: ${value} (type: ${typeof value})`);
-            }
-        });
-        console.log("=== END FIELD LENGTH CHECK ===\n");
 
         // Execute the insert
         const [result] = await mysqlPool.query(sql, values);
@@ -292,7 +280,6 @@ const addCar = async (req, res) => {
         console.log("=== INSERT SUCCESS ===");
         console.log("Insert ID:", result.insertId);
         console.log("Affected rows:", result.affectedRows);
-        console.log("Result object:", result);
 
         // Success response
         const response = {
@@ -304,6 +291,7 @@ const addCar = async (req, res) => {
                 case_no: case_no,
                 date_endorsed: date_endorsed,
                 facility_code: facility_code,
+                created_by: userName,
                 attachment: req.file ? {
                     filename: req.file.filename,
                     originalname: req.file.originalname,
@@ -371,6 +359,10 @@ const updateStatus = async (req, res) => {
         
         const { id, status } = req.body;
         
+        // ⭐ Get username from request
+        const userName = req.user?.name || req.body.userName || 'System';
+        const now = new Date();
+
         if (!id) {
             console.error('Missing ID in request');
             return res.status(400).json({
@@ -416,16 +408,18 @@ const updateStatus = async (req, res) => {
 
         console.log('Record exists, current status:', checkResult[0].status);
 
-        // Determine what to update based on status
+        // ✅ FIX: Swapped modified_at and modified_by so that
+        //    modified_at (DATETIME) receives `now`
+        //    modified_by (VARCHAR)  receives `userName`
         let sql, values;
         
         if (status.toLowerCase() === 'closed') {
-            sql = "UPDATE test_nscslcom_nscsl_dashboard.list_car SET status = ?, closed_on = NOW() WHERE id = ?";
-            values = [status.toLowerCase(), id];
+            sql = "UPDATE test_nscslcom_nscsl_dashboard.list_car SET status = ?, closed_on = NOW(), modified_at = ?, modified_by = ? WHERE id = ?";
+            values = [status.toLowerCase(), now, userName, id];
             console.log('Setting status to closed and updating closed_on timestamp');
         } else {
-            sql = "UPDATE test_nscslcom_nscsl_dashboard.list_car SET status = ?, closed_on = NULL WHERE id = ?";
-            values = [status.toLowerCase(), id];
+            sql = "UPDATE test_nscslcom_nscsl_dashboard.list_car SET status = ?, closed_on = NULL, modified_at = ?, modified_by = ? WHERE id = ?";
+            values = [status.toLowerCase(), now, userName, id];
             console.log('Setting status to', status, 'and clearing closed_on timestamp');
         }
 
@@ -445,7 +439,7 @@ const updateStatus = async (req, res) => {
         }
 
         // Get the updated record to confirm the change
-        const selectSql = "SELECT id, status, closed_on FROM test_nscslcom_nscsl_dashboard.list_car WHERE id = ?";
+        const selectSql = "SELECT id, status, closed_on, modified_by, modified_at FROM test_nscslcom_nscsl_dashboard.list_car WHERE id = ?";
         const [selectResult] = await mysqlPool.query(selectSql, [id]);
         
         const updatedRecord = selectResult && selectResult[0] ? selectResult[0] : null;
@@ -460,6 +454,77 @@ const updateStatus = async (req, res) => {
 
     } catch (error) {
         console.error("Update status controller error:", error);
+        res.status(500).json({
+            success: false,
+            error: "Internal Server Error",
+            message: error.message
+        });
+    }
+};
+
+// Delete car record
+const deleteCar = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        console.log('Delete endpoint hit with ID:', id);
+
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                error: "Missing required fields",
+                message: "ID is required"
+            });
+        }
+
+        // Get attachment path before deleting
+        const [record] = await mysqlPool.query(
+            "SELECT attachment_path FROM test_nscslcom_nscsl_dashboard.list_car WHERE id = ?",
+            [id]
+        );
+
+        if (!record || record.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: "Record not found",
+                message: "No record found with the provided ID"
+            });
+        }
+
+        // Delete the record
+        const [result] = await mysqlPool.query(
+            "DELETE FROM test_nscslcom_nscsl_dashboard.list_car WHERE id = ?",
+            [id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                error: "Delete failed",
+                message: "No record was deleted"
+            });
+        }
+
+        // Delete associated file if exists
+        if (record[0].attachment_path) {
+            const filePath = path.join(__dirname, '..', record[0].attachment_path);
+            fs.unlink(filePath, (err) => {
+                if (err) {
+                    console.error(`Error deleting file ${filePath}:`, err);
+                } else {
+                    console.log(`Successfully deleted file: ${filePath}`);
+                }
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Record deleted successfully",
+            affectedRows: result.affectedRows
+        });
+
+    } catch (error) {
+        console.error("Delete controller error:", error);
         res.status(500).json({
             success: false,
             error: "Internal Server Error",
@@ -590,6 +655,7 @@ module.exports = {
     getCarListGrouped,
     addCar,
     updateStatus,
+    deleteCar,
     testDatabaseConnection,
     getFacilityByCode
 };

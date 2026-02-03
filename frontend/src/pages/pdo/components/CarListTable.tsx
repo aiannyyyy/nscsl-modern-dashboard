@@ -1,21 +1,25 @@
 import React, { useState, useRef, useEffect } from "react";
+import { Trash2 } from "lucide-react";
 import { AddDocumentModal } from "./AddDocumentModal";
 import { StatusChangeModal } from "./StatusChangeModal";
 import { FileViewerModal } from "./FileViewerModal";
+import { useAuth } from "../../../hooks/useAuth";
 import { 
   getAllCarList, 
   addCar, 
   updateCarStatus,
+  deleteCarRecord,
   getErrorMessage
 } from "../../../services/carListApi";
 import type { CarRecord } from "../../../services/carListApi";
 import type { AddCarFormData } from "../../../services/carListApi";
 
 interface CarListTableProps {
-  onDataChange?: () => void; // Callback to notify parent of data changes
+  onDataChange?: () => void;
 }
 
 export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
+  const { user } = useAuth();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -23,18 +27,16 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
   const [selectedRecord, setSelectedRecord] = useState<CarRecord | null>(null);
   const [selectedFileUrl, setSelectedFileUrl] = useState<string>("");
   const [carList, setCarList] = useState<CarRecord[]>([]);
-  const [filteredCarList, setFilteredCarList] = useState<CarRecord[]>([]); // For search results
-  const [searchQuery, setSearchQuery] = useState(""); // Search state
+  const [filteredCarList, setFilteredCarList] = useState<CarRecord[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Fetch car list on component mount
   useEffect(() => {
     fetchCarList();
   }, []);
 
-  // Filter car list based on search query
   useEffect(() => {
     if (searchQuery.trim() === "") {
       setFilteredCarList(carList);
@@ -52,7 +54,11 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
     try {
       const data = await getAllCarList();
       setCarList(data);
-      setFilteredCarList(data); // Initialize filtered list
+      setFilteredCarList(data);
+      
+      if (onDataChange) {
+        onDataChange();
+      }
     } catch (err) {
       const errorMsg = getErrorMessage(err);
       setError(errorMsg);
@@ -62,7 +68,6 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
     }
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -82,7 +87,6 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
     };
   }, [isFilterOpen]);
 
-  // Body scroll lock
   useEffect(() => {
     document.body.style.overflow =
       showAddModal || showStatusModal || showFileModal ? "hidden" : "unset";
@@ -94,18 +98,21 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
 
   const handleSaveDocument = async (formData: AddCarFormData) => {
     try {
-      const result = await addCar(formData);
+      // ⭐ Add username to form data
+      const dataWithUser = {
+        ...formData,
+        userName: user?.name || 'Unknown User'
+      };
+      
+      const result = await addCar(dataWithUser);
       console.log("Document saved successfully:", result);
       
-      // Refresh the car list
       await fetchCarList();
       
-      // Notify parent component to refresh charts
       if (onDataChange) {
         onDataChange();
       }
       
-      // Show success message
       alert("Document added successfully!");
     } catch (err) {
       const errorMsg = getErrorMessage(err);
@@ -118,23 +125,48 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
     if (!selectedRecord) return;
 
     try {
-      const result = await updateCarStatus(selectedRecord.id, status);
+      // ⭐ Pass username to track modification
+      const result = await updateCarStatus(
+        selectedRecord.id, 
+        status, 
+        user?.name || 'Unknown User'
+      );
       console.log("Status updated successfully:", result);
       
-      // Refresh the car list
       await fetchCarList();
       
-      // Notify parent component to refresh charts
       if (onDataChange) {
         onDataChange();
       }
       
-      // Show success message
       alert(`Status updated to ${status} successfully!`);
     } catch (err) {
       const errorMsg = getErrorMessage(err);
       console.error("Error updating status:", err);
       alert(`Failed to update status: ${errorMsg}`);
+    }
+  };
+
+  const handleDelete = async (record: CarRecord) => {
+    if (!window.confirm(`Are you sure you want to delete case "${record.case_no}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const result = await deleteCarRecord(record.id);
+      console.log("Record deleted successfully:", result);
+      
+      await fetchCarList();
+      
+      if (onDataChange) {
+        onDataChange();
+      }
+      
+      alert("Record deleted successfully!");
+    } catch (err) {
+      const errorMsg = getErrorMessage(err);
+      console.error("Error deleting record:", err);
+      alert(`Failed to delete record: ${errorMsg}`);
     }
   };
 
@@ -153,24 +185,39 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
   };
 
   const formatDate = (dateString: string | null) => {
-    if (!dateString) return "-";
+    if (!dateString) return "—";
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'short', 
-      day: 'numeric' 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
+  };
+
+  const formatCreatedModified = (name: string | null, date: string | null) => {
+    if (!name && !date) return '—';
+    if (!name) return formatDate(date!);
+    if (!date) return name;
+    
+    return (
+      <div className="text-xs">
+        <div className="font-medium text-gray-900 dark:text-gray-100">{name}</div>
+        <div className="text-gray-500 dark:text-gray-400">{formatDate(date)}</div>
+      </div>
+    );
   };
 
   const getStatusBadge = (status: string) => {
     const statusColors: Record<string, string> = {
-      open: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+      open: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200",
       closed: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
-      pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+      pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200"
     };
 
     return (
-      <span className={`px-2 py-1 text-xs rounded-full ${statusColors[status.toLowerCase()] || 'bg-gray-100 text-gray-800'}`}>
+      <span className={`px-2 py-1 text-xs rounded-full font-medium ${statusColors[status.toLowerCase()] || 'bg-gray-100 text-gray-800'}`}>
         {status.toUpperCase()}
       </span>
     );
@@ -243,36 +290,42 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                     <tr>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Case No</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Date Endorsed</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Endorsed By</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Facility Code</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Facility Name</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">City</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Province</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Status</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Lab No</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Number Sample</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Case Code</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Sub Code 1</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Sub Code 2</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Sub Code 3</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Sub Code 4</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Remarks</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">FRC</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">WRC</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Prepared By</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Follow Up On</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Reviewed On</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Closed On</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap sticky right-0 bg-gray-50 dark:bg-gray-800">Actions</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Case No</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Date Endorsed</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Endorsed By</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Facility Code</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Facility Name</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">City</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Province</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Status</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Lab No</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Number Sample</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Case Code</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Sub Code 1</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Sub Code 2</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Sub Code 3</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Sub Code 4</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Remarks</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">FRC</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">WRC</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Prepared By</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Follow Up On</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Reviewed On</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Closed On</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Created</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs">Modified</th>
+                      <th className="px-4 py-3 text-center font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap text-xs sticky right-0 bg-gray-50 dark:bg-gray-800 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {filteredCarList.map((record) => (
+                    {filteredCarList.map((record, index) => (
                       <tr 
                         key={record.id} 
-                        className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        className={`transition-colors ${
+                          index % 2 === 0 
+                            ? 'bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50' 
+                            : 'bg-gray-50/50 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-800/60'
+                        }`}
                       >
                         <td className="px-4 py-3 text-gray-900 dark:text-gray-100 font-medium whitespace-nowrap">
                           {record.case_no}
@@ -340,8 +393,18 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
                         <td className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {formatDate(record.closed_on)}
                         </td>
-                        <td className="px-4 py-3 sticky right-0 bg-white dark:bg-gray-900 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {formatCreatedModified(record.created_by, record.created_at)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {formatCreatedModified(record.modified_by, record.modified_at)}
+                        </td>
+                        <td className={`px-4 py-3 whitespace-nowrap sticky right-0 shadow-[-2px_0_4px_rgba(0,0,0,0.05)] ${
+                          index % 2 === 0 
+                            ? 'bg-white dark:bg-gray-900' 
+                            : 'bg-gray-50/50 dark:bg-gray-800/30'
+                        }`}>
+                          <div className="flex items-center justify-center gap-2">
                             <button
                               onClick={() => openStatusModal(record)}
                               className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
@@ -360,6 +423,13 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
                                 No File
                               </span>
                             )}
+                            <button
+                              onClick={() => handleDelete(record)}
+                              className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
                         </td>
                       </tr>
