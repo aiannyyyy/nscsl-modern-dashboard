@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Search, X } from "lucide-react";
 import { getUnsatDetails, getFullPatient } from "../../../services/unsatApi";
 import type { PatientDetails } from "../../../services/patientDetailsTypes";
 import { NotebookDetailsModal } from "./NotebookDetailsModal";
@@ -35,6 +36,12 @@ export const FacilityPatientModal: React.FC<Props> = ({
   const [data, setData] = useState<UnsatDetail[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // 🔹 Filter state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTestResult, setSelectedTestResult] = useState<string>("all");
+  const [filteredData, setFilteredData] = useState<UnsatDetail[]>([]);
+  const [availableTestResults, setAvailableTestResults] = useState<string[]>([]);
+
   // 🔹 Notebook modal state
   const [showNotebookModal, setShowNotebookModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<PatientDetails | null>(null);
@@ -67,6 +74,56 @@ export const FacilityPatientModal: React.FC<Props> = ({
 
     fetchDetails();
   }, [open, facilityName, from, to, mode]);
+
+  // ================= EXTRACT UNIQUE TEST RESULTS =================
+  useEffect(() => {
+    const uniqueResults = Array.from(
+      new Set(
+        data.map(row => row.TEST_RESULT || row.test_result || "").filter(Boolean)
+      )
+    ).sort();
+    setAvailableTestResults(uniqueResults);
+  }, [data]);
+
+  // ================= FILTER DATA =================
+  useEffect(() => {
+    let filtered = [...data];
+
+    // Filter by test result dropdown
+    if (selectedTestResult !== "all") {
+      filtered = filtered.filter((row) => {
+        const testResult = row.TEST_RESULT || row.test_result || "";
+        return testResult === selectedTestResult;
+      });
+    }
+
+    // Filter by search term
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase();
+      filtered = filtered.filter((row) => {
+        const firstName = (row.FIRST_NAME || row.first_name || "").toLowerCase();
+        const lastName = (row.LAST_NAME || row.last_name || "").toLowerCase();
+        const labno = (row.LABNO || "").toLowerCase();
+        const testResult = (row.TEST_RESULT || row.test_result || "").toLowerCase();
+
+        return (
+          labno.includes(search) ||
+          firstName.includes(search) ||
+          lastName.includes(search) ||
+          `${firstName} ${lastName}`.includes(search) ||
+          testResult.includes(search)
+        );
+      });
+    }
+
+    setFilteredData(filtered);
+  }, [searchTerm, selectedTestResult, data]);
+
+  // ================= CLEAR FILTER =================
+  const clearSearch = () => {
+    setSearchTerm("");
+    setSelectedTestResult("all");
+  };
 
   // ================= OPEN NOTEBOOK =================
   const openNotebook = async (row: UnsatDetail) => {
@@ -143,6 +200,13 @@ export const FacilityPatientModal: React.FC<Props> = ({
     onClose();
   };
 
+  // ================= RESET ON CLOSE =================
+  const handleClose = () => {
+    setSearchTerm("");
+    setSelectedTestResult("all");
+    onClose();
+  };
+
   if (!open) return null;
 
   return (
@@ -152,19 +216,78 @@ export const FacilityPatientModal: React.FC<Props> = ({
         <div className="w-full max-w-6xl rounded-xl bg-white dark:bg-gray-900 shadow-lg">
           {/* HEADER */}
           <div className="flex justify-between items-center px-5 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h5 className="font-semibold text-gray-800 dark:text-gray-100">
-              Facility Details — {facilityName}
-            </h5>
+            <div>
+              <h5 className="font-semibold text-gray-800 dark:text-gray-100">
+                Facility Details — {facilityName}
+              </h5>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Total: {data.length} patients
+                {(searchTerm || selectedTestResult !== "all") && ` • Showing: ${filteredData.length} filtered results`}
+              </p>
+            </div>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             >
               ✕
             </button>
           </div>
 
+          {/* FILTER SECTION */}
+          <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+            <div className="flex gap-3">
+              {/* Search Input */}
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <Search size={16} className="text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search by Lab No, Name, or Test Result..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              {/* Test Result Dropdown */}
+              <div className="w-56">
+                <select
+                  value={selectedTestResult}
+                  onChange={(e) => setSelectedTestResult(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="all">All Test Results</option>
+                  {availableTestResults.map((result) => (
+                    <option key={result} value={result}>
+                      {result}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Clear All Filters Button */}
+              {(searchTerm || selectedTestResult !== "all") && (
+                <button
+                  onClick={clearSearch}
+                  className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors whitespace-nowrap"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* BODY */}
-          <div className="p-5 max-h-[70vh] overflow-y-auto">
+          <div className="p-5 max-h-[60vh] overflow-y-auto">
             {loading && (
               <div className="text-center py-8">
                 <div className="w-6 h-6 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
@@ -178,7 +301,20 @@ export const FacilityPatientModal: React.FC<Props> = ({
               </div>
             )}
 
-            {!loading && data.length > 0 && (
+            {!loading && data.length > 0 && filteredData.length === 0 && (
+              <div className="text-center py-8">
+                <Search size={32} className="mx-auto text-gray-400 mb-2" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">No patients match your search</p>
+                <button
+                  onClick={clearSearch}
+                  className="mt-2 text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Clear search
+                </button>
+              </div>
+            )}
+
+            {!loading && filteredData.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border border-gray-300 dark:border-gray-700">
                   <thead className="bg-gray-100 dark:bg-gray-800">
@@ -198,7 +334,7 @@ export const FacilityPatientModal: React.FC<Props> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {data.map((row, i) => {
+                    {filteredData.map((row, i) => {
                       const firstName = row.FIRST_NAME || row.first_name || "";
                       const lastName = row.LAST_NAME || row.last_name || "";
                       const testResult = row.TEST_RESULT || row.test_result || "—";
@@ -240,7 +376,7 @@ export const FacilityPatientModal: React.FC<Props> = ({
           {/* FOOTER */}
           <div className="flex justify-end px-5 py-3 border-t border-gray-200 dark:border-gray-700">
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-1.5 text-sm rounded bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 transition-colors"
             >
               Close

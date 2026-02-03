@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Download, FileText, Edit, Trash2, X, ExternalLink, CheckCircle, AlertCircle, XCircle, Eye } from 'lucide-react';
+import { Plus, Download, FileText, Edit, Trash2, X, Eye } from 'lucide-react';
 import facilityVisitsService from '../../../services/facilityVisitsService';
 import type { FacilityVisit } from '../../../services/facilityVisitsService';
 import { FacilityVisitModal } from './FacilityVisitModal';
 import { ExportModal } from './ExportModal';
+import { useAuth } from '../../../hooks/useAuth';
 
 interface FacilityVisitsProps {
   onDataChange?: () => void;
@@ -19,6 +20,8 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
   const [selectedAttachments, setSelectedAttachments] = useState<string[]>([]);
   const [editingVisit, setEditingVisit] = useState<FacilityVisit | null>(null);
   const [viewingFile, setViewingFile] = useState<{ path: string; name: string; type: string } | null>(null);
+  
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchVisits();
@@ -31,7 +34,6 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
       const data = await facilityVisitsService.getAll();
       setVisits(data);
       
-      // CRITICAL: Call onDataChange after fetching data
       console.log('📋 Visits fetched, calling onDataChange:', typeof onDataChange);
       if (onDataChange) {
         onDataChange();
@@ -57,7 +59,7 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
     try {
       await facilityVisitsService.delete(id);
       console.log('🗑️ Visit deleted, fetching updated list');
-      await fetchVisits(); // This will trigger onDataChange
+      await fetchVisits();
     } catch (err: any) {
       console.error('Error deleting visit:', err);
       alert('Failed to delete facility visit');
@@ -94,44 +96,36 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
 
   const handleModalSuccess = () => {
     console.log('🔄 Modal success - fetching visits and triggering chart refresh');
-    fetchVisits(); // This will trigger onDataChange inside fetchVisits
+    fetchVisits();
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case '1':
         return (
-          <div title="Active" className="inline-flex">
-            <CheckCircle 
-              size={20} 
-              className="text-green-600 dark:text-green-400"
-            />
-          </div>
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+            Active
+          </span>
         );
       case '0':
         return (
-          <div title="Inactive" className="inline-flex">
-            <AlertCircle 
-              size={20} 
-              className="text-yellow-600 dark:text-yellow-400"
-            />
-          </div>
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+            Inactive
+          </span>
         );
       case '2':
         return (
-          <div title="Closed" className="inline-flex">
-            <XCircle 
-              size={20} 
-              className="text-gray-600 dark:text-gray-400"
-            />
-          </div>
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400">
+            Closed
+          </span>
         );
       default:
-        return <span className="text-gray-400">?</span>;
+        return <span className="text-gray-400">Unknown</span>;
     }
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return '—';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -139,6 +133,19 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const formatCreatedModified = (name: string | null, date: string | null) => {
+    if (!name && !date) return '—';
+    if (!name) return formatDate(date!);
+    if (!date) return name;
+    
+    return (
+      <div className="text-xs">
+        <div className="font-medium text-gray-900 dark:text-white">{name}</div>
+        <div className="text-gray-500 dark:text-gray-400">{formatDate(date)}</div>
+      </div>
+    );
   };
 
   const renderFileViewer = () => {
@@ -151,7 +158,6 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
         <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-          {/* Header */}
           <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
             <div className="flex items-center gap-3">
               <FileText size={20} className="text-blue-500" />
@@ -181,7 +187,6 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
             </div>
           </div>
 
-          {/* Content */}
           <div className="flex-1 overflow-auto bg-gray-100 dark:bg-gray-950 p-4">
             {isImage ? (
               <div className="flex items-center justify-center h-full">
@@ -269,11 +274,11 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
           </div>
         </div>
 
-        {/* Table Container - Scrollable */}
+        {/* Table Container - Scrollable with frozen action column */}
         <div className="flex-1 overflow-hidden p-4">
-          <div className="h-full border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden flex flex-col">
-            <div className="overflow-auto flex-1">
-              <table className="w-full text-xs">
+          <div className="h-full border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto overflow-y-auto h-full">
+              <table className="w-full text-xs relative">
                 <thead className="bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-10">
                   <tr className="border-b border-gray-200 dark:border-gray-800">
                     <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
@@ -297,23 +302,33 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
                     <th className="px-3 py-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       Status
                     </th>
-                    <th className="px-3 py-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                      Created
+                    </th>
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                      Modified
+                    </th>
+                    <th className="px-3 py-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 bg-gray-50 dark:bg-gray-800/50 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-800 bg-white dark:bg-gray-900">
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                   {visits.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
+                      <td colSpan={10} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
                         No facility visits found
                       </td>
                     </tr>
                   ) : (
-                    visits.map((visit) => (
+                    visits.map((visit, index) => (
                       <tr
                         key={visit.id}
-                        className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                        className={`transition-colors ${
+                          index % 2 === 0 
+                            ? 'bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50' 
+                            : 'bg-gray-50/50 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-800/60'
+                        }`}
                       >
                         <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-300 whitespace-nowrap">
                           {visit.facility_code}
@@ -344,11 +359,19 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
                           )}
                         </td>
                         <td className="px-3 py-2 text-center whitespace-nowrap">
-                          <div className="flex justify-center">
-                            {getStatusIcon(visit.status)}
-                          </div>
+                          {getStatusBadge(visit.status)}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
+                          {formatCreatedModified(visit.created_by, visit.created_at)}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {formatCreatedModified(visit.modified_by, visit.modified_at)}
+                        </td>
+                        <td className={`px-3 py-2 whitespace-nowrap sticky right-0 shadow-[-2px_0_4px_rgba(0,0,0,0.05)] ${
+                          index % 2 === 0 
+                            ? 'bg-white dark:bg-gray-900' 
+                            : 'bg-gray-50/50 dark:bg-gray-800/30'
+                        }`}>
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => handleEdit(visit)}

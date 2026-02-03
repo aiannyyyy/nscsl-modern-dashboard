@@ -357,10 +357,10 @@ export const Notebooks: React.FC = () => {
                                     Labno
                                 </th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                                    First Name
+                                    Name
                                 </th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                                    Last Name
+                                    Added By
                                 </th>
                                 <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                                     Date Added
@@ -397,10 +397,10 @@ export const Notebooks: React.FC = () => {
                                             {entry.labno}
                                         </td>
                                         <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">
-                                            {entry.fname}
+                                            {`${entry.fname} ${entry.lname}`.trim()}
                                         </td>
-                                        <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-100">
-                                            {entry.lname}
+                                        <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300">
+                                            {entry.techCreate || '-'}
                                         </td>
                                         <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300">
                                             {formatDate(entry.createDate)}

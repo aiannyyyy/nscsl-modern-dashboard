@@ -15,7 +15,7 @@ export default function ListCar() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 p-6">
-      <div className="max-w-[1600px] mx-auto space-y-6">
+      <div className="max-w-[1400px] mx-auto space-y-6">
         {/* Page Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">

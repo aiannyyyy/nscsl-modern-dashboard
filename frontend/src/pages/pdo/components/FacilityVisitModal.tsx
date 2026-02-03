@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Upload, FileText, Trash2, Loader2 } from 'lucide-react';
 import facilityVisitsService from '../../../services/facilityVisitsService';
 import type { FacilityVisit } from '../../../services/facilityVisitsService';
+import { useAuth } from '../../../hooks/useAuth';  // ⭐ ADDED
 
 interface FacilityVisitModalProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ export const FacilityVisitModal: React.FC<FacilityVisitModalProps> = ({
   onSuccess,
   visit,
 }) => {
+  const { user } = useAuth();  // ⭐ ADDED - Get current user
+  
   const [formData, setFormData] = useState({
     facility_code: '',
     facility_name: '',
@@ -138,24 +141,27 @@ export const FacilityVisitModal: React.FC<FacilityVisitModalProps> = ({
         
         // Append form fields
         Object.entries(formData).forEach(([key, value]) => {
-        submitData.append(key, value);
+          submitData.append(key, value);
         });
+
+        // ⭐ ADDED - Append username from auth context
+        submitData.append('userName', user?.name || 'Unknown User');
 
         // Append new files
         files.forEach(file => {
-        submitData.append('attachments', file);
+          submitData.append('attachments', file);
         });
 
         if (visit?.id) {
-        // Update mode
-        const filesToKeep = existingFiles.filter(f => !filesToDelete.includes(f));
-        submitData.append('files_to_keep', JSON.stringify(filesToKeep));
-        submitData.append('files_to_delete', JSON.stringify(filesToDelete));
-        
-        await facilityVisitsService.update(visit.id, submitData);
+          // Update mode
+          const filesToKeep = existingFiles.filter(f => !filesToDelete.includes(f));
+          submitData.append('files_to_keep', JSON.stringify(filesToKeep));
+          submitData.append('files_to_delete', JSON.stringify(filesToDelete));
+          
+          await facilityVisitsService.update(visit.id, submitData);
         } else {
-        // Create mode
-        await facilityVisitsService.create(submitData);
+          // Create mode
+          await facilityVisitsService.create(submitData);
         }
 
         resetForm();
@@ -168,7 +174,7 @@ export const FacilityVisitModal: React.FC<FacilityVisitModalProps> = ({
     } finally {
         setLoading(false);
     }
-    };
+  };
 
   if (!isOpen) return null;
 

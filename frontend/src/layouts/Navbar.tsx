@@ -124,33 +124,6 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, setIsCollapsed }) =
                     </div>
                   </div>
                   
-                  {/* Menu Options
-                  <div className="p-2">
-                    <button 
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        // Navigate to profile page if you have one
-                        // navigate('/profile');
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                    >
-                      <User size={18} />
-                      <span className="text-sm">Profile</span>
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        // Navigate to settings page if you have one
-                        // navigate('/settings');
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                    >
-                      <Settings size={18} />
-                      <span className="text-sm">Settings</span>
-                    </button>
-                  </div>
-                  */}
-
                   <div className="p-2 border-t border-gray-200 dark:border-gray-700">
                     <button
                       onClick={handleLogout}

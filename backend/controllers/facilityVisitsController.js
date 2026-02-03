@@ -30,20 +30,25 @@ const createVisit = async (req, res) => {
             mark,
         } = req.body;
 
+        // Get user info from session/token (you'll need to implement authentication)
+        // For now, using placeholder - replace with actual user from auth middleware
+        const userName = req.user?.name || req.body.userName || 'System';
+
         // Handle file uploads
         const filePaths = req.files && req.files.length > 0
             ? req.files.map((file) => "uploads/" + file.filename).join(",")
             : null;
 
         // Convert the datetime from frontend to MySQL datetime format
-        // Frontend sends: "2026-01-28T14:30"
-        // MySQL needs: "2026-01-28 14:30:00"
         const mysqlDateTime = date_visited.replace('T', ' ') + ':00';
+
+        // Get current timestamp for created_at
+        const now = new Date();
 
         const sql = `
             INSERT INTO test_nscslcom_nscsl_dashboard.pdo_visit 
-            (facility_code, facility_name, date_visited, province, status, remarks, mark, attachment_path) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (facility_code, facility_name, date_visited, province, status, remarks, mark, attachment_path, created_by, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const [result] = await database.mysqlPool.query(sql, [
@@ -55,6 +60,8 @@ const createVisit = async (req, res) => {
             remarks || 'No remarks',
             mark,
             filePaths,
+            userName,
+            now
         ]);
 
         res.json({ 
@@ -86,9 +93,12 @@ const updateVisit = async (req, res) => {
             files_to_delete
         } = req.body;
 
-        // Get current record
+        // Get user info from session/token
+        const userName = req.user?.name || req.body.userName || 'System';
+
+        // Get current record to preserve created_by and created_at
         const [currentRecord] = await database.mysqlPool.query(
-            "SELECT attachment_path FROM test_nscslcom_nscsl_dashboard.pdo_visit WHERE id = ?",
+            "SELECT attachment_path, created_by, created_at FROM test_nscslcom_nscsl_dashboard.pdo_visit WHERE id = ?",
             [id]
         );
 
@@ -97,6 +107,8 @@ const updateVisit = async (req, res) => {
         }
 
         const currentAttachmentPath = currentRecord[0].attachment_path;
+        const createdBy = currentRecord[0].created_by;
+        const createdAt = currentRecord[0].created_at;
 
         // Parse file management data
         let filesToKeep = [];
@@ -149,10 +161,14 @@ const updateVisit = async (req, res) => {
             ? date_visited.replace('T', ' ') + ':00'
             : date_visited;
 
+        // Get current timestamp for modified_at
+        const now = new Date();
+
         // Update database
         const sql = `
             UPDATE test_nscslcom_nscsl_dashboard.pdo_visit 
-            SET facility_code=?, facility_name=?, date_visited=?, province=?, status=?, remarks=?, mark=?, attachment_path=?
+            SET facility_code=?, facility_name=?, date_visited=?, province=?, status=?, remarks=?, mark=?, attachment_path=?, 
+                created_by=?, created_at=?, modified_by=?, modified_at=?
             WHERE id=?
         `;
 
@@ -165,6 +181,10 @@ const updateVisit = async (req, res) => {
             remarks || 'No remarks',
             mark,
             attachmentPathString,
+            createdBy,
+            createdAt,
+            userName,
+            now,
             id
         ]);
 
@@ -236,9 +256,13 @@ const updateStatus = async (req, res) => {
         const { id } = req.params;
         const { status } = req.body;
 
+        // Get user info
+        const userName = req.user?.name || req.body.userName || 'System';
+        const now = new Date();
+
         const [result] = await database.mysqlPool.query(
-            "UPDATE test_nscslcom_nscsl_dashboard.pdo_visit SET status=? WHERE id=?",
-            [status, id]
+            "UPDATE test_nscslcom_nscsl_dashboard.pdo_visit SET status=?, modified_by=?, modified_at=? WHERE id=?",
+            [status, userName, now, id]
         );
 
         if (result.affectedRows === 0) {
@@ -269,7 +293,6 @@ const getStatusCount = async (req, res) => {
         const fromDate = date_from || defaultFrom;
         const toDate = date_to || defaultTo;
 
-        // FIXED: Use COUNT instead of SUM
         const sql = `
             SELECT
                 COUNT(CASE WHEN status = '1' THEN 1 END) AS active,
@@ -339,7 +362,7 @@ const getFacilitiesByStatus = async (req, res) => {
     }
 };
 
-// Get facility by code from Oracle - UPDATED FOR CONNECTION POOL
+// Get facility by code from Oracle
 const getFacilityByCode = async (req, res) => {
     let connection;
     
@@ -376,7 +399,6 @@ const getFacilityByCode = async (req, res) => {
 
         if (result.rows && result.rows.length > 0) {
             const facility = result.rows[0];
-            // Return in the array format your frontend expects
             res.json([[
                 facility.FACILITYCODE,
                 facility.ADRS_TYPE || '',
@@ -393,7 +415,6 @@ const getFacilityByCode = async (req, res) => {
             details: error.message 
         });
     } finally {
-        // Always close the connection
         if (connection) {
             try {
                 await connection.close();

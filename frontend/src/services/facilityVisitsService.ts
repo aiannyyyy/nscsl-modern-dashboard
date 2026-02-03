@@ -11,6 +11,10 @@ export interface FacilityVisit {
     remarks: string;
     mark?: string | null;
     attachment_path?: string | null;
+    created_by?: string | null;
+    created_at?: string | null;
+    modified_by?: string | null;
+    modified_at?: string | null;
 }
 
 export interface StatusCount {
