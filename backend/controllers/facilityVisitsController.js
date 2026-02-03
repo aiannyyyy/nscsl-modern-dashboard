@@ -5,7 +5,7 @@ const oracledb = require('oracledb');
 const getAllVisits = async (req, res) => {
     try {
         const [results] = await database.mysqlPool.query(
-            "SELECT * FROM nscslcom_nscsl_dashboard.pdo_visit ORDER BY date_visited DESC"
+            "SELECT * FROM test_nscslcom_nscsl_dashboard.pdo_visit ORDER BY date_visited DESC"
         );
         res.json(results);
     } catch (err) {
@@ -41,7 +41,7 @@ const createVisit = async (req, res) => {
         const mysqlDateTime = date_visited.replace('T', ' ') + ':00';
 
         const sql = `
-            INSERT INTO nscslcom_nscsl_dashboard.pdo_visit 
+            INSERT INTO test_nscslcom_nscsl_dashboard.pdo_visit 
             (facility_code, facility_name, date_visited, province, status, remarks, mark, attachment_path) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `;
@@ -88,7 +88,7 @@ const updateVisit = async (req, res) => {
 
         // Get current record
         const [currentRecord] = await database.mysqlPool.query(
-            "SELECT attachment_path FROM nscslcom_nscsl_dashboard.pdo_visit WHERE id = ?",
+            "SELECT attachment_path FROM test_nscslcom_nscsl_dashboard.pdo_visit WHERE id = ?",
             [id]
         );
 
@@ -151,7 +151,7 @@ const updateVisit = async (req, res) => {
 
         // Update database
         const sql = `
-            UPDATE nscslcom_nscsl_dashboard.pdo_visit 
+            UPDATE test_nscslcom_nscsl_dashboard.pdo_visit 
             SET facility_code=?, facility_name=?, date_visited=?, province=?, status=?, remarks=?, mark=?, attachment_path=?
             WHERE id=?
         `;
@@ -193,13 +193,13 @@ const deleteVisit = async (req, res) => {
         
         // Get attachment path before deleting
         const [record] = await database.mysqlPool.query(
-            "SELECT attachment_path FROM nscslcom_nscsl_dashboard.pdo_visit WHERE id = ?",
+            "SELECT attachment_path FROM test_nscslcom_nscsl_dashboard.pdo_visit WHERE id = ?",
             [id]
         );
 
         // Delete the record
         const [result] = await database.mysqlPool.query(
-            "DELETE FROM nscslcom_nscsl_dashboard.pdo_visit WHERE id=?",
+            "DELETE FROM test_nscslcom_nscsl_dashboard.pdo_visit WHERE id=?",
             [id]
         );
 
@@ -237,7 +237,7 @@ const updateStatus = async (req, res) => {
         const { status } = req.body;
 
         const [result] = await database.mysqlPool.query(
-            "UPDATE nscslcom_nscsl_dashboard.pdo_visit SET status=? WHERE id=?",
+            "UPDATE test_nscslcom_nscsl_dashboard.pdo_visit SET status=? WHERE id=?",
             [status, id]
         );
 
@@ -275,7 +275,7 @@ const getStatusCount = async (req, res) => {
                 COUNT(CASE WHEN status = '1' THEN 1 END) AS active,
                 COUNT(CASE WHEN status = '0' THEN 1 END) AS inactive,
                 COUNT(CASE WHEN status = '2' THEN 1 END) AS closed
-            FROM nscslcom_nscsl_dashboard.pdo_visit
+            FROM test_nscslcom_nscsl_dashboard.pdo_visit
             WHERE date_visited BETWEEN ? AND ?
         `;
 
@@ -310,7 +310,7 @@ const getFacilitiesByStatus = async (req, res) => {
                 facility_name,
                 date_visited,
                 province
-            FROM nscslcom_nscsl_dashboard.pdo_visit
+            FROM test_nscslcom_nscsl_dashboard.pdo_visit
             WHERE status = ?
         `;
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Download, FileText, Edit, Trash2, X, ExternalLink, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import { Plus, Download, FileText, Edit, Trash2, X, ExternalLink, CheckCircle, AlertCircle, XCircle, Eye } from 'lucide-react';
 import facilityVisitsService from '../../../services/facilityVisitsService';
 import type { FacilityVisit } from '../../../services/facilityVisitsService';
 import { FacilityVisitModal } from './FacilityVisitModal';
@@ -18,6 +18,7 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
   const [selectedAttachments, setSelectedAttachments] = useState<string[]>([]);
   const [editingVisit, setEditingVisit] = useState<FacilityVisit | null>(null);
+  const [viewingFile, setViewingFile] = useState<{ path: string; name: string; type: string } | null>(null);
 
   useEffect(() => {
     fetchVisits();
@@ -71,8 +72,19 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
 
   const handleDownloadFile = (filePath: string) => {
     const downloadUrl = `http://localhost:5000/${filePath}`;
-    console.log('📂 Opening file:', downloadUrl);
+    console.log('📂 Downloading file:', downloadUrl);
     window.open(downloadUrl, '_blank');
+  };
+
+  const handleViewFile = (filePath: string) => {
+    const fileName = filePath.split('/').pop() || 'Unknown file';
+    const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+    
+    setViewingFile({
+      path: filePath,
+      name: fileName,
+      type: fileExtension
+    });
   };
 
   const handleModalClose = () => {
@@ -127,6 +139,86 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const renderFileViewer = () => {
+    if (!viewingFile) return null;
+
+    const fileUrl = `http://localhost:5000/${viewingFile.path}`;
+    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(viewingFile.type);
+    const isPdf = viewingFile.type === 'pdf';
+
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
+            <div className="flex items-center gap-3">
+              <FileText size={20} className="text-blue-500" />
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {viewingFile.name}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {viewingFile.type.toUpperCase()} file
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleDownloadFile(viewingFile.path)}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
+              >
+                <Download size={14} />
+                Download
+              </button>
+              <button
+                onClick={() => setViewingFile(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-auto bg-gray-100 dark:bg-gray-950 p-4">
+            {isImage ? (
+              <div className="flex items-center justify-center h-full">
+                <img
+                  src={fileUrl}
+                  alt={viewingFile.name}
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                />
+              </div>
+            ) : isPdf ? (
+              <iframe
+                src={fileUrl}
+                className="w-full h-full min-h-[600px] rounded-lg shadow-lg bg-white"
+                title={viewingFile.name}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <FileText size={64} className="text-gray-400 mb-4" />
+                <p className="text-gray-600 dark:text-gray-400 mb-2">
+                  Preview not available for this file type
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-500 mb-4">
+                  {viewingFile.name}
+                </p>
+                <button
+                  onClick={() => handleDownloadFile(viewingFile.path)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <Download size={16} />
+                  Download File
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -297,7 +389,7 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
         onClose={() => setShowExportModal(false)}
       />
 
-      {/* Attachment Viewer Modal */}
+      {/* Attachment List Modal */}
       {showAttachmentModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
@@ -335,13 +427,22 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
                           </p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDownloadFile(filePath)}
-                        className="ml-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs flex-shrink-0"
-                      >
-                        <ExternalLink size={14} />
-                        Open
-                      </button>
+                      <div className="flex items-center gap-2 ml-3">
+                        <button
+                          onClick={() => handleViewFile(filePath)}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs flex-shrink-0"
+                        >
+                          <Eye size={14} />
+                          View
+                        </button>
+                        <button
+                          onClick={() => handleDownloadFile(filePath)}
+                          className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs flex-shrink-0"
+                        >
+                          <Download size={14} />
+                          Download
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -350,6 +451,9 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
           </div>
         </div>
       )}
+
+      {/* File Viewer Modal */}
+      {renderFileViewer()}
     </>
   );
 };

@@ -84,7 +84,7 @@ const addNotebookEntry = async (req, res) => {
                     attachment_path: file.filename
                 };
 
-                const sql = `INSERT INTO nscslcom_nscsl_dashboard.pdo_notebook 
+                const sql = `INSERT INTO test_nscslcom_nscsl_dashboard.pdo_notebook 
                              (labno, labid, fname, lname, code, facility_name, notes, createDate, techCreate, modDate, techMod, attachment_path) 
                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
@@ -135,7 +135,7 @@ const addNotebookEntry = async (req, res) => {
                 attachment_path: ''
             };
 
-            const sql = `INSERT INTO nscslcom_nscsl_dashboard.pdo_notebook 
+            const sql = `INSERT INTO test_nscslcom_nscsl_dashboard.pdo_notebook 
                          (labno, labid, fname, lname, code, facility_name, notes, createDate, techCreate, modDate, techMod, attachment_path) 
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
@@ -205,7 +205,7 @@ const getNotebookEntriesFromMySQL = async (req, res) => {
 
         console.log("📊 GET /api/notebooks/mysql-entries - Fetching MySQL notebook entries", { fname, lname, labno });
 
-        let sql = "SELECT * FROM nscslcom_nscsl_dashboard.pdo_notebook";
+        let sql = "SELECT * FROM test_nscslcom_nscsl_dashboard.pdo_notebook";
         const params = [];
         const conditions = [];
 
@@ -269,7 +269,7 @@ const getRecentNotebooks = async (req, res) => {
                 createDate,
                 modDate,
                 attachment_path
-            FROM nscslcom_nscsl_dashboard.pdo_notebook
+            FROM test_nscslcom_nscsl_dashboard.pdo_notebook
             ORDER BY createDate DESC
             LIMIT 10
         `;

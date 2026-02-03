@@ -16,7 +16,7 @@ const safeTrim = (str, maxLength) => {
 // Get all car list
 const getAllCarList = async (req, res) => {
     try {
-        const query = "SELECT * FROM nscslcom_nscsl_dashboard.list_car ORDER BY date_endorsed DESC";
+        const query = "SELECT * FROM test_nscslcom_nscsl_dashboard.list_car ORDER BY date_endorsed DESC";
         
         const [results] = await mysqlPool.query(query);
         
@@ -41,7 +41,7 @@ const getFilteredCarList = async (req, res) => {
         const { status, date_start, date_end } = req.query;
 
         const query = `
-            SELECT * FROM nscslcom_nscsl_dashboard.list_car
+            SELECT * FROM test_nscslcom_nscsl_dashboard.list_car
             WHERE LOWER(status) = LOWER(?)
             AND DATE(date_endorsed) BETWEEN ? AND ?
             ORDER BY date_endorsed DESC
@@ -71,7 +71,7 @@ const getCarListGroupedByProvince = async (req, res) => {
 
         let query = `
             SELECT province, COUNT(DISTINCT id) as count
-            FROM nscslcom_nscsl_dashboard.list_car
+            FROM test_nscslcom_nscsl_dashboard.list_car
             WHERE province IS NOT NULL AND province != ''
         `;
 
@@ -117,7 +117,7 @@ const getCarListGrouped = async (req, res) => {
 
         let query = `
             SELECT sub_code1, COUNT(*) as count
-            FROM nscslcom_nscsl_dashboard.list_car
+            FROM test_nscslcom_nscsl_dashboard.list_car
         `;
         const params = [];
 
@@ -225,7 +225,7 @@ const addCar = async (req, res) => {
         console.log("Attachment path:", attachment_path);
 
         const sql = `
-            INSERT INTO nscslcom_nscsl_dashboard.list_car 
+            INSERT INTO test_nscslcom_nscsl_dashboard.list_car 
             (case_no, date_endorsed, endorsed_by, facility_code, facility_name, city, province, labno,
             repeat_field, status, number_sample, case_code, sub_code1, sub_code2, sub_code3, sub_code4,
             remarks, frc, wrc, prepared_by, followup_on, reviewed_on, closed_on, attachment_path)
@@ -402,7 +402,7 @@ const updateStatus = async (req, res) => {
         console.log('Updating record ID:', id, 'to status:', status);
 
         // Check if record exists first
-        const checkSql = "SELECT id, status FROM nscslcom_nscsl_dashboard.list_car WHERE id = ?";
+        const checkSql = "SELECT id, status FROM test_nscslcom_nscsl_dashboard.list_car WHERE id = ?";
         const [checkResult] = await mysqlPool.query(checkSql, [id]);
 
         if (!checkResult || checkResult.length === 0) {
@@ -420,11 +420,11 @@ const updateStatus = async (req, res) => {
         let sql, values;
         
         if (status.toLowerCase() === 'closed') {
-            sql = "UPDATE nscslcom_nscsl_dashboard.list_car SET status = ?, closed_on = NOW() WHERE id = ?";
+            sql = "UPDATE test_nscslcom_nscsl_dashboard.list_car SET status = ?, closed_on = NOW() WHERE id = ?";
             values = [status.toLowerCase(), id];
             console.log('Setting status to closed and updating closed_on timestamp');
         } else {
-            sql = "UPDATE nscslcom_nscsl_dashboard.list_car SET status = ?, closed_on = NULL WHERE id = ?";
+            sql = "UPDATE test_nscslcom_nscsl_dashboard.list_car SET status = ?, closed_on = NULL WHERE id = ?";
             values = [status.toLowerCase(), id];
             console.log('Setting status to', status, 'and clearing closed_on timestamp');
         }
@@ -445,7 +445,7 @@ const updateStatus = async (req, res) => {
         }
 
         // Get the updated record to confirm the change
-        const selectSql = "SELECT id, status, closed_on FROM nscslcom_nscsl_dashboard.list_car WHERE id = ?";
+        const selectSql = "SELECT id, status, closed_on FROM test_nscslcom_nscsl_dashboard.list_car WHERE id = ?";
         const [selectResult] = await mysqlPool.query(selectSql, [id]);
         
         const updatedRecord = selectResult && selectResult[0] ? selectResult[0] : null;
