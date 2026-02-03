@@ -1,0 +1,411 @@
+import React, { useState, useEffect } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+interface TimelinessRecord {
+  month: string;
+  // Age of Collection
+  aoc_mean_year1: number;
+  aoc_mean_year2: number;
+  aoc_median_year1: number;
+  aoc_median_year2: number;
+  aoc_mode_year1: number;
+  aoc_mode_year2: number;
+  // Transit Time
+  transit_mean_year1: number;
+  transit_mean_year2: number;
+  transit_median_year1: number;
+  transit_median_year2: number;
+  transit_mode_year1: number;
+  transit_mode_year2: number;
+  // Age Upon Receipt
+  aur_mean_year1: number;
+  aur_mean_year2: number;
+  aur_median_year1: number;
+  aur_median_year2: number;
+  aur_mode_year1: number;
+  aur_mode_year2: number;
+}
+
+interface ApiResponse {
+  success: boolean;
+  data: TimelinessRecord[];
+  executionTime: string;
+  recordCount: number;
+}
+
+export const TimelinessCharts: React.FC = () => {
+  const currentYear = new Date().getFullYear();
+  const currentMonth = (new Date().getMonth() + 1).toString(); // getMonth() returns 0-11, so add 1
+
+  const [year1, setYear1] = useState((currentYear - 1).toString());
+  const [year2, setYear2] = useState(currentYear.toString());
+
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [selectedProvince, setSelectedProvince] = useState('Batangas');
+
+  const [data, setData] = useState<TimelinessRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  const years = ['2029', '2028', '2027', '2026', '2025', '2024', '2023', '2022', '2021', '2020'];
+  const months = [
+    { label: 'Jan', value: '1' },
+    { label: 'Feb', value: '2' },
+    { label: 'Mar', value: '3' },
+    { label: 'Apr', value: '4' },
+    { label: 'May', value: '5' },
+    { label: 'Jun', value: '6' },
+    { label: 'Jul', value: '7' },
+    { label: 'Aug', value: '8' },
+    { label: 'Sept', value: '9' },
+    { label: 'Oct', value: '10' },
+    { label: 'Nov', value: '11' },
+    { label: 'Dec', value: '12' }
+  ];
+  const provinces = ['Cavite', 'Laguna', 'Batangas', 'Rizal', 'Quezon'];
+
+  const charts = [
+    { title: 'Age of Collection', id: 'aoc' },
+    { title: 'Transit Time', id: 'transit' },
+    { title: 'Age Upon Receipt', id: 'aur' }
+  ];
+
+  // Detect dark mode
+  useEffect(() => {
+    const checkDarkMode = () => {
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        setIsDarkMode(document.documentElement.classList.contains('dark'));
+      }
+    };
+
+    checkDarkMode();
+
+    // Listen for dark mode changes
+    const observer = new MutationObserver(checkDarkMode);
+    if (typeof document !== 'undefined') {
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class']
+      });
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Fetch data from API
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(
+          `/api/timeliness?year1=${year1}&year2=${year2}&month=${selectedMonth}&province=${selectedProvince}`
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch data');
+        }
+
+        const result: ApiResponse = await response.json();
+        
+        // Validate the response structure
+        if (!result || !Array.isArray(result.data)) {
+          console.warn('Invalid API response structure:', result);
+          setData([]);
+        } else {
+          console.log('API Response:', result); // Debug log
+          setData(result.data);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+        console.error('Error fetching timeliness data:', err);
+        setData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [year1, year2, selectedMonth, selectedProvince]);
+
+  // Transform data for charts
+  const getChartData = (chartType: string) => {
+    if (!data || data.length === 0) {
+      console.log('No data available for chart:', chartType);
+      return [];
+    }
+
+    const record = data[0]; // API returns single record with all data
+    console.log('Chart data record:', record);
+
+    const chartData = [];
+
+    if (chartType === 'aoc') {
+      // Age of Collection
+      chartData.push({
+        name: 'Mean',
+        [year1]: record.aoc_mean_year1 || 0,
+        [year2]: record.aoc_mean_year2 || 0,
+      });
+      chartData.push({
+        name: 'Median',
+        [year1]: record.aoc_median_year1 || 0,
+        [year2]: record.aoc_median_year2 || 0,
+      });
+      chartData.push({
+        name: 'Mode',
+        [year1]: record.aoc_mode_year1 || 0,
+        [year2]: record.aoc_mode_year2 || 0,
+      });
+    } else if (chartType === 'transit') {
+      // Transit Time
+      chartData.push({
+        name: 'Mean',
+        [year1]: record.transit_mean_year1 || 0,
+        [year2]: record.transit_mean_year2 || 0,
+      });
+      chartData.push({
+        name: 'Median',
+        [year1]: record.transit_median_year1 || 0,
+        [year2]: record.transit_median_year2 || 0,
+      });
+      chartData.push({
+        name: 'Mode',
+        [year1]: record.transit_mode_year1 || 0,
+        [year2]: record.transit_mode_year2 || 0,
+      });
+    } else if (chartType === 'aur') {
+      // Age Upon Receipt
+      chartData.push({
+        name: 'Mean',
+        [year1]: record.aur_mean_year1 || 0,
+        [year2]: record.aur_mean_year2 || 0,
+      });
+      chartData.push({
+        name: 'Median',
+        [year1]: record.aur_median_year1 || 0,
+        [year2]: record.aur_median_year2 || 0,
+      });
+      chartData.push({
+        name: 'Mode',
+        [year1]: record.aur_mode_year1 || 0,
+        [year2]: record.aur_mode_year2 || 0,
+      });
+    }
+
+    console.log(`${chartType} chart data:`, chartData);
+    return chartData;
+  };
+
+  // Custom label component that respects dark mode
+  const CustomLabel = (props: any) => {
+    const { x, y, width, value } = props;
+    
+    // Safety check for value
+    if (value === undefined || value === null || typeof value !== 'number') {
+      return null;
+    }
+    
+    return (
+      <text
+        x={x + width / 2}
+        y={y - 5}
+        fill={isDarkMode ? '#e5e7eb' : '#1f2937'}
+        textAnchor="middle"
+        fontSize={10}
+        fontWeight={500}
+      >
+        {value.toFixed(2)}
+      </text>
+    );
+  };
+
+  // Custom tooltip
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} className="text-xs text-gray-600 dark:text-gray-400">
+              <span style={{ color: entry.color }}>●</span> {entry.name}: {entry.value.toFixed(2)} days
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Get colors for each chart
+  const getChartColors = (chartId: string) => {
+    if (chartId === 'aoc') {
+      return { year1Color: '#93c5fd', year2Color: '#f9a8d4' }; // Blue-300 and Pink-300
+    } else if (chartId === 'transit') {
+      return { year1Color: '#5eead4', year2Color: '#fb923c' }; // Teal-300 and Orange-400
+    } else {
+      return { year1Color: '#c4b5fd', year2Color: '#fde047' }; // Purple-300 and Yellow-300
+    }
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 transition-colors min-h-[300px]">
+      
+      {/* Header */}
+      <div className="p-5 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex flex-wrap justify-between items-center gap-4">
+          <div className="flex items-center gap-3">
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Timeliness of NBS
+            </h4>
+            <span className="px-2.5 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium">
+              {selectedProvince}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <select 
+              value={year1}
+              onChange={(e) => setYear1(e.target.value)}
+              className="px-2.5 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg text-xs border-0 focus:ring-2 focus:ring-blue-500 font-medium"
+            >
+              {years.map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+            
+            <span className="text-gray-600 dark:text-gray-400 text-xs font-semibold px-1">VS</span>
+            
+            <select 
+              value={year2}
+              onChange={(e) => setYear2(e.target.value)}
+              className="px-2.5 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg text-xs border-0 focus:ring-2 focus:ring-blue-500 font-medium"
+            >
+              {years.map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+            
+            <select 
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="px-2.5 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg text-xs border-0 focus:ring-2 focus:ring-blue-500 font-medium"
+            >
+              {months.map((month) => (
+                <option key={month.value} value={month.value}>{month.label}</option>
+              ))}
+            </select>
+            
+            <select 
+              value={selectedProvince}
+              onChange={(e) => setSelectedProvince(e.target.value)}
+              className="px-2.5 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg text-xs border-0 focus:ring-2 focus:ring-blue-500 font-medium"
+            >
+              {provinces.map((province) => (
+                <option key={province} value={province}>{province}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div className="p-5">
+        {loading && (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-3"></div>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">Loading data...</p>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="text-4xl mb-2">⚠️</div>
+              <p className="text-red-600 dark:text-red-400 text-sm font-medium">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {charts.map((chart) => {
+              const chartData = getChartData(chart.id);
+              const colors = getChartColors(chart.id);
+
+              return (
+                <div key={chart.id} className="space-y-3">
+                  <h5 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {chart.title}
+                  </h5>
+                  <div className="h-52 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                    {chartData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={chartData}
+                          margin={{ top: 20, right: 5, left: -20, bottom: 5 }}
+                        >
+                          <CartesianGrid 
+                            strokeDasharray="3 3" 
+                            stroke="#e5e7eb" 
+                            className="dark:stroke-gray-700"
+                          />
+                          <XAxis 
+                            dataKey="name" 
+                            tick={{ fontSize: 11, fill: '#6b7280' }}
+                            className="dark:fill-gray-400"
+                          />
+                          <YAxis 
+                            domain={[0, 5]}
+                            tick={{ fontSize: 11, fill: '#6b7280' }}
+                            className="dark:fill-gray-400"
+                            label={{ 
+                              value: 'Days', 
+                              angle: -90, 
+                              position: 'insideLeft',
+                              style: { fontSize: 11, fill: '#6b7280' }
+                            }}
+                          />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Legend 
+                            wrapperStyle={{ fontSize: '11px' }}
+                            iconType="circle"
+                          />
+                          <Bar 
+                            dataKey={year1} 
+                            fill={colors.year1Color}
+                            radius={[4, 4, 0, 0]}
+                            label={<CustomLabel />}
+                          />
+                          <Bar 
+                            dataKey={year2} 
+                            fill={colors.year2Color}
+                            radius={[4, 4, 0, 0]}
+                            label={<CustomLabel />}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                          <div className="text-3xl mb-2">📊</div>
+                          <p className="text-gray-500 dark:text-gray-400 text-xs">
+                            No data available
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

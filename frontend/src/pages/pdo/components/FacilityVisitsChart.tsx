@@ -1,0 +1,231 @@
+import React, { useState, useEffect } from 'react';
+import facilityVisitsService from '../../../services/facilityVisitsService';
+import type { StatusCount } from '../../../services/facilityVisitsService';
+
+interface FacilityVisitsChartProps {
+  refreshTrigger?: number;
+}
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+const YEARS = ['2029', '2028', '2027', '2028', '2027', '2026', '2025', '2024', '2023', '2022', '2021', '2020', '2019', '2018'];
+
+export const FacilityVisitsChart: React.FC<FacilityVisitsChartProps> = ({ refreshTrigger }) => {
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('default', { month: 'long' }));
+  const [statusData, setStatusData] = useState<StatusCount>({ active: 0, inactive: 0, closed: 0 });
+  const [loading, setLoading] = useState(false);
+
+  // THIS IS THE KEY FIX - Split into two useEffects
+  useEffect(() => {
+    console.log('📈 Chart useEffect triggered', { selectedYear, selectedMonth, refreshTrigger });
+    fetchStatusData();
+  }, [selectedYear, selectedMonth, refreshTrigger]); // Keep dependencies here
+
+  const fetchStatusData = async () => {
+    setLoading(true);
+    try {
+      const monthIndex = MONTHS.indexOf(selectedMonth);
+      const yearNum = parseInt(selectedYear);
+      
+      if (monthIndex === -1) {
+        console.error('Invalid month:', selectedMonth);
+        setStatusData({ active: 0, inactive: 0, closed: 0 });
+        return;
+      }
+      
+      const firstDay = new Date(yearNum, monthIndex, 1);
+      const lastDay = new Date(yearNum, monthIndex + 1, 0, 23, 59, 59);
+
+      const dateFrom = firstDay.toISOString().split('T')[0];
+      const dateTo = lastDay.toISOString().split('T')[0];
+
+      console.log('📅 Fetching chart data:', {
+        selectedYear,
+        selectedMonth,
+        monthIndex,
+        dateFrom,
+        dateTo,
+        refreshTrigger
+      });
+      
+      const data = await facilityVisitsService.getStatusCount(dateFrom, dateTo);
+      console.log('📊 Chart data received:', data);
+      
+      setStatusData({
+        active: data?.active || 0,
+        inactive: data?.inactive || 0,
+        closed: data?.closed || 0
+      });
+    } catch (err) {
+      console.error('Error fetching status count:', err);
+      setStatusData({ active: 0, inactive: 0, closed: 0 });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const total = statusData.active + statusData.inactive + statusData.closed;
+
+  const getPercentage = (value: number) => {
+    if (total === 0) return 0;
+    return ((value / total) * 100).toFixed(1);
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 transition-colors h-full flex flex-col">
+      <div className="p-6 flex-1 flex flex-col">
+        <div className="mb-4">
+          <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Facilities Visits By This Month Of {selectedMonth} {selectedYear}
+          </h4>
+          {/* Debug info 
+          <div className="text-xs text-gray-500 mt-1">
+            Refresh Trigger: {refreshTrigger} | Total: {total}
+          </div>
+          */}
+        </div>
+
+        {/* Rest of your chart JSX stays the same... */}
+        <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-lg min-h-[300px] p-6">
+          {loading ? (
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <div className="text-gray-600 dark:text-gray-400">Loading...</div>
+            </div>
+          ) : total === 0 ? (
+            <div className="text-center">
+              <div className="text-6xl mb-4">📊</div>
+              <p className="text-gray-600 dark:text-gray-400">No data available for this period</p>
+              <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                {selectedMonth} {selectedYear}
+              </p>
+            </div>
+          ) : (
+            <div className="text-center w-full">
+              <div className="grid grid-cols-3 gap-6 max-w-2xl mx-auto">
+                {/* Your existing chart circles */}
+                <div className="text-center">
+                  <div className="relative w-32 h-32 mx-auto mb-3">
+                    <svg viewBox="0 0 100 100" className="transform -rotate-90">
+                      <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" strokeWidth="20" />
+                      <circle
+                        cx="50" cy="50" r="40" fill="none" stroke="#10b981" strokeWidth="20"
+                        strokeDasharray={`${(statusData.active / total) * 251.2} 251.2`}
+                        className="transition-all duration-500"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                        {statusData.active}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+                    <div className="text-sm font-semibold text-green-700 dark:text-green-300">Active</div>
+                    <div className="text-xs text-green-600 dark:text-green-400 mt-1">{getPercentage(statusData.active)}%</div>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <div className="relative w-32 h-32 mx-auto mb-3">
+                    <svg viewBox="0 0 100 100" className="transform -rotate-90">
+                      <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" strokeWidth="20" />
+                      <circle
+                        cx="50" cy="50" r="40" fill="none" stroke="#eab308" strokeWidth="20"
+                        strokeDasharray={`${(statusData.inactive / total) * 251.2} 251.2`}
+                        className="transition-all duration-500"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">
+                        {statusData.inactive}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-3">
+                    <div className="text-sm font-semibold text-yellow-700 dark:text-yellow-300">Inactive</div>
+                    <div className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">{getPercentage(statusData.inactive)}%</div>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <div className="relative w-32 h-32 mx-auto mb-3">
+                    <svg viewBox="0 0 100 100" className="transform -rotate-90">
+                      <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" strokeWidth="20" />
+                      <circle
+                        cx="50" cy="50" r="40" fill="none" stroke="#6b7280" strokeWidth="20"
+                        strokeDasharray={`${(statusData.closed / total) * 251.2} 251.2`}
+                        className="transition-all duration-500"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-2xl font-bold text-gray-700 dark:text-gray-300">
+                        {statusData.closed}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-900/20 rounded-lg p-3">
+                    <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">Closed</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{getPercentage(statusData.closed)}%</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Total Visits: <span className="font-semibold text-gray-900 dark:text-white">{total}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex justify-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+            <span className="text-xs text-gray-600 dark:text-gray-400">Active ({statusData.active})</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+            <span className="text-xs text-gray-600 dark:text-gray-400">Inactive ({statusData.inactive})</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
+            <span className="text-xs text-gray-600 dark:text-gray-400">Closed ({statusData.closed})</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 border-t border-gray-200 dark:border-gray-800 flex gap-2">
+        <select
+          value={selectedYear}
+          onChange={(e) => {
+            console.log('🔄 Year changed to:', e.target.value);
+            setSelectedYear(e.target.value);
+          }}
+          className="px-3 py-2 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg text-sm border-0 focus:ring-2 focus:ring-blue-500"
+        >
+          {YEARS.map((year) => (
+            <option key={year} value={year}>{year}</option>
+          ))}
+        </select>
+        <select
+          value={selectedMonth}
+          onChange={(e) => {
+            console.log('🔄 Month changed to:', e.target.value);
+            setSelectedMonth(e.target.value);
+          }}
+          className="px-3 py-2 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg text-sm border-0 focus:ring-2 focus:ring-blue-500"
+        >
+          {MONTHS.map((month) => (
+            <option key={month} value={month}>{month}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+};

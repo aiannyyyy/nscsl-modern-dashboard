@@ -1,0 +1,59 @@
+{
+  "name": "nscsl-dashboard-client",
+  "version": "1.0.0",
+  "description": "NSCSL Dashboard Client",
+  "author": "Newborn Screening Center Southern Luzon",
+  "main": "index.js",
+  "type": "commonjs",
+  "private": true,
+
+  "scripts": {
+    "start": "electron .",
+    "build": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder",
+    "build:unsigned": "set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --publish=never"
+  },
+
+  "cscLink": null,
+  "cscKeyPassword": null,
+
+  "build": {
+    "appId": "com.nscsl.dashboard",
+    "productName": "NSCSL Dashboard",
+
+    "forceCodeSigning": false,
+
+    "directories": {
+      "output": "dist-installer"
+    },
+
+    "files": [
+      "index.js",
+      "assets/**/*",
+      "package.json"
+    ],
+
+    "win": {
+      "target": "nsis",
+      "verifyUpdateCodeSignature": false,
+      "signAndEditExecutable": false,
+      "signDlls": false
+    },
+
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+
+    "publish": null,
+    "afterSign": null,
+    "beforeBuild": null
+  },
+
+  "devDependencies": {
+    "electron": "^40.1.0",
+    "electron-builder": "^24.13.3"
+  }
+}

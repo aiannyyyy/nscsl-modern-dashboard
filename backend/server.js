@@ -1,0 +1,332 @@
+// Load environment config first
+const { config, database, corsOptions } = require('./config');
+
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
+
+const app = express();
+
+// ============================================
+// MIDDLEWARE
+// ============================================
+
+app.use(cors(corsOptions));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+    const timestamp = new Date().toISOString();
+    const clientIP = req.ip || req.connection.remoteAddress;
+    const origin = req.get('Origin') || 'direct-access';
+    console.log(`[${timestamp}] ${req.method} ${req.url} | Client: ${clientIP} | Origin: ${origin}`);
+    next();
+});
+
+// ============================================
+// PATHS SETUP
+// ============================================
+
+const publicPath = config.paths.public;
+const uploadsPath = config.paths.uploads;
+
+// Ensure directories exist
+if (!fs.existsSync(publicPath)) {
+    console.warn(`⚠️  Public directory not found: ${publicPath}`);
+}
+if (!fs.existsSync(uploadsPath)) {
+    fs.mkdirSync(uploadsPath, { recursive: true });
+    console.log(`📁 Created uploads directory: ${uploadsPath}`);
+}
+
+// ============================================
+// STATIC FILE SERVING
+// ============================================
+
+app.use(express.static(publicPath));
+app.use('/assets', express.static(path.join(publicPath, 'assets')));
+app.use('/css', express.static(publicPath));
+app.use('/js', express.static(publicPath));
+app.use('/uploads', express.static(uploadsPath));
+
+// ============================================
+// ROOT & HEALTH CHECK ROUTES
+// ============================================
+
+app.get("/health", (req, res) => {
+    const os = require('os');
+    const serverIPs = Object.values(os.networkInterfaces())
+        .flat()
+        .filter(i => i.family === 'IPv4' && !i.internal)
+        .map(i => i.address);
+
+    res.json({
+        status: "✅ Server is running",
+        timestamp: new Date().toISOString(),
+        server: {
+            environment: config.env,
+            port: config.server.port,
+            host: config.server.host,
+            ips: serverIPs
+        },
+        databases: {
+            oracle: app.locals.oracleDb ? 'connected' : 'disconnected',
+            mysql: 'connected'
+        },
+        paths: {
+            public: publicPath,
+            uploads: uploadsPath
+        }
+    });
+});
+
+// Test route
+app.get("/test", (req, res) => {
+    res.send(`
+        <h1>✅ Network Test Successful!</h1>
+        <p><strong>Server:</strong> ${config.server.host}:${config.server.port}</p>
+        <p><strong>Environment:</strong> ${config.env}</p>
+        <p><strong>Your IP:</strong> ${req.ip || req.connection.remoteAddress}</p>
+        <p><strong>Time:</strong> ${new Date().toISOString()}</p>
+    `);
+});
+
+// Oracle check
+app.get("/api/check-oracle", async (req, res) => {
+    if (!app.locals.oracleDb) {
+        return res.status(500).json({ 
+            error: "Oracle connection is not initialized",
+            environment: config.env
+        });
+    }
+
+    try {
+        // Test the pool by getting a connection
+        const connection = await app.locals.oracleDb.getConnection();
+        await connection.execute('SELECT 1 FROM DUAL');
+        await connection.close();
+        
+        res.json({ 
+            message: "✅ Oracle connection pool is active!",
+            environment: config.env
+        });
+    } catch (err) {
+        res.status(500).json({
+            error: "Oracle connection test failed",
+            message: err.message
+        });
+    }
+});
+
+// MySQL check
+app.get("/api/check-mysql", async (req, res) => {
+    try {
+        const connection = await database.mysqlPool.getConnection();
+        await connection.query('SELECT 1 as test');
+        connection.release();
+        res.json({ 
+            message: "✅ MySQL connection is active!",
+            environment: config.env
+        });
+    } catch (err) {
+        res.status(500).json({ 
+            error: "MySQL connection failed", 
+            message: err.message 
+        });
+    }
+});
+
+// ============================================
+// DATABASE CONNECTIONS
+// ============================================
+
+// Connect to Oracle on startup (using connection pool)
+database.createOraclePool()
+    .then((pool) => {
+        if (pool) {
+            app.locals.oracleDb = pool;
+            console.log("✅ Oracle connection pool stored in app.locals");
+        }
+    })
+    .catch((err) => {
+        console.error("❌ Oracle pool creation error:", err.message);
+        if (config.isProduction) {
+            process.exit(1);
+        }
+    });
+
+// Store MySQL pool in app.locals
+app.locals.mysqlDb = database.mysqlPool;
+
+// ============================================
+// API ROUTES
+// ============================================
+
+// Authentication routes
+const authRoutes = require("./routes/authRoutes");
+app.use("/api/auth", authRoutes);
+console.log("🔐 Authentication routes loaded");
+
+// Facility Visits
+app.use("/api/facility-visits", require("./routes/facilityVisitsRoutes"));
+
+// Notebooks
+app.use("/api/notebooks", require("./routes/notebooksRoutes"));
+
+// Timeliness
+app.use("/api/timeliness", require("./routes/timelinessRoutes"));
+
+// Car List
+app.use("/api", require("./routes/carListRoutes"));
+
+// Sample Receive
+app.use("/api/sample-receive", require("./routes/sampleReceiveRoutes"));
+
+// Sample Screened
+app.use("/api/sample-screened", require("./routes/sampleScreenedRoutes"));
+
+// Unsatisfactory Analysis
+app.use("/api/unsat", require("./routes/unsatRoutes"));
+
+// NSF Performance
+app.use("/api", require("./routes/nsfPerformanceRoutes"));
+
+
+
+console.log("📋 API Routes loaded");
+
+// ============================================
+// ERROR HANDLING
+// ============================================
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error("❌ Server Error:", err.stack || err.message || err);
+    res.status(err.status || 500).json({
+        status: "error",
+        message: config.isDevelopment ? err.message : "Internal Server Error",
+        stack: config.isDevelopment ? err.stack : undefined
+    });
+});
+
+// ============================================
+// REACT ROUTER FALLBACK (SPA Support)
+// ============================================
+
+// Handle React Router - serves index.html for all non-API routes
+// This must be AFTER all API routes but BEFORE the 404 handler
+app.get('*', (req, res, next) => {
+    // Don't serve index.html for API routes
+    if (req.path.startsWith('/api')) {
+        return next();
+    }
+    
+    const indexPath = path.join(publicPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(404).json({ 
+            error: 'Application not built',
+            message: 'Please build the frontend first by running: npm run build',
+            path: indexPath
+        });
+    }
+});
+
+// ============================================
+// 404 HANDLER (API Routes Only)
+// ============================================
+
+// This will only trigger for API routes that don't exist
+// since the wildcard route above catches everything else
+app.use("/api/*", (req, res) => {
+    res.status(404).json({
+        error: "API endpoint not found",
+        path: req.originalUrl,
+        server: `${config.server.host}:${config.server.port}`,
+        environment: config.env,
+        available_endpoints: {
+            health: "/health",
+            test: "/test",
+            checkOracle: "/api/check-oracle",
+            checkMySQL: "/api/check-mysql",
+            auth: {
+                login: "/api/auth/login",
+                logout: "/api/auth/logout",
+                verify: "/api/auth/verify",
+                me: "/api/auth/me"
+            },
+            timeliness: "/api/timeliness",
+            facilityVisits: "/api/facility-visits",
+            notebooks: "/api/notebooks",
+            sampleReceive: "/api/sample-receive",
+            sampleScreened: "/api/sample-screened",
+            unsat: "/api/unsat"
+        }
+    });
+});
+
+// ============================================
+// GRACEFUL SHUTDOWN
+// ============================================
+
+async function gracefulShutdown(signal) {
+    console.log(`\n${signal} signal received: closing connections gracefully...`);
+    
+    try {
+        // Close Oracle pool
+        if (database.closeOraclePool) {
+            await database.closeOraclePool();
+        }
+        
+        // Close MySQL pool
+        if (database.mysqlPool) {
+            await database.mysqlPool.end();
+            console.log('✅ MySQL pool closed');
+        }
+        
+        console.log('✅ All connections closed successfully');
+        process.exit(0);
+    } catch (err) {
+        console.error('❌ Error during shutdown:', err);
+        process.exit(1);
+    }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+    console.error('❌ Uncaught Exception:', err);
+    gracefulShutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+    gracefulShutdown('unhandledRejection');
+});
+
+// ============================================
+// START SERVER
+// ============================================
+
+const PORT = config.server.port;
+const HOST = config.server.host;
+
+app.listen(PORT, HOST, () => {
+    console.log('');
+    console.log('='.repeat(60));
+    console.log('🚀 NSCSL Dashboard API Server');
+    console.log('='.repeat(60));
+    console.log(`📍 Environment: ${config.env.toUpperCase()}`);
+    console.log(`🌐 Server running on: http://${HOST}:${PORT}`);
+    console.log(`🔗 Local access: http://localhost:${PORT}`);
+    console.log(`📂 Public path: ${publicPath}`);
+    console.log(`📁 Uploads path: ${uploadsPath}`);
+    console.log('='.repeat(60));
+    console.log('');
+});

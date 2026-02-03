@@ -1,0 +1,524 @@
+import React, { useState, useEffect } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  LabelList,
+} from "recharts";
+import {
+  getTwoYearComparisonUpToMonth,
+  calculatePercentageDiff,
+  getAvailableProvinces,
+} from "../../../services/receivedApi";
+
+const years = Array.from({ length: 16 }, (_, i) => 2028 - i);
+
+// Cumulative month ranges (abbreviated format)
+const cumulativeMonths = [
+  "Jan",
+  "Jan-Feb",
+  "Jan-Mar",
+  "Jan-Apr",
+  "Jan-May",
+  "Jan-Jun",
+  "Jan-Jul",
+  "Jan-Aug",
+  "Jan-Sep",
+  "Jan-Oct",
+  "Jan-Nov",
+  "Jan-Dec",
+];
+
+interface Props {
+  expanded: boolean;
+  onExpand: () => void;
+}
+
+type ChartType = "single-province" | "all-provinces";
+
+/**
+ * Custom Label Component for bar values
+ * Chart 1 (horizontal/vertical bars) - Dark text in dark mode
+ * Chart 2 (horizontal bars) - Light text in dark mode
+ */
+const CustomLabel = ({ x, y, width, height, value }: any) => {
+  const isDarkMode = document.documentElement.classList.contains("dark");
+  
+  // For Chart 1 - Horizontal layout (vertical bars)
+  // Bar is taller than wide (height > width means vertical bar)
+  if (height && height > width) {
+    return (
+      <text
+        x={x + width / 2}
+        y={y - 6}
+        textAnchor="middle"
+        fontSize={11}
+        fontWeight={600}
+        fill={isDarkMode ? "#f9fafb" : "#1f2937"}
+        style={{
+          textShadow: "none",
+        }}
+      >
+        {value?.toLocaleString()}
+      </text>
+    );
+  }
+  
+  // For Chart 2 - Horizontal bars (same as before)
+  return (
+    <text
+      x={x + width / 2}
+      y={y - 6}
+      textAnchor="middle"
+      fontSize={11}
+      fontWeight={600}
+      fill={isDarkMode ? "#f9fafb" : "#1f2937"}
+      style={{
+        textShadow: isDarkMode ? "0 1px 2px rgba(0,0,0,0.6)" : "none",
+      }}
+    >
+      {value?.toLocaleString()}
+    </text>
+  );
+};
+
+export const CumulativePerProvince: React.FC<Props> = ({
+  expanded,
+  onExpand,
+}) => {
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth(); // 0-based (0 = January, 11 = December)
+
+  // ✅ Default: Chart 1 (Single Province), Year B = current year, Year A = last year
+  const [yearA, setYearA] = useState((currentYear - 1).toString());
+  const [yearB, setYearB] = useState(currentYear.toString());
+  const [province, setProvince] = useState("BATANGAS");
+  const [monthRange, setMonthRange] = useState(cumulativeMonths[currentMonth]);
+  const [chartType, setChartType] = useState<ChartType>("single-province");
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [chartData, setChartData] = useState<any[]>([]);
+  
+  // Stats for comparison table
+  const [yearATotal, setYearATotal] = useState(0);
+  const [yearBTotal, setYearBTotal] = useState(0);
+
+  /**
+   * Convert abbreviated month range to full month name for API
+   * "Jan" -> "January", "Jan-Feb" -> "February", etc.
+   */
+  const getFullMonthName = (abbreviatedRange: string): string => {
+    const monthMap: { [key: string]: string } = {
+      "Jan": "January",
+      "Jan-Feb": "February",
+      "Jan-Mar": "March",
+      "Jan-Apr": "April",
+      "Jan-May": "May",
+      "Jan-Jun": "June",
+      "Jan-Jul": "July",
+      "Jan-Aug": "August",
+      "Jan-Sep": "September",
+      "Jan-Oct": "October",
+      "Jan-Nov": "November",
+      "Jan-Dec": "December",
+    };
+    return monthMap[abbreviatedRange] || "December";
+  };
+
+  // Fetch data when dependencies change
+  useEffect(() => {
+    fetchData();
+  }, [chartType, yearA, yearB, province, monthRange]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (chartType === "single-province") {
+        await fetchSingleProvinceData();
+      } else {
+        await fetchAllProvincesData();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch data");
+      console.error("❌ Error fetching data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Chart 1: Single Province Comparison
+   */
+  const fetchSingleProvinceData = async () => {
+    console.log("📊 Fetching Chart 1 - Single Province:", {
+      yearA,
+      yearB,
+      province,
+      monthRange,
+    });
+
+    const fullMonthName = getFullMonthName(monthRange);
+
+    const result = await getTwoYearComparisonUpToMonth(
+      parseInt(yearA),
+      parseInt(yearB),
+      fullMonthName
+    );
+
+    console.log("📦 Raw Year 1 Data:", result.raw.year1.data.cumulativeData);
+    console.log("📦 Raw Year 2 Data:", result.raw.year2.data.cumulativeData);
+
+    // Filter for selected province - TRIM whitespace from backend
+    const provinceDataA = result.raw.year1.data.cumulativeData?.find(
+      (d) => d.province.trim().toUpperCase() === province.toUpperCase()
+    );
+    const provinceDataB = result.raw.year2.data.cumulativeData?.find(
+      (d) => d.province.trim().toUpperCase() === province.toUpperCase()
+    );
+
+    console.log("🔍 Found Province A:", provinceDataA);
+    console.log("🔍 Found Province B:", provinceDataB);
+
+    const totalA = provinceDataA?.total_samples || 0;
+    const totalB = provinceDataB?.total_samples || 0;
+
+    setYearATotal(totalA);
+    setYearBTotal(totalB);
+
+    // Single bar chart data
+    const transformedData = [
+      {
+        name: province.toUpperCase(),
+        [yearA]: totalA,
+        [yearB]: totalB,
+      },
+    ];
+
+    console.log("✅ Chart 1 Data:", transformedData);
+    setChartData(transformedData);
+  };
+
+  /**
+   * Chart 2: All Provinces Comparison
+   */
+  const fetchAllProvincesData = async () => {
+    console.log("📊 Fetching Chart 2 - All Provinces:", {
+      yearA,
+      yearB,
+      monthRange,
+    });
+
+    const fullMonthName = getFullMonthName(monthRange);
+
+    const result = await getTwoYearComparisonUpToMonth(
+      parseInt(yearA),
+      parseInt(yearB),
+      fullMonthName
+    );
+
+    console.log("📦 Raw Year 1 Data:", result.raw.year1.data.cumulativeData);
+    console.log("📦 Raw Year 2 Data:", result.raw.year2.data.cumulativeData);
+
+    // Transform for chart - TRIM whitespace from province names
+    const transformedData = result.formatted.map((item) => ({
+      name: item.province.trim(), // Trim whitespace
+      [yearA]: item.year1Total,
+      [yearB]: item.year2Total,
+    }));
+
+    // Calculate totals
+    const totalA = result.formatted.reduce((sum, item) => sum + item.year1Total, 0);
+    const totalB = result.formatted.reduce((sum, item) => sum + item.year2Total, 0);
+
+    setYearATotal(totalA);
+    setYearBTotal(totalB);
+
+    console.log("✅ Chart 2 Data:", transformedData);
+    console.log("📊 Totals - Year A:", totalA, "Year B:", totalB);
+    
+    if (transformedData.every(item => item[yearA] === 0 && item[yearB] === 0)) {
+      console.warn("⚠️ No data found for any province!");
+      setError("No data available for the selected years");
+      setChartData([]);
+    } else {
+      setChartData(transformedData);
+    }
+  };
+
+  const toggleChartType = () => {
+    setChartType(chartType === "single-province" ? "all-provinces" : "single-province");
+  };
+
+  // Calculate comparison stats
+  const diff = yearBTotal - yearATotal;
+  const percentDiff = calculatePercentageDiff(yearATotal, yearBTotal);
+  const isIncrease = diff > 0;
+  const isDecrease = diff < 0;
+
+  return (
+    <div
+      className={`flex flex-col rounded-2xl shadow-lg overflow-hidden
+        bg-white dark:bg-gray-900
+        transition-all duration-300 ease-in-out
+        ${expanded ? "h-[600px]" : "h-[380px]"}`}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 border-b
+        bg-gray-50 dark:bg-gray-800
+        border-gray-200 dark:border-gray-700"
+      >
+        {/* Title */}
+        <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+          <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Cumulative Per Province
+        </h3>
+
+        {/* Controls */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {expanded && (
+            <>
+              {/* Year A */}
+              <select
+                className="h-8 px-3 text-xs rounded-lg border
+                  bg-white dark:bg-gray-700
+                  border-gray-300 dark:border-gray-600
+                  text-gray-800 dark:text-gray-100
+                  focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={yearA}
+                onChange={(e) => setYearA(e.target.value)}
+              >
+                {years.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">VS</span>
+
+              {/* Year B */}
+              <select
+                className="h-8 px-3 text-xs rounded-lg border
+                  bg-white dark:bg-gray-700
+                  border-gray-300 dark:border-gray-600
+                  text-gray-800 dark:text-gray-100
+                  focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={yearB}
+                onChange={(e) => setYearB(e.target.value)}
+              >
+                {years.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+
+              {/* Province - Only show for Chart 1 */}
+              {chartType === "single-province" && (
+                <select
+                  className="h-8 px-3 text-xs rounded-lg border
+                    bg-white dark:bg-gray-700
+                    border-gray-300 dark:border-gray-600
+                    text-gray-800 dark:text-gray-100
+                    focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={province}
+                  onChange={(e) => setProvince(e.target.value)}
+                >
+                  {getAvailableProvinces().map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              )}
+
+              {/* Cumulative Month Range */}
+              <select
+                className="h-8 px-3 text-xs rounded-lg border
+                  bg-white dark:bg-gray-700
+                  border-gray-300 dark:border-gray-600
+                  text-gray-800 dark:text-gray-100
+                  focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={monthRange}
+                onChange={(e) => setMonthRange(e.target.value)}
+              >
+                {cumulativeMonths.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+
+              {/* Change Chart Button */}
+              <button
+                onClick={toggleChartType}
+                className="h-8 px-4 text-xs rounded-lg font-medium
+                  bg-purple-600 hover:bg-purple-700
+                  text-white shadow transition-colors flex items-center gap-1.5"
+              >
+                {chartType === "single-province" ? "Show All Provinces" : "Show Single Province"}
+              </button>
+            </>
+          )}
+
+          {/* Expand / Collapse */}
+          <button
+            onClick={onExpand}
+            className="h-8 px-4 text-xs rounded-lg font-medium
+              bg-blue-600 hover:bg-blue-700
+              text-white shadow transition-colors flex items-center gap-1.5"
+          >
+            {expanded ? "Collapse" : "Expand"}
+          </button>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="flex-1 p-5">
+        {loading ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Loading chart...</p>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <svg className="w-12 h-12 mx-auto mb-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              <button
+                onClick={fetchData}
+                className="mt-2 text-xs text-blue-600 hover:text-blue-700 underline"
+              >
+                Try again
+              </button>
+            </div>
+          </div>
+        ) : chartData.length === 0 ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <svg className="w-16 h-16 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
+            </div>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={chartData}
+              layout="horizontal"
+              margin={{ 
+                top: 20, 
+                right: 30, 
+                left: 20, 
+                bottom: 5 
+              }}
+              barGap={8}
+              barCategoryGap="20%"
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
+              
+              <XAxis 
+                dataKey="name"
+                tick={{ fontSize: 12, fill: '#6b7280' }}
+                axisLine={{ stroke: '#d1d5db' }}
+              />
+              
+              <YAxis 
+                tick={{ fontSize: 12, fill: '#6b7280' }}
+                axisLine={{ stroke: '#d1d5db' }}
+              />
+              
+              <Tooltip 
+                contentStyle={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                }}
+                cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }}
+              />
+              
+              <Legend 
+                wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                iconType="circle"
+              />
+              
+              {/* Year A Bar - Blue */}
+              <Bar 
+                dataKey={yearA} 
+                name={yearA}
+                fill="#3b82f6"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={150}
+              >
+                <LabelList content={CustomLabel} />
+              </Bar>
+              
+              {/* Year B Bar - Pink */}
+              <Bar 
+                dataKey={yearB} 
+                name={yearB}
+                fill="#ec4899"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={150}
+              >
+                <LabelList content={CustomLabel} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Comparison Table */}
+      {expanded && !loading && chartData.length > 0 && (
+        <div className="px-5 pb-4">
+          <table className="w-full text-sm border-collapse text-center border border-gray-300 dark:border-gray-700">
+            <thead className="bg-blue-600 dark:bg-blue-700 text-white">
+              <tr>
+                <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">Year</th>
+                <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">{yearA}</th>
+                <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">{yearB}</th>
+                <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">INC/DEC</th>
+                <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="bg-gray-50 dark:bg-gray-800">
+                <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 font-medium text-gray-800 dark:text-gray-100">
+                  Total Received
+                </td>
+                <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-gray-800 dark:text-gray-100">
+                  {yearATotal.toLocaleString()}
+                </td>
+                <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-gray-800 dark:text-gray-100">
+                  {yearBTotal.toLocaleString()}
+                </td>
+                <td className={`border border-gray-300 dark:border-gray-700 px-3 py-2 font-semibold ${
+                  isIncrease ? 'text-green-600 dark:text-green-400' : 
+                  isDecrease ? 'text-red-600 dark:text-red-400' : 
+                  'text-gray-600 dark:text-gray-400'
+                }`}>
+                  {diff > 0 ? '+' : ''}{diff.toLocaleString()}
+                </td>
+                <td className={`border border-gray-300 dark:border-gray-700 px-3 py-2 font-semibold ${
+                  isIncrease ? 'text-green-600 dark:text-green-400' : 
+                  isDecrease ? 'text-red-600 dark:text-red-400' : 
+                  'text-gray-600 dark:text-gray-400'
+                }`}>
+                  {percentDiff} {isIncrease ? 'Increase' : isDecrease ? 'Decrease' : ''}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
