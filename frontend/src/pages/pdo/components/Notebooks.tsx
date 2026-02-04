@@ -4,8 +4,8 @@ import { NotebookSearchModal } from './NotebookSearchModal';
 import { NotebookResultsModal } from './NotebookResultsModal';
 import { NotebookDetailsModal } from './NotebookDetailsModal';
 import type { SearchCriteria } from './NotebookSearchModal';
-import * as notebooksApi from '../../../services/notebooksApi';
-import type { PatientSearchResult } from '../../../services/notebooksApi';
+import * as notebooksApi from '../../../services/PDOServices/notebooksApi';
+import type { PatientSearchResult } from '../../../services/PDOServices/notebooksApi';
 
 interface PatientResult {
     labno: string;

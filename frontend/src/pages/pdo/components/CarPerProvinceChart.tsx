@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import type { PieLabelRenderProps } from "recharts";
-import { getCarListGroupedByProvince, getMonthDateRange } from "../../../services/carListApi";
+import { Download, ChevronDown } from 'lucide-react';
+import { downloadChart } from '../../../utils/chartDownloadUtils';
+import { getCarListGroupedByProvince, getMonthDateRange } from "../../../services/PDOServices/carListApi";
 
 const COLORS = [
   '#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8',
@@ -13,7 +15,7 @@ const months = [
   "July", "August", "September", "October", "November", "December"
 ];
 
-// ✅ NEW: Get current month
+// Get current month
 const getCurrentMonth = () => {
   const now = new Date();
   return months[now.getMonth()];
@@ -25,10 +27,11 @@ interface CarPerProvinceChartProps {
 
 export const CarPerProvinceChart: React.FC<CarPerProvinceChartProps> = ({ refreshTrigger = 0 }) => {
   const [status, setStatus] = useState("");
-  const [month, setMonth] = useState(getCurrentMonth()); // ✅ FIXED: Use current month
+  const [month, setMonth] = useState(getCurrentMonth());
   const [data, setData] = useState<{ name: string; value: number }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -60,6 +63,45 @@ export const CarPerProvinceChart: React.FC<CarPerProvinceChartProps> = ({ refres
     }
   };
 
+  // Download handlers
+  const handleDownload = async (format: 'png' | 'svg' | 'excel') => {
+    setShowDownloadMenu(false);
+
+    try {
+      const statusText = status ? `_${status}` : '';
+      const filename = `CAR_Per_Province_${month}${statusText}`;
+
+      if (format === 'excel') {
+        // Prepare Excel data
+        const excelData = data.map((item, index) => ({
+          'Rank': index + 1,
+          'Province': item.name,
+          'Count': item.value,
+          'Percentage': `${((item.value / data.reduce((sum, d) => sum + d.value, 0)) * 100).toFixed(2)}%`,
+        }));
+
+        await downloadChart({
+          elementId: 'car-province-chart',
+          filename,
+          format: 'excel',
+          data: excelData,
+          sheetName: 'CAR Per Province',
+        });
+      } else {
+        // PNG or SVG
+        await downloadChart({
+          elementId: 'car-province-chart',
+          filename,
+          format,
+          backgroundColor: '#ffffff',
+          scale: 2,
+        });
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+    }
+  };
+
   // Properly typed label function with nice positioning outside the slice
   const renderCustomLabel = (props: PieLabelRenderProps) => {
     const { cx, cy, midAngle, outerRadius, value, name } = props;
@@ -67,18 +109,17 @@ export const CarPerProvinceChart: React.FC<CarPerProvinceChartProps> = ({ refres
     if (!name || value === undefined) return null;
 
     const RADIAN = Math.PI / 180;
-    const radius = outerRadius! + 20; // distance from the pie
+    const radius = outerRadius! + 20;
     const x = cx! + radius * Math.cos(-midAngle! * RADIAN);
     const y = cy! + radius * Math.sin(-midAngle! * RADIAN);
 
-    // ✅ BONUS FIX: Dark mode support for labels
     const isDark = document.documentElement.classList.contains("dark");
 
     return (
       <text
         x={x}
         y={y}
-        fill={isDark ? "#f3f4f6" : "#333"}  // Light text in dark mode
+        fill={isDark ? "#f3f4f6" : "#333"}
         textAnchor={x > cx! ? "start" : "end"}
         dominantBaseline="central"
         fontSize={12}
@@ -120,11 +161,70 @@ export const CarPerProvinceChart: React.FC<CarPerProvinceChartProps> = ({ refres
               <option key={m} value={m}>{m}</option>
             ))}
           </select>
+
+          {/* Download Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+              disabled={isLoading || data.length === 0}
+              className="h-8 px-3 text-xs rounded-full border
+                bg-white dark:bg-gray-700
+                border-gray-300 dark:border-gray-600
+                text-gray-800 dark:text-gray-100
+                hover:bg-gray-50 dark:hover:bg-gray-600
+                disabled:opacity-50 disabled:cursor-not-allowed
+                flex items-center gap-1.5 transition-colors"
+            >
+              <Download size={14} />
+              Export
+              <ChevronDown size={12} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {showDownloadMenu && (
+              <>
+                {/* Backdrop */}
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowDownloadMenu(false)}
+                />
+
+                {/* Menu */}
+                <div className="absolute right-0 mt-1 w-44 rounded-lg shadow-lg border
+                  bg-white dark:bg-gray-800
+                  border-gray-200 dark:border-gray-700
+                  z-20 overflow-hidden"
+                >
+                  <button
+                    onClick={() => handleDownload('png')}
+                    className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                      text-gray-700 dark:text-gray-300 transition-colors"
+                  >
+                    Download as PNG
+                  </button>
+                  <button
+                    onClick={() => handleDownload('svg')}
+                    className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                      text-gray-700 dark:text-gray-300 transition-colors"
+                  >
+                    Download as SVG
+                  </button>
+                  <button
+                    onClick={() => handleDownload('excel')}
+                    className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                      text-gray-700 dark:text-gray-300 transition-colors"
+                  >
+                    Export Data to Excel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Chart Area */}
-      <div className="mx-5 mt-4 h-[420px] rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4 flex items-center justify-center">
+      {/* Chart Area - IMPORTANT: Added id="car-province-chart" */}
+      <div id="car-province-chart" className="mx-5 mt-4 h-[420px] rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4 flex items-center justify-center">
         {isLoading ? (
           <div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
         ) : error ? (
@@ -139,7 +239,7 @@ export const CarPerProvinceChart: React.FC<CarPerProvinceChartProps> = ({ refres
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={renderCustomLabel} // ✅ properly typed with dark mode support
+                label={renderCustomLabel}
                 outerRadius={120}
                 fill="#8884d8"
                 dataKey="value"

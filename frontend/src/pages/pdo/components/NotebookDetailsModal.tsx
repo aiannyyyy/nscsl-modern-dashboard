@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, Search, Eye } from 'lucide-react';
-import type { PatientDetails } from '../../../services/patientDetailsTypes';
+import type { PatientDetails } from '../../../services/PDOServices/patientDetailsTypes';
 import {
     getSpecimenType,
     getTechName,
@@ -8,9 +8,9 @@ import {
     formatYesNo,
     formatDateTime,
     calculateSpecimenAge,
-} from '../../../services/patientDetailsTypes';
-import * as notebooksApi from '../../../services/notebooksApi';
-import type { NotebookEntry } from '../../../services/notebooksApi';
+} from '../../../services/PDOServices/patientDetailsTypes';
+import * as notebooksApi from '../../../services/PDOServices/notebooksApi';
+import type { NotebookEntry } from '../../../services/PDOServices/notebooksApi';
 import { AddNotebookModal } from './AddNotebookModal';
 import { ViewImageModal } from "./ViewImageModal";
 

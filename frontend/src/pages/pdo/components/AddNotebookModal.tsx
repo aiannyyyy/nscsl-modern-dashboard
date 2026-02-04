@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Upload, Paperclip, Trash2 } from 'lucide-react';
-import type { PatientDetails } from '../../../services/patientDetailsTypes';
-import * as notebooksApi from '../../../services/notebooksApi';
+import type { PatientDetails } from '../../../services/PDOServices/patientDetailsTypes';
+import * as notebooksApi from '../../../services/PDOServices/notebooksApi';
 import { useAuth } from '../../../hooks/useAuth'; // 🆕 USE EXISTING AUTH HOOK
 
 interface AddNotebookModalProps {

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2, ChevronDown, FileDown } from "lucide-react";
 import { AddDocumentModal } from "./AddDocumentModal";
 import { StatusChangeModal } from "./StatusChangeModal";
 import { FileViewerModal } from "./FileViewerModal";
@@ -10,9 +10,10 @@ import {
   updateCarStatus,
   deleteCarRecord,
   getErrorMessage
-} from "../../../services/carListApi";
-import type { CarRecord } from "../../../services/carListApi";
-import type { AddCarFormData } from "../../../services/carListApi";
+} from "../../../services/PDOServices/carListApi";
+import type { CarRecord } from "../../../services/PDOServices/carListApi";
+import type { AddCarFormData } from "../../../services/PDOServices/carListApi";
+import * as XLSX from 'xlsx';
 
 interface CarListTableProps {
   onDataChange?: () => void;
@@ -29,24 +30,45 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
   const [carList, setCarList] = useState<CarRecord[]>([]);
   const [filteredCarList, setFilteredCarList] = useState<CarRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedProvince, setSelectedProvince] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Get unique provinces from car list
+  const provinces = React.useMemo(() => {
+    const uniqueProvinces = new Set(
+      carList
+        .map(record => record.province)
+        .filter(province => province && province.trim() !== '')
+    );
+    return Array.from(uniqueProvinces).sort();
+  }, [carList]);
 
   useEffect(() => {
     fetchCarList();
   }, []);
 
+  // Apply both search and province filters
   useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredCarList(carList);
-    } else {
-      const filtered = carList.filter((record) =>
+    let filtered = carList;
+
+    // Filter by province
+    if (selectedProvince !== "all") {
+      filtered = filtered.filter(
+        record => record.province?.toLowerCase() === selectedProvince.toLowerCase()
+      );
+    }
+
+    // Filter by search query
+    if (searchQuery.trim() !== "") {
+      filtered = filtered.filter((record) =>
         record.case_no.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setFilteredCarList(filtered);
     }
-  }, [searchQuery, carList]);
+
+    setFilteredCarList(filtered);
+  }, [searchQuery, selectedProvince, carList]);
 
   const fetchCarList = async () => {
     setIsLoading(true);
@@ -170,6 +192,105 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
     }
   };
 
+  // ⭐ NEW: Export to Excel function
+  const handleExportToExcel = () => {
+    try {
+      // Prepare data for export
+      const exportData = filteredCarList.map(record => ({
+        'Case No': record.case_no,
+        'Date Endorsed': formatDateForExcel(record.date_endorsed),
+        'Endorsed By': record.endorsed_by || '',
+        'Facility Code': record.facility_code,
+        'Facility Name': record.facility_name,
+        'City': record.city,
+        'Province': record.province,
+        'Status': record.status?.toUpperCase() || '',
+        'Lab No': record.labno || '',
+        'Number Sample': record.number_sample || '',
+        'Case Code': record.case_code || '',
+        'Sub Code 1': record.sub_code1 || '',
+        'Sub Code 2': record.sub_code2 || '',
+        'Sub Code 3': record.sub_code3 || '',
+        'Sub Code 4': record.sub_code4 || '',
+        'Remarks': record.remarks || '',
+        'FRC': record.frc || '',
+        'WRC': record.wrc || '',
+        'Prepared By': record.prepared_by || '',
+        'Follow Up On': formatDateForExcel(record.followup_on),
+        'Reviewed On': formatDateForExcel(record.reviewed_on),
+        'Closed On': formatDateForExcel(record.closed_on),
+        'Created By': record.created_by || '',
+        'Created At': formatDateForExcel(record.created_at),
+        'Modified By': record.modified_by || '',
+        'Modified At': formatDateForExcel(record.modified_at),
+      }));
+
+      // Create worksheet
+      const ws = XLSX.utils.json_to_sheet(exportData);
+
+      // Set column widths
+      const colWidths = [
+        { wch: 20 }, // Case No
+        { wch: 18 }, // Date Endorsed
+        { wch: 20 }, // Endorsed By
+        { wch: 12 }, // Facility Code
+        { wch: 30 }, // Facility Name
+        { wch: 15 }, // City
+        { wch: 15 }, // Province
+        { wch: 10 }, // Status
+        { wch: 15 }, // Lab No
+        { wch: 12 }, // Number Sample
+        { wch: 12 }, // Case Code
+        { wch: 25 }, // Sub Code 1
+        { wch: 25 }, // Sub Code 2
+        { wch: 25 }, // Sub Code 3
+        { wch: 25 }, // Sub Code 4
+        { wch: 30 }, // Remarks
+        { wch: 10 }, // FRC
+        { wch: 10 }, // WRC
+        { wch: 20 }, // Prepared By
+        { wch: 18 }, // Follow Up On
+        { wch: 18 }, // Reviewed On
+        { wch: 18 }, // Closed On
+        { wch: 20 }, // Created By
+        { wch: 18 }, // Created At
+        { wch: 20 }, // Modified By
+        { wch: 18 }, // Modified At
+      ];
+      ws['!cols'] = colWidths;
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'CAR List');
+
+      // Generate filename with timestamp and filter info
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const provinceFilter = selectedProvince !== 'all' ? `_${selectedProvince}` : '';
+      const searchFilter = searchQuery ? `_search` : '';
+      const filename = `CAR_List_${timestamp}${provinceFilter}${searchFilter}.xlsx`;
+
+      // Save file
+      XLSX.writeFile(wb, filename);
+
+      alert(`Exported ${filteredCarList.length} records to ${filename}`);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      alert('Failed to export to Excel. Please try again.');
+    }
+  };
+
+  const formatDateForExcel = (dateString: string | null) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   const openStatusModal = (record: CarRecord) => {
     setSelectedRecord(record);
     setShowStatusModal(true);
@@ -248,15 +369,79 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
               </button>
             </div>
 
-            {/* Search Input */}
-            <div className="flex-1 max-w-md">
-              <input
-                type="text"
-                placeholder="Search by Case No..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-9 px-4 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            {/* Search and Province Filter */}
+            <div className="flex gap-2 items-center">
+              {/* Province Filter Dropdown */}
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  className="h-9 px-4 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium flex items-center gap-2 min-w-[150px] justify-between"
+                >
+                  <span className="truncate">
+                    {selectedProvince === 'all' ? 'All Provinces' : selectedProvince}
+                  </span>
+                  <ChevronDown size={16} className={`transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isFilterOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          setSelectedProvince('all');
+                          setIsFilterOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                          selectedProvince === 'all'
+                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
+                            : 'text-gray-700 dark:text-gray-200'
+                        }`}
+                      >
+                        All Provinces
+                        {selectedProvince === 'all' && (
+                          <span className="ml-2 text-blue-600 dark:text-blue-400">✓</span>
+                        )}
+                      </button>
+                      
+                      {provinces.length > 0 && (
+                        <>
+                          <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                          {provinces.map(province => (
+                            <button
+                              key={province}
+                              onClick={() => {
+                                setSelectedProvince(province);
+                                setIsFilterOpen(false);
+                              }}
+                              className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                selectedProvince === province
+                                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
+                                  : 'text-gray-700 dark:text-gray-200'
+                              }`}
+                            >
+                              {province}
+                              {selectedProvince === province && (
+                                <span className="ml-2 text-blue-600 dark:text-blue-400">✓</span>
+                              )}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Search Input */}
+              <div className="flex-1 min-w-[250px]">
+                <input
+                  type="text"
+                  placeholder="Search by Case No..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-9 px-4 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
           </div>
 
@@ -276,11 +461,13 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
             ) : filteredCarList.length === 0 ? (
               <div className="bg-gray-50 dark:bg-gray-800 py-20 text-center">
                 <h5 className="text-gray-800 dark:text-gray-200 font-semibold text-lg mb-1">
-                  {searchQuery ? "No matching records found" : "No records found"}
+                  {searchQuery || selectedProvince !== 'all' ? "No matching records found" : "No records found"}
                 </h5>
                 <p className="text-gray-500 dark:text-gray-400 text-sm">
                   {searchQuery 
                     ? `No records match "${searchQuery}"`
+                    : selectedProvince !== 'all'
+                    ? `No records found for ${selectedProvince}`
                     : 'Click "Add Document" to create your first record'
                   }
                 </p>
@@ -440,10 +627,23 @@ export const CarListTable: React.FC<CarListTableProps> = ({ onDataChange }) => {
             )}
           </div>
 
+          {/* Stats and Export Button */}
           {!isLoading && filteredCarList.length > 0 && (
-            <div className="mt-4 text-sm text-gray-600 dark:text-gray-400 text-center">
-              Showing {filteredCarList.length} of {carList.length} record{carList.length !== 1 ? 's' : ''}
-              {searchQuery && ` (filtered by "${searchQuery}")`}
+            <div className="mt-4 flex justify-between items-center">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Showing {filteredCarList.length} of {carList.length} record{carList.length !== 1 ? 's' : ''}
+                {selectedProvince !== 'all' && ` in ${selectedProvince}`}
+                {searchQuery && ` (filtered by "${searchQuery}")`}
+              </div>
+              
+              {/* Export to Excel Button */}
+              <button
+                onClick={handleExportToExcel}
+                className="h-9 px-4 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700 font-medium flex items-center gap-2 transition-colors"
+              >
+                <FileDown size={16} />
+                Export to Excel
+              </button>
             </div>
           )}
         </div>

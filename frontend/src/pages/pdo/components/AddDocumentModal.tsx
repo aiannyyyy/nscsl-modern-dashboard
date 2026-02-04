@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { getFacilityByCode } from "../../../services/carListApi";
-import type { AddCarFormData } from "../../../services/carListApi";
+import { getFacilityByCode, getNextCaseNumber } from "../../../services/PDOServices/carListApi";
+import type { AddCarFormData } from "../../../services/PDOServices/carListApi";
 
 interface Props {
   show: boolean;
   onClose: () => void;
   onSave: (data: AddCarFormData) => Promise<void>;
 }
+
+// Province code mapping
+const PROVINCE_CODES: { [key: string]: string } = {
+  'CAVITE': 'CAV',
+  'LAGUNA': 'LAG',
+  'BATANGAS': 'BAT',
+  'RIZAL': 'RIZ',
+  'QUEZON': 'QUE',
+};
 
 export const AddDocumentModal: React.FC<Props> = ({
   show,
@@ -17,6 +26,22 @@ export const AddDocumentModal: React.FC<Props> = ({
   const [isLoadingFacility, setIsLoadingFacility] = useState(false);
   const [facilityError, setFacilityError] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingCaseNo, setIsGeneratingCaseNo] = useState(false);
+
+  // Auto-fill current date/time when modal opens
+  useEffect(() => {
+    if (show) {
+      const now = new Date();
+      const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+      
+      setFormData((prev: any) => ({
+        ...prev,
+        endorsedDate: localDateTime,
+      }));
+    }
+  }, [show]);
 
   // Facility code lookup with debounce
   useEffect(() => {
@@ -30,6 +55,7 @@ export const AddDocumentModal: React.FC<Props> = ({
         facilityName: "",
         city: "",
         province: "",
+        caseNo: "", // Clear case number when facility code is cleared
       }));
       setFacilityError("");
       return;
@@ -43,6 +69,9 @@ export const AddDocumentModal: React.FC<Props> = ({
         const facility = await getFacilityByCode(facilityCode);
 
         if (facility) {
+          const province = facility.province?.toUpperCase().trim();
+          const provinceCode = PROVINCE_CODES[province] || '';
+
           setFormData((prev: any) => ({
             ...prev,
             facilityName: facility.facilityname,
@@ -50,12 +79,24 @@ export const AddDocumentModal: React.FC<Props> = ({
             province: facility.province,
           }));
           setFacilityError("");
+
+          // Generate case number if we have a valid province code
+          if (provinceCode) {
+            await generateCaseNumber(provinceCode);
+          } else {
+            setFacilityError(`Unknown province code for: ${facility.province}`);
+            setFormData((prev: any) => ({
+              ...prev,
+              caseNo: "",
+            }));
+          }
         } else {
           setFormData((prev: any) => ({
             ...prev,
             facilityName: "",
             city: "",
             province: "",
+            caseNo: "",
           }));
           setFacilityError("Facility not found");
         }
@@ -67,6 +108,7 @@ export const AddDocumentModal: React.FC<Props> = ({
           facilityName: "",
           city: "",
           province: "",
+          caseNo: "",
         }));
       } finally {
         setIsLoadingFacility(false);
@@ -75,6 +117,35 @@ export const AddDocumentModal: React.FC<Props> = ({
 
     return () => clearTimeout(timer);
   }, [show, formData.facilityCode]);
+
+  // Generate case number based on province code
+  const generateCaseNumber = async (provinceCode: string) => {
+    setIsGeneratingCaseNo(true);
+    try {
+      // Get current year (last 2 digits)
+      const year = new Date().getFullYear().toString().slice(-2);
+
+      // Call API to get next case number
+      const data = await getNextCaseNumber(provinceCode, year);
+
+      if (data.success) {
+        const caseNumber = data.preview;
+
+        setFormData((prev: any) => ({
+          ...prev,
+          caseNo: caseNumber,
+        }));
+      } else {
+        console.error("Failed to generate case number:", data.message);
+        setFacilityError("Failed to generate case number");
+      }
+    } catch (error) {
+      console.error("Error generating case number:", error);
+      setFacilityError("Error generating case number");
+    } finally {
+      setIsGeneratingCaseNo(false);
+    }
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -142,21 +213,29 @@ export const AddDocumentModal: React.FC<Props> = ({
           className="px-4 py-3 max-h-[70vh] overflow-y-auto text-sm"
         >
           <div className="grid grid-cols-12 gap-3">
-            {/* Case No */}
+            {/* Case No - AUTO GENERATED & DISABLED */}
             <div className="col-span-12 md:col-span-3">
               <label className={label}>
                 Case No. <span className="text-red-500">*</span>
               </label>
-              <input
-                name="caseNo"
-                className={input}
-                required
-                onChange={handleChange}
-                value={formData.caseNo || ""}
-              />
+              <div className="relative">
+                <input
+                  name="caseNo"
+                  className={`${input} bg-gray-100 cursor-not-allowed`}
+                  required
+                  disabled
+                  value={formData.caseNo || ""}
+                  placeholder="Auto-generated"
+                />
+                {isGeneratingCaseNo && (
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                    <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Date Endorsed */}
+            {/* Date Endorsed - AUTO FILLED with current date/time */}
             <div className="col-span-12 md:col-span-3">
               <label className={label}>
                 Date Endorsed <span className="text-red-500">*</span>
@@ -169,6 +248,7 @@ export const AddDocumentModal: React.FC<Props> = ({
                 onChange={handleChange}
                 value={formData.endorsedDate || ""}
               />
+              <p className="text-xs text-gray-500 mt-0.5">Auto-filled with current time</p>
             </div>
 
             {/* Endorsed By */}
@@ -206,6 +286,7 @@ export const AddDocumentModal: React.FC<Props> = ({
                   required
                   onChange={handleChange}
                   value={formData.facilityCode || ""}
+                  placeholder="Enter facility code"
                 />
                 {isLoadingFacility && (
                   <div className="absolute right-2 top-1/2 -translate-y-1/2">

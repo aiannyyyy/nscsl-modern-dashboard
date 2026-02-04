@@ -171,28 +171,28 @@ app.use("/api/auth", authRoutes);
 console.log("🔐 Authentication routes loaded");
 
 // Facility Visits
-app.use("/api/facility-visits", require("./routes/facilityVisitsRoutes"));
+app.use("/api/facility-visits", require("./routes/PDORoutes/facilityVisitsRoutes"));
 
 // Notebooks
-app.use("/api/notebooks", require("./routes/notebooksRoutes"));
+app.use("/api/notebooks", require("./routes/PDORoutes/notebooksRoutes"));
 
 // Timeliness
-app.use("/api/timeliness", require("./routes/timelinessRoutes"));
+app.use("/api/timeliness", require("./routes/PDORoutes/timelinessRoutes"));
 
 // Car List
-app.use("/api", require("./routes/carListRoutes"));
+app.use("/api", require("./routes/PDORoutes/carListRoutes"));
 
 // Sample Receive
-app.use("/api/sample-receive", require("./routes/sampleReceiveRoutes"));
+app.use("/api/sample-receive", require("./routes/PDORoutes/sampleReceiveRoutes"));
 
 // Sample Screened
-app.use("/api/sample-screened", require("./routes/sampleScreenedRoutes"));
+app.use("/api/sample-screened", require("./routes/PDORoutes/sampleScreenedRoutes"));
 
 // Unsatisfactory Analysis
-app.use("/api/unsat", require("./routes/unsatRoutes"));
+app.use("/api/unsat", require("./routes/PDORoutes/unsatRoutes"));
 
 // NSF Performance
-app.use("/api", require("./routes/nsfPerformanceRoutes"));
+app.use("/api", require("./routes/PDORoutes/nsfPerformanceRoutes"));
 
 
 

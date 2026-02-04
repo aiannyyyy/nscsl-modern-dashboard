@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Download } from 'lucide-react';
-import facilityVisitsService from '../../../services/facilityVisitsService';
+import facilityVisitsService from '../../../services/PDOServices/facilityVisitsService';
 
 interface ExportModalProps {
     isOpen: boolean;

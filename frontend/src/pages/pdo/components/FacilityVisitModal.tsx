@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Upload, FileText, Trash2, Loader2 } from 'lucide-react';
-import facilityVisitsService from '../../../services/facilityVisitsService';
-import type { FacilityVisit } from '../../../services/facilityVisitsService';
-import { useAuth } from '../../../hooks/useAuth';  // ⭐ ADDED
+import facilityVisitsService from '../../../services/PDOServices/facilityVisitsService';
+import type { FacilityVisit } from '../../../services/PDOServices/facilityVisitsService';
+import { useAuth } from '../../../hooks/useAuth';
 
 interface FacilityVisitModalProps {
   isOpen: boolean;
@@ -17,7 +17,7 @@ export const FacilityVisitModal: React.FC<FacilityVisitModalProps> = ({
   onSuccess,
   visit,
 }) => {
-  const { user } = useAuth();  // ⭐ ADDED - Get current user
+  const { user } = useAuth();
   
   const [formData, setFormData] = useState({
     facility_code: '',
@@ -66,10 +66,19 @@ export const FacilityVisitModal: React.FC<FacilityVisitModalProps> = ({
   }, [visit]);
 
   const resetForm = () => {
+    // Get current date/time in YYYY-MM-DDTHH:mm format
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const currentDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+
     setFormData({
       facility_code: '',
       facility_name: '',
-      date_visited: '',
+      date_visited: currentDateTime,
       province: '',
       status: '1',
       remarks: '',
@@ -144,7 +153,7 @@ export const FacilityVisitModal: React.FC<FacilityVisitModalProps> = ({
           submitData.append(key, value);
         });
 
-        // ⭐ ADDED - Append username from auth context
+        // Append username from auth context
         submitData.append('userName', user?.name || 'Unknown User');
 
         // Append new files

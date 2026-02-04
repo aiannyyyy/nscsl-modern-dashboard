@@ -10,11 +10,13 @@ import {
   ResponsiveContainer,
   LabelList,
 } from "recharts";
+import { Download, ChevronDown } from 'lucide-react';
 import {
   getTwoYearComparisonUpToMonth,
   calculatePercentageDiff,
   getAvailableProvinces,
-} from "../../../services/screenedApi";
+} from "../../../services/PDOServices/screenedApi";
+import { downloadChart } from '../../../utils/chartDownloadUtils';
 
 const years = Array.from({ length: 16 }, (_, i) => 2028 - i);
 
@@ -104,6 +106,8 @@ export const CumulativePerProvince: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   
   // Stats for comparison table
   const [yearATotal, setYearATotal] = useState(0);
@@ -130,6 +134,23 @@ export const CumulativePerProvince: React.FC<Props> = ({
     };
     return monthMap[abbreviatedRange] || "December";
   };
+
+  // Detect dark mode
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
+
+    checkDarkMode();
+
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   // Fetch data when dependencies change
   useEffect(() => {
@@ -257,6 +278,62 @@ export const CumulativePerProvince: React.FC<Props> = ({
     setChartType(chartType === "single-province" ? "all-provinces" : "single-province");
   };
 
+  // Get Excel data for export
+  const getExcelData = () => {
+    const data = chartData.map(item => ({
+      Province: item.name,
+      [yearA]: item[yearA],
+      [yearB]: item[yearB],
+      Difference: item[yearB] - item[yearA],
+      'Change %': calculatePercentageDiff(item[yearA], item[yearB]),
+    }));
+
+    // Add totals row
+    data.push({
+      Province: 'TOTAL',
+      [yearA]: yearATotal,
+      [yearB]: yearBTotal,
+      Difference: yearBTotal - yearATotal,
+      'Change %': calculatePercentageDiff(yearATotal, yearBTotal),
+    });
+
+    return data;
+  };
+
+  // Handle chart download
+  const handleDownload = async (format: 'png' | 'svg' | 'excel') => {
+    setShowDownloadMenu(false);
+
+    const chartTitle = chartType === "single-province" 
+      ? `Screened_Cumulative_${province}_${monthRange}_${yearA}_vs_${yearB}`
+      : `Screened_Cumulative_All_Provinces_${monthRange}_${yearA}_vs_${yearB}`;
+
+    const filename = chartTitle.replace(/\s+/g, '_');
+
+    try {
+      if (format === 'excel') {
+        const excelData = getExcelData();
+        await downloadChart({
+          elementId: 'screened-cumulative-per-province-chart',
+          filename,
+          format: 'excel',
+          data: excelData,
+          sheetName: 'Screened Cumulative'
+        });
+      } else {
+        await downloadChart({
+          elementId: 'screened-cumulative-per-province-chart',
+          filename,
+          format,
+          backgroundColor: isDarkMode ? '#111827' : '#ffffff',
+          scale: 2
+        });
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+    }
+  };
+
   // Calculate comparison stats
   const diff = yearBTotal - yearATotal;
   const percentDiff = calculatePercentageDiff(yearATotal, yearBTotal);
@@ -360,6 +437,64 @@ export const CumulativePerProvince: React.FC<Props> = ({
               >
                 {chartType === "single-province" ? "Show All Provinces" : "Show Single Province"}
               </button>
+
+              {/* Download Button */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                  disabled={loading}
+                  className="h-8 px-3 text-xs rounded-lg border
+                    bg-white dark:bg-gray-700
+                    border-gray-300 dark:border-gray-600
+                    text-gray-800 dark:text-gray-100
+                    hover:bg-gray-50 dark:hover:bg-gray-600
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    flex items-center gap-1.5 transition-colors"
+                >
+                  <Download size={14} />
+                  Export
+                  <ChevronDown size={12} />
+                </button>
+
+                {showDownloadMenu && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowDownloadMenu(false)}
+                    />
+                    <div className="absolute right-0 mt-1 w-44 rounded-lg shadow-lg border
+                      bg-white dark:bg-gray-800
+                      border-gray-200 dark:border-gray-700
+                      z-20 overflow-hidden"
+                    >
+                      <button
+                        onClick={() => handleDownload('png')}
+                        className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                          text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                      >
+                        <Download size={12} />
+                        Download as PNG
+                      </button>
+                      <button
+                        onClick={() => handleDownload('svg')}
+                        className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                          text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                      >
+                        <Download size={12} />
+                        Download as SVG
+                      </button>
+                      <button
+                        onClick={() => handleDownload('excel')}
+                        className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                          text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                      >
+                        <Download size={12} />
+                        Export Data to Excel
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </>
           )}
 
@@ -376,7 +511,7 @@ export const CumulativePerProvince: React.FC<Props> = ({
       </div>
 
       {/* Chart */}
-      <div className="flex-1 p-5">
+      <div id="screened-cumulative-per-province-chart" className="flex-1 p-5">
         {loading ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
@@ -492,7 +627,7 @@ export const CumulativePerProvince: React.FC<Props> = ({
             <tbody>
               <tr className="bg-gray-50 dark:bg-gray-800">
                 <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 font-medium text-gray-800 dark:text-gray-100">
-                  Total Received
+                  Total Screened
                 </td>
                 <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-gray-800 dark:text-gray-100">
                   {yearATotal.toLocaleString()}

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import facilityVisitsService from '../../../services/facilityVisitsService';
-import type { StatusCount } from '../../../services/facilityVisitsService';
+import { Download, ChevronDown } from 'lucide-react';
+import facilityVisitsService from '../../../services/PDOServices/facilityVisitsService';
+import type { StatusCount } from '../../../services/PDOServices/facilityVisitsService';
+import { downloadChart } from '../../../utils/chartDownloadUtils';
 
 interface FacilityVisitsChartProps {
   refreshTrigger?: number;
@@ -11,19 +13,19 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-const YEARS = ['2029', '2028', '2027', '2028', '2027', '2026', '2025', '2024', '2023', '2022', '2021', '2020', '2019', '2018'];
+const YEARS = ['2029', '2028', '2027', '2026', '2025', '2024', '2023', '2022', '2021', '2020', '2019', '2018'];
 
 export const FacilityVisitsChart: React.FC<FacilityVisitsChartProps> = ({ refreshTrigger }) => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('default', { month: 'long' }));
   const [statusData, setStatusData] = useState<StatusCount>({ active: 0, inactive: 0, closed: 0 });
   const [loading, setLoading] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
-  // THIS IS THE KEY FIX - Split into two useEffects
   useEffect(() => {
     console.log('📈 Chart useEffect triggered', { selectedYear, selectedMonth, refreshTrigger });
     fetchStatusData();
-  }, [selectedYear, selectedMonth, refreshTrigger]); // Keep dependencies here
+  }, [selectedYear, selectedMonth, refreshTrigger]);
 
   const fetchStatusData = async () => {
     setLoading(true);
@@ -68,6 +70,55 @@ export const FacilityVisitsChart: React.FC<FacilityVisitsChartProps> = ({ refres
     }
   };
 
+  const handleDownload = async (format: 'png' | 'svg' | 'excel') => {
+    setShowDownloadMenu(false);
+
+    try {
+      if (format === 'excel') {
+        const excelData = [
+          {
+            'Status': 'Active',
+            'Count': statusData.active,
+            'Percentage': `${getPercentage(statusData.active)}%`
+          },
+          {
+            'Status': 'Inactive',
+            'Count': statusData.inactive,
+            'Percentage': `${getPercentage(statusData.inactive)}%`
+          },
+          {
+            'Status': 'Closed',
+            'Count': statusData.closed,
+            'Percentage': `${getPercentage(statusData.closed)}%`
+          },
+          {
+            'Status': 'TOTAL',
+            'Count': total,
+            'Percentage': '100%'
+          }
+        ];
+
+        await downloadChart({
+          elementId: 'facility-visits-chart',
+          filename: `Facility_Visits_${selectedMonth}_${selectedYear}`,
+          format: 'excel',
+          data: excelData,
+          sheetName: 'Facility Visits',
+        });
+      } else {
+        await downloadChart({
+          elementId: 'facility-visits-chart',
+          filename: `Facility_Visits_${selectedMonth}_${selectedYear}`,
+          format,
+          backgroundColor: '#ffffff',
+          scale: 2,
+        });
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+    }
+  };
+
   const total = statusData.active + statusData.inactive + statusData.closed;
 
   const getPercentage = (value: number) => {
@@ -78,19 +129,75 @@ export const FacilityVisitsChart: React.FC<FacilityVisitsChartProps> = ({ refres
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 transition-colors h-full flex flex-col">
       <div className="p-6 flex-1 flex flex-col">
-        <div className="mb-4">
-          <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Facilities Visits By This Month Of {selectedMonth} {selectedYear}
-          </h4>
-          {/* Debug info 
-          <div className="text-xs text-gray-500 mt-1">
-            Refresh Trigger: {refreshTrigger} | Total: {total}
+        {/* Header with Download Button */}
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Facilities Visits By This Month Of {selectedMonth} {selectedYear}
+            </h4>
           </div>
-          */}
+
+          {/* Download Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+              disabled={total === 0 || loading}
+              className="h-8 px-3 text-xs rounded-lg border
+                bg-white dark:bg-gray-700
+                border-gray-300 dark:border-gray-600
+                text-gray-800 dark:text-gray-100
+                hover:bg-gray-50 dark:hover:bg-gray-600
+                disabled:opacity-50 disabled:cursor-not-allowed
+                flex items-center gap-1.5 transition-colors"
+            >
+              <Download size={14} />
+              Export
+              <ChevronDown size={12} />
+            </button>
+
+            {showDownloadMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowDownloadMenu(false)}
+                />
+                <div className="absolute right-0 mt-1 w-44 rounded-lg shadow-lg border
+                  bg-white dark:bg-gray-800
+                  border-gray-200 dark:border-gray-700
+                  z-20 overflow-hidden"
+                >
+                  <button
+                    onClick={() => handleDownload('png')}
+                    className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                      text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                  >
+                    <Download size={12} />
+                    Download as PNG
+                  </button>
+                  <button
+                    onClick={() => handleDownload('svg')}
+                    className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                      text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                  >
+                    <Download size={12} />
+                    Download as SVG
+                  </button>
+                  <button
+                    onClick={() => handleDownload('excel')}
+                    className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                      text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                  >
+                    <Download size={12} />
+                    Export Data to Excel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Rest of your chart JSX stays the same... */}
-        <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-lg min-h-[300px] p-6">
+        {/* Chart Area - IMPORTANT: Added id="facility-visits-chart" */}
+        <div id="facility-visits-chart" className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-lg min-h-[300px] p-6">
           {loading ? (
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -107,7 +214,7 @@ export const FacilityVisitsChart: React.FC<FacilityVisitsChartProps> = ({ refres
           ) : (
             <div className="text-center w-full">
               <div className="grid grid-cols-3 gap-6 max-w-2xl mx-auto">
-                {/* Your existing chart circles */}
+                {/* Active */}
                 <div className="text-center">
                   <div className="relative w-32 h-32 mx-auto mb-3">
                     <svg viewBox="0 0 100 100" className="transform -rotate-90">
@@ -130,6 +237,7 @@ export const FacilityVisitsChart: React.FC<FacilityVisitsChartProps> = ({ refres
                   </div>
                 </div>
 
+                {/* Inactive */}
                 <div className="text-center">
                   <div className="relative w-32 h-32 mx-auto mb-3">
                     <svg viewBox="0 0 100 100" className="transform -rotate-90">
@@ -152,6 +260,7 @@ export const FacilityVisitsChart: React.FC<FacilityVisitsChartProps> = ({ refres
                   </div>
                 </div>
 
+                {/* Closed */}
                 <div className="text-center">
                   <div className="relative w-32 h-32 mx-auto mb-3">
                     <svg viewBox="0 0 100 100" className="transform -rotate-90">
@@ -200,6 +309,7 @@ export const FacilityVisitsChart: React.FC<FacilityVisitsChartProps> = ({ refres
         </div>
       </div>
 
+      {/* Footer with selectors */}
       <div className="p-4 border-t border-gray-200 dark:border-gray-800 flex gap-2">
         <select
           value={selectedYear}

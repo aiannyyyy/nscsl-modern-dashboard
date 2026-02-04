@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { downloadChart } from '../../../utils/chartDownloadUtils'; // Adjust the import path as needed
 
 interface TimelinessRecord {
   month: string;
@@ -35,13 +36,15 @@ interface ApiResponse {
 
 export const TimelinessCharts: React.FC = () => {
   const currentYear = new Date().getFullYear();
-  const currentMonth = (new Date().getMonth() + 1).toString(); // getMonth() returns 0-11, so add 1
+  const currentMonth = (new Date().getMonth() + 1).toString();
 
   const [year1, setYear1] = useState((currentYear - 1).toString());
   const [year2, setYear2] = useState(currentYear.toString());
-
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [selectedProvince, setSelectedProvince] = useState('Batangas');
+  
+  // New state for view mode
+  const [viewMode, setViewMode] = useState<'county' | 'summary'>('county');
 
   const [data, setData] = useState<TimelinessRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -81,7 +84,6 @@ export const TimelinessCharts: React.FC = () => {
 
     checkDarkMode();
 
-    // Listen for dark mode changes
     const observer = new MutationObserver(checkDarkMode);
     if (typeof document !== 'undefined') {
       observer.observe(document.documentElement, {
@@ -100,9 +102,15 @@ export const TimelinessCharts: React.FC = () => {
       setError(null);
 
       try {
-        const response = await fetch(
-          `/api/timeliness?year1=${year1}&year2=${year2}&month=${selectedMonth}&province=${selectedProvince}`
-        );
+        let url = '';
+        
+        if (viewMode === 'county') {
+          url = `/api/timeliness?year1=${year1}&year2=${year2}&month=${selectedMonth}&province=${selectedProvince}`;
+        } else {
+          url = `/api/timeliness/summary?year1=${year1}&year2=${year2}&month=${selectedMonth}`;
+        }
+
+        const response = await fetch(url);
 
         if (!response.ok) {
           throw new Error('Failed to fetch data');
@@ -110,12 +118,11 @@ export const TimelinessCharts: React.FC = () => {
 
         const result: ApiResponse = await response.json();
         
-        // Validate the response structure
         if (!result || !Array.isArray(result.data)) {
           console.warn('Invalid API response structure:', result);
           setData([]);
         } else {
-          console.log('API Response:', result); // Debug log
+          console.log('API Response:', result);
           setData(result.data);
         }
       } catch (err) {
@@ -128,7 +135,7 @@ export const TimelinessCharts: React.FC = () => {
     };
 
     fetchData();
-  }, [year1, year2, selectedMonth, selectedProvince]);
+  }, [year1, year2, selectedMonth, selectedProvince, viewMode]);
 
   // Transform data for charts
   const getChartData = (chartType: string) => {
@@ -137,13 +144,12 @@ export const TimelinessCharts: React.FC = () => {
       return [];
     }
 
-    const record = data[0]; // API returns single record with all data
+    const record = data[0];
     console.log('Chart data record:', record);
 
     const chartData = [];
 
     if (chartType === 'aoc') {
-      // Age of Collection
       chartData.push({
         name: 'Mean',
         [year1]: record.aoc_mean_year1 || 0,
@@ -160,7 +166,6 @@ export const TimelinessCharts: React.FC = () => {
         [year2]: record.aoc_mode_year2 || 0,
       });
     } else if (chartType === 'transit') {
-      // Transit Time
       chartData.push({
         name: 'Mean',
         [year1]: record.transit_mean_year1 || 0,
@@ -177,7 +182,6 @@ export const TimelinessCharts: React.FC = () => {
         [year2]: record.transit_mode_year2 || 0,
       });
     } else if (chartType === 'aur') {
-      // Age Upon Receipt
       chartData.push({
         name: 'Mean',
         [year1]: record.aur_mean_year1 || 0,
@@ -199,11 +203,52 @@ export const TimelinessCharts: React.FC = () => {
     return chartData;
   };
 
-  // Custom label component that respects dark mode
+  // Get Excel data for download
+  const getExcelData = (chartType: string) => {
+    const chartData = getChartData(chartType);
+    return chartData.map(item => ({
+      Metric: item.name,
+      [year1]: item[year1],
+      [year2]: item[year2]
+    }));
+  };
+
+  // Handle chart download
+  const handleDownload = async (chartId: string, format: 'png' | 'svg' | 'excel') => {
+    const chart = charts.find(c => c.id === chartId);
+    if (!chart) return;
+
+    const filename = viewMode === 'county' 
+      ? `${chart.title.replace(/\s+/g, '_')}_${selectedProvince}_${selectedMonth}_${year1}_vs_${year2}`
+      : `${chart.title.replace(/\s+/g, '_')}_Summary_${selectedMonth}_${year1}_vs_${year2}`;
+
+    try {
+      if (format === 'excel') {
+        const excelData = getExcelData(chartId);
+        await downloadChart({
+          elementId: `chart-${chartId}`,
+          filename,
+          format: 'excel',
+          data: excelData,
+          sheetName: chart.title
+        });
+      } else {
+        await downloadChart({
+          elementId: `chart-${chartId}`,
+          filename,
+          format,
+          backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
+          scale: 2
+        });
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+    }
+  };
+
   const CustomLabel = (props: any) => {
     const { x, y, width, value } = props;
     
-    // Safety check for value
     if (value === undefined || value === null || typeof value !== 'number') {
       return null;
     }
@@ -222,7 +267,6 @@ export const TimelinessCharts: React.FC = () => {
     );
   };
 
-  // Custom tooltip
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -239,14 +283,13 @@ export const TimelinessCharts: React.FC = () => {
     return null;
   };
 
-  // Get colors for each chart
   const getChartColors = (chartId: string) => {
     if (chartId === 'aoc') {
-      return { year1Color: '#93c5fd', year2Color: '#f9a8d4' }; // Blue-300 and Pink-300
+      return { year1Color: '#93c5fd', year2Color: '#f9a8d4' };
     } else if (chartId === 'transit') {
-      return { year1Color: '#5eead4', year2Color: '#fb923c' }; // Teal-300 and Orange-400
+      return { year1Color: '#5eead4', year2Color: '#fb923c' };
     } else {
-      return { year1Color: '#c4b5fd', year2Color: '#fde047' }; // Purple-300 and Yellow-300
+      return { year1Color: '#c4b5fd', year2Color: '#fde047' };
     }
   };
 
@@ -260,12 +303,41 @@ export const TimelinessCharts: React.FC = () => {
             <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
               Timeliness of NBS
             </h4>
-            <span className="px-2.5 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium">
-              {selectedProvince}
-            </span>
+            {viewMode === 'county' && (
+              <span className="px-2.5 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium">
+                {selectedProvince}
+              </span>
+            )}
+            {viewMode === 'summary' && (
+              <span className="px-2.5 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg text-xs font-medium">
+                All Counties
+              </span>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Toggle View Button */}
+            <button
+              onClick={() => setViewMode(viewMode === 'county' ? 'summary' : 'county')}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+            >
+              {viewMode === 'county' ? (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  Show Summary
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Back to County View
+                </>
+              )}
+            </button>
+
             <select 
               value={year1}
               onChange={(e) => setYear1(e.target.value)}
@@ -298,10 +370,14 @@ export const TimelinessCharts: React.FC = () => {
               ))}
             </select>
             
+            {/* Province dropdown - hidden/disabled in summary mode */}
             <select 
               value={selectedProvince}
               onChange={(e) => setSelectedProvince(e.target.value)}
-              className="px-2.5 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg text-xs border-0 focus:ring-2 focus:ring-blue-500 font-medium"
+              disabled={viewMode === 'summary'}
+              className={`px-2.5 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg text-xs border-0 focus:ring-2 focus:ring-blue-500 font-medium transition-opacity ${
+                viewMode === 'summary' ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
               {provinces.map((province) => (
                 <option key={province} value={province}>{province}</option>
@@ -339,10 +415,45 @@ export const TimelinessCharts: React.FC = () => {
 
               return (
                 <div key={chart.id} className="space-y-3">
-                  <h5 className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {chart.title}
-                  </h5>
-                  <div className="h-52 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {chart.title}
+                    </h5>
+                    
+                    {/* Download Dropdown */}
+                    <div className="relative group">
+                      <button className="px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        <span>Export</span>
+                      </button>
+                      
+                      {/* Dropdown Menu */}
+                      <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                        <button
+                          onClick={() => handleDownload(chart.id, 'png')}
+                          className="w-full px-3 py-2 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg transition-colors"
+                        >
+                          Download as PNG
+                        </button>
+                        <button
+                          onClick={() => handleDownload(chart.id, 'svg')}
+                          className="w-full px-3 py-2 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          Download as SVG
+                        </button>
+                        <button
+                          onClick={() => handleDownload(chart.id, 'excel')}
+                          className="w-full px-3 py-2 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg transition-colors"
+                        >
+                          Export Data to Excel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div id={`chart-${chart.id}`} className="h-52 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
                     {chartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart

@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Search, X } from "lucide-react";
-import { getUnsatDetails, getFullPatient } from "../../../services/unsatApi";
-import type { PatientDetails } from "../../../services/patientDetailsTypes";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+import { getUnsatDetails, getFullPatient } from "../../../services/PDOServices/unsatApi";
+import type { PatientDetails } from "../../../services/PDOServices/patientDetailsTypes";
 import { NotebookDetailsModal } from "./NotebookDetailsModal";
 
 type Mode = "numbers" | "percentage";
@@ -36,18 +38,16 @@ export const FacilityPatientModal: React.FC<Props> = ({
   const [data, setData] = useState<UnsatDetail[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // 🔹 Filter state
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTestResult, setSelectedTestResult] = useState<string>("all");
   const [filteredData, setFilteredData] = useState<UnsatDetail[]>([]);
   const [availableTestResults, setAvailableTestResults] = useState<string[]>([]);
 
-  // 🔹 Notebook modal state
   const [showNotebookModal, setShowNotebookModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<PatientDetails | null>(null);
   const [patientLoading, setPatientLoading] = useState(false);
 
-  // ================= FETCH FACILITY DETAILS =================
+  // ================= FETCH =================
   useEffect(() => {
     if (!open || !facilityName) return;
 
@@ -75,7 +75,7 @@ export const FacilityPatientModal: React.FC<Props> = ({
     fetchDetails();
   }, [open, facilityName, from, to, mode]);
 
-  // ================= EXTRACT UNIQUE TEST RESULTS =================
+  // ================= UNIQUE TEST RESULTS =================
   useEffect(() => {
     const uniqueResults = Array.from(
       new Set(
@@ -85,11 +85,10 @@ export const FacilityPatientModal: React.FC<Props> = ({
     setAvailableTestResults(uniqueResults);
   }, [data]);
 
-  // ================= FILTER DATA =================
+  // ================= FILTER =================
   useEffect(() => {
     let filtered = [...data];
 
-    // Filter by test result dropdown
     if (selectedTestResult !== "all") {
       filtered = filtered.filter((row) => {
         const testResult = row.TEST_RESULT || row.test_result || "";
@@ -97,7 +96,6 @@ export const FacilityPatientModal: React.FC<Props> = ({
       });
     }
 
-    // Filter by search term
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter((row) => {
@@ -119,34 +117,59 @@ export const FacilityPatientModal: React.FC<Props> = ({
     setFilteredData(filtered);
   }, [searchTerm, selectedTestResult, data]);
 
-  // ================= CLEAR FILTER =================
   const clearSearch = () => {
     setSearchTerm("");
     setSelectedTestResult("all");
   };
 
-  // ================= OPEN NOTEBOOK =================
+  // ================= EXPORT EXCEL =================
+  const handleExport = () => {
+    if (filteredData.length === 0) {
+      alert("No data to export");
+      return;
+    }
+
+    const exportData = filteredData.map((row) => {
+      const firstName = row.FIRST_NAME || row.first_name || "";
+      const lastName = row.LAST_NAME || row.last_name || "";
+      const testResult = row.TEST_RESULT || row.test_result || "";
+
+      return {
+        "Lab No": row.LABNO,
+        "First Name": firstName,
+        "Last Name": lastName,
+        "Patient Name": `${firstName} ${lastName}`,
+        "Test Result": testResult,
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Patients");
+
+    const modeLabel = mode === "numbers" ? "Numbers" : "Percentage";
+    const fileName = `${modeLabel}_${facilityName}_${from}_to_${to}.xlsx`;
+
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+
+    const blob = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8",
+    });
+
+    saveAs(blob, fileName);
+  };
+
+  // ================= NOTEBOOK FETCH =================
   const openNotebook = async (row: UnsatDetail) => {
     try {
       setPatientLoading(true);
       setSelectedPatient(null);
       setShowNotebookModal(true);
 
-      console.log("🔍 Fetching patient details for LABNO:", row.LABNO);
-
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-      const completeDetailsUrl = `${API_BASE_URL}/notebooks/complete-details?labno=${row.LABNO}`;
-
-      console.log('📡 Fetching from:', completeDetailsUrl);
-
-      const response = await fetch(completeDetailsUrl);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch: ${response.status}`);
-      }
-
+      const response = await fetch(`${API_BASE_URL}/notebooks/complete-details?labno=${row.LABNO}`);
+      if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
       const data = await response.json();
-      console.log('✅ Patient data received:', data);
 
       const patientDetails: PatientDetails = {
         labno: data.LABNO || row.LABNO,
@@ -179,10 +202,8 @@ export const FacilityPatientModal: React.FC<Props> = ({
       };
 
       setSelectedPatient(patientDetails);
-
     } catch (error) {
-      console.error("❌ Failed to load patient details", error);
-      alert(`Failed to load patient: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert("Failed to load patient");
       setShowNotebookModal(false);
     } finally {
       setPatientLoading(false);
@@ -197,10 +218,10 @@ export const FacilityPatientModal: React.FC<Props> = ({
   const handleCompleteClose = () => {
     setShowNotebookModal(false);
     setSelectedPatient(null);
-    onClose();
+    onClose(); // also close main modal
   };
 
-  // ================= RESET ON CLOSE =================
+
   const handleClose = () => {
     setSearchTerm("");
     setSelectedTestResult("all");
@@ -211,9 +232,9 @@ export const FacilityPatientModal: React.FC<Props> = ({
 
   return (
     <>
-      {/* ================= FACILITY PATIENT MODAL ================= */}
       <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
         <div className="w-full max-w-6xl rounded-xl bg-white dark:bg-gray-900 shadow-lg">
+
           {/* HEADER */}
           <div className="flex justify-between items-center px-5 py-3 border-b border-gray-200 dark:border-gray-700">
             <div>
@@ -225,12 +246,15 @@ export const FacilityPatientModal: React.FC<Props> = ({
                 {(searchTerm || selectedTestResult !== "all") && ` • Showing: ${filteredData.length} filtered results`}
               </p>
             </div>
-            <button
-              onClick={handleClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-            >
-              ✕
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleClose}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           {/* FILTER SECTION */}
@@ -374,7 +398,15 @@ export const FacilityPatientModal: React.FC<Props> = ({
           </div>
 
           {/* FOOTER */}
-          <div className="flex justify-end px-5 py-3 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-between items-center px-5 py-3 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={handleExport}
+              disabled={filteredData.length === 0}
+              className="px-3 py-1.5 text-xs rounded bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-400 transition-colors"
+            >
+              Export Excel
+            </button>
+
             <button
               onClick={handleClose}
               className="px-4 py-1.5 text-sm rounded bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 transition-colors"

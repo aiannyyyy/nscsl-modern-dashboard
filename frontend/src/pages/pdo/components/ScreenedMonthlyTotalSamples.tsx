@@ -11,11 +11,13 @@ import {
   LabelList,
   ReferenceArea,
 } from "recharts";
+import { Download, ChevronDown } from 'lucide-react';
 import {
   getMonthlyLabNoCount,
   calculatePercentageDiff,
   type MonthlyDataItem,
-} from "../../../services/screenedApi";
+} from "../../../services/PDOServices/screenedApi";
+import { downloadChart } from '../../../utils/chartDownloadUtils';
 import axios from "axios";
 
 const years = Array.from({ length: 16 }, (_, i) => 2028 - i);
@@ -80,6 +82,7 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
   // Comparison stats
   const [yearATotal, setYearATotal] = useState(0);
@@ -263,6 +266,48 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
   const isIncrease = diff > 0;
   const isDecrease = diff < 0;
 
+  // Download handler
+  const handleDownload = async (format: 'png' | 'svg' | 'excel') => {
+    setShowDownloadMenu(false);
+
+    try {
+      if (format === 'excel') {
+        const excelData = chartData.map(item => ({
+          'Month': item.month,
+          [yearA]: item.year1,
+          [yearB]: item.year2,
+          'Difference': item.year2 - item.year1,
+        }));
+
+        // Add totals row
+        excelData.push({
+          'Month': 'TOTAL',
+          [yearA]: yearATotal,
+          [yearB]: yearBTotal,
+          'Difference': yearBTotal - yearATotal,
+        });
+
+        await downloadChart({
+          elementId: 'monthly-total-screened-chart',
+          filename: `Monthly_Total_Screened_${yearA}_vs_${yearB}_${province}`,
+          format: 'excel',
+          data: excelData,
+          sheetName: 'Monthly Data',
+        });
+      } else {
+        await downloadChart({
+          elementId: 'monthly-total-screened-chart',
+          filename: `Monthly_Total_Screened_${yearA}_vs_${yearB}_${province}`,
+          format,
+          backgroundColor: '#ffffff',
+          scale: 2,
+        });
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+    }
+  };
+
   return (
     <div
       className={`flex flex-col rounded-2xl shadow-lg overflow-hidden
@@ -345,6 +390,64 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
+
+              {/* Download Button */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                  disabled={loading}
+                  className="h-8 px-3 text-xs rounded-lg border
+                    bg-white dark:bg-gray-700
+                    border-gray-300 dark:border-gray-600
+                    text-gray-800 dark:text-gray-100
+                    hover:bg-gray-50 dark:hover:bg-gray-600
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    flex items-center gap-1.5 transition-colors"
+                >
+                  <Download size={14} />
+                  Export
+                  <ChevronDown size={12} />
+                </button>
+
+                {showDownloadMenu && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowDownloadMenu(false)}
+                    />
+                    <div className="absolute right-0 mt-1 w-44 rounded-lg shadow-lg border
+                      bg-white dark:bg-gray-800
+                      border-gray-200 dark:border-gray-700
+                      z-20 overflow-hidden"
+                    >
+                      <button
+                        onClick={() => handleDownload('png')}
+                        className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                          text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                      >
+                        <Download size={12} />
+                        Download as PNG
+                      </button>
+                      <button
+                        onClick={() => handleDownload('svg')}
+                        className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                          text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                      >
+                        <Download size={12} />
+                        Download as SVG
+                      </button>
+                      <button
+                        onClick={() => handleDownload('excel')}
+                        className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                          text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                      >
+                        <Download size={12} />
+                        Export Data to Excel
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </>
           )}
 
@@ -355,21 +458,13 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
               bg-blue-600 hover:bg-blue-700
               text-white shadow transition-colors flex items-center gap-1.5"
           >
-            {expanded ? (
-              <>
-                Collapse
-              </>
-            ) : (
-              <>
-                Expand
-              </>
-            )}
+            {expanded ? "Collapse" : "Expand"}
           </button>
         </div>
       </div>
 
       {/* Chart */}
-      <div className="flex-1 p-5">
+      <div id="monthly-total-screened-chart" className="flex-1 p-5">
         {loading ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center">

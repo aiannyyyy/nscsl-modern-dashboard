@@ -4,7 +4,7 @@ import {
   getNsfPerformanceLabDetails,
   type NsfPerformanceData,
   type LabDetailsData,
-} from '../../services/nsfPerformanceApi';
+} from '../../services/PDOServices/nsfPerformanceApi';
 import FilterSection from './components/FilterSection';
 import ProvinceOverview from './components/ProvinceOverview';
 import FacilitiesList from './components/FacilitiesList';

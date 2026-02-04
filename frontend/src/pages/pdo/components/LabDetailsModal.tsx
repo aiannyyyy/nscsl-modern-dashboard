@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { LabDetailsData } from '../../../services/nsfPerformanceApi';
+import type { LabDetailsData } from '../../../services/PDOServices/nsfPerformanceApi';
 import { NotebookDetailsModal } from './NotebookDetailsModal';
-import type { PatientDetails } from '../../../services/patientDetailsTypes';
+import type { PatientDetails } from '../../../services/PDOServices/patientDetailsTypes';
 
 interface LabDetailsModalProps {
   show: boolean;

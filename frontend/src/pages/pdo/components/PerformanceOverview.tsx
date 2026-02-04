@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import type { NsfPerformanceData } from '../../../services/nsfPerformanceApi';
+import type { NsfPerformanceData } from '../../../services/PDOServices/nsfPerformanceApi';
 import { 
   generateNsfReport, 
   downloadReportBlob, 
   openReportInNewTab,
   validateCrystalReportsSetup,
   getReportSystemHealth  // ✅ Added to check health details
-} from '../../../services/nsfPerformanceApi';
+} from '../../../services/PDOServices/nsfPerformanceApi';
 
 interface PerformanceOverviewProps {
   facility: NsfPerformanceData;

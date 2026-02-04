@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Download, FileText, Edit, Trash2, X, Eye } from 'lucide-react';
-import facilityVisitsService from '../../../services/facilityVisitsService';
-import type { FacilityVisit } from '../../../services/facilityVisitsService';
+import facilityVisitsService from '../../../services/PDOServices/facilityVisitsService';
+import type { FacilityVisit } from '../../../services/PDOServices/facilityVisitsService';
 import { FacilityVisitModal } from './FacilityVisitModal';
 import { ExportModal } from './ExportModal';
 import { useAuth } from '../../../hooks/useAuth';
