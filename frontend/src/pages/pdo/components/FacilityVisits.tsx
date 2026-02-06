@@ -17,7 +17,9 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedAttachments, setSelectedAttachments] = useState<string[]>([]);
+  const [selectedVisit, setSelectedVisit] = useState<FacilityVisit | null>(null);
   const [editingVisit, setEditingVisit] = useState<FacilityVisit | null>(null);
   const [viewingFile, setViewingFile] = useState<{ path: string; name: string; type: string } | null>(null);
   
@@ -44,6 +46,11 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleView = (visit: FacilityVisit) => {
+    setSelectedVisit(visit);
+    setShowDetailsModal(true);
   };
 
   const handleEdit = (visit: FacilityVisit) => {
@@ -75,13 +82,30 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
   const handleDownloadFile = (filePath: string) => {
     const downloadUrl = `http://localhost:5000/${filePath}`;
     console.log('📂 Downloading file:', downloadUrl);
-    window.open(downloadUrl, '_blank');
+    
+    // Create a temporary anchor element to trigger download
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filePath.split('/').pop() || 'download';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleViewFile = (filePath: string) => {
     const fileName = filePath.split('/').pop() || 'Unknown file';
     const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
     
+    // List of file types that should be downloaded instead of viewed
+    const downloadOnlyTypes = ['doc', 'docx', 'xls', 'xlsx', 'xlsm', 'ppt', 'pptx', 'csv', 'zip', 'rar'];
+    
+    // If it's a download-only type, trigger download directly
+    if (downloadOnlyTypes.includes(fileExtension)) {
+      handleDownloadFile(filePath);
+      return;
+    }
+    
+    // Otherwise, show in viewer modal
     setViewingFile({
       path: filePath,
       name: fileName,
@@ -148,12 +172,212 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
     );
   };
 
+  const truncateText = (text: string | null, maxLength: number = 50) => {
+    if (!text) return 'No remarks';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  };
+
+  const renderDetailsModal = () => {
+    if (!selectedVisit) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="p-5 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Facility Visit Details
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                {selectedVisit.facility_name}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowDetailsModal(false)}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white dark:hover:bg-gray-700 p-2 rounded-lg transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="p-6 overflow-y-auto flex-1">
+            <div className="space-y-6">
+              {/* Basic Information */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <div className="w-1 h-4 bg-blue-500 rounded"></div>
+                  Basic Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Facility Code</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {selectedVisit.facility_code}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Province</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {selectedVisit.province}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Date Visited</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {formatDate(selectedVisit.date_visited)}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</p>
+                    <div className="mt-1">
+                      {getStatusBadge(selectedVisit.status)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Facility Name */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <div className="w-1 h-4 bg-blue-500 rounded"></div>
+                  Facility Name
+                </h4>
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    {selectedVisit.facility_name}
+                  </p>
+                </div>
+              </div>
+
+              {/* Remarks */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <div className="w-1 h-4 bg-blue-500 rounded"></div>
+                  Remarks
+                </h4>
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                  <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">
+                    {selectedVisit.remarks || 'No remarks'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Attachments */}
+              {selectedVisit.attachment_path && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <div className="w-1 h-4 bg-blue-500 rounded"></div>
+                    Attachments ({selectedVisit.attachment_path.split(',').length})
+                  </h4>
+                  <div className="space-y-2">
+                    {selectedVisit.attachment_path.split(',').map((filePath, index) => {
+                      const fileName = filePath.trim().split('/').pop() || 'Unknown file';
+                      const fileExtension = fileName.split('.').pop()?.toLowerCase();
+                      
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <FileText size={18} className="text-blue-500 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                {fileName}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {fileExtension?.toUpperCase()} file
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 ml-3">
+                            <button
+                              onClick={() => handleViewFile(filePath.trim())}
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
+                            >
+                              <Eye size={14} />
+                              View
+                            </button>
+                            <button
+                              onClick={() => handleDownloadFile(filePath.trim())}
+                              className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
+                            >
+                              <Download size={14} />
+                              Download
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Audit Information */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <div className="w-1 h-4 bg-blue-500 rounded"></div>
+                  Audit Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Created By</p>
+                    {formatCreatedModified(selectedVisit.created_by, selectedVisit.created_at)}
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Modified By</p>
+                    {formatCreatedModified(selectedVisit.modified_by, selectedVisit.modified_at)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 flex justify-end gap-2">
+            <button
+              onClick={() => {
+                setShowDetailsModal(false);
+                handleEdit(selectedVisit);
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
+            >
+              <Edit size={16} />
+              Edit
+            </button>
+            <button
+              onClick={() => setShowDetailsModal(false)}
+              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors text-sm font-medium"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderFileViewer = () => {
     if (!viewingFile) return null;
 
     const fileUrl = `http://localhost:5000/${viewingFile.path}`;
-    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(viewingFile.type);
-    const isPdf = viewingFile.type === 'pdf';
+    
+    // Categorize file types
+    const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+    const pdfTypes = ['pdf'];
+    const downloadOnlyTypes = ['doc', 'docx', 'xls', 'xlsx', 'xlsm', 'ppt', 'pptx', 'csv', 'zip', 'rar'];
+    
+    const isImage = imageTypes.includes(viewingFile.type);
+    const isPdf = pdfTypes.includes(viewingFile.type);
+    const isDownloadOnly = downloadOnlyTypes.includes(viewingFile.type);
+
+    // For Excel/Word files, automatically download instead of showing preview
+    // This should not happen if handleViewFile works correctly, but as a safety measure
+    if (isDownloadOnly) {
+      handleDownloadFile(viewingFile.path);
+      setViewingFile(null);
+      return null;
+    }
 
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
@@ -194,6 +418,20 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
                   src={fileUrl}
                   alt={viewingFile.name}
                   className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                  onError={(e) => {
+                    console.error('Image failed to load:', fileUrl);
+                    e.currentTarget.style.display = 'none';
+                    // Show error message
+                    const parent = e.currentTarget.parentElement;
+                    if (parent) {
+                      parent.innerHTML = `
+                        <div class="text-center">
+                          <p class="text-red-500 mb-4">Failed to load image</p>
+                          <button onclick="window.location.reload()" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Retry</button>
+                        </div>
+                      `;
+                    }
+                  }}
                 />
               </div>
             ) : isPdf ? (
@@ -201,6 +439,9 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
                 src={fileUrl}
                 className="w-full h-full min-h-[600px] rounded-lg shadow-lg bg-white"
                 title={viewingFile.name}
+                onError={() => {
+                  console.error('PDF failed to load:', fileUrl);
+                }}
               />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center">
@@ -228,7 +469,7 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 h-full">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 h-[600px] max-h-[600px]">
         <div className="flex items-center justify-center h-full">
           <div className="text-sm text-gray-500 dark:text-gray-400">Loading...</div>
         </div>
@@ -238,7 +479,7 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
 
   if (error) {
     return (
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 h-full">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 h-[600px] max-h-[600px]">
         <div className="flex items-center justify-center h-full">
           <div className="text-sm text-red-500">Error: {error}</div>
         </div>
@@ -248,7 +489,7 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
 
   return (
     <>
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 transition-colors h-full flex flex-col">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 transition-colors h-[600px] max-h-[600px] flex flex-col">
         {/* Header - Fixed */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
           <div className="flex justify-between items-center">
@@ -281,34 +522,34 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
               <table className="w-full text-xs relative">
                 <thead className="bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-10">
                   <tr className="border-b border-gray-200 dark:border-gray-800">
-                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap w-24">
                       Code
                     </th>
-                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap w-48">
                       Facility Name
                     </th>
-                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap w-36">
                       Date Visited
                     </th>
-                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap w-28">
                       Province
                     </th>
-                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider w-64">
                       Remarks
                     </th>
-                    <th className="px-3 py-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    <th className="px-3 py-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap w-16">
                       File
                     </th>
-                    <th className="px-3 py-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    <th className="px-3 py-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap w-20">
                       Status
                     </th>
-                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap w-32">
                       Created
                     </th>
-                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap w-32">
                       Modified
                     </th>
-                    <th className="px-3 py-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 bg-gray-50 dark:bg-gray-800/50 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">
+                    <th className="px-3 py-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 bg-gray-50 dark:bg-gray-800/50 shadow-[-2px_0_4px_rgba(0,0,0,0.05)] w-28">
                       Actions
                     </th>
                   </tr>
@@ -333,7 +574,7 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
                         <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-300 whitespace-nowrap">
                           {visit.facility_code}
                         </td>
-                        <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-300">
+                        <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-300 max-w-48 truncate">
                           {visit.facility_name}
                         </td>
                         <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-300 whitespace-nowrap">
@@ -342,8 +583,10 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
                         <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-300 whitespace-nowrap">
                           {visit.province}
                         </td>
-                        <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-300 max-w-xs truncate">
-                          {visit.remarks || 'No remarks'}
+                        <td className="px-3 py-2 text-xs text-gray-900 dark:text-gray-300 max-w-64">
+                          <div className="truncate" title={visit.remarks || 'No remarks'}>
+                            {truncateText(visit.remarks, 60)}
+                          </div>
                         </td>
                         <td className="px-3 py-2 text-center whitespace-nowrap">
                           {visit.attachment_path ? (
@@ -373,6 +616,13 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
                             : 'bg-gray-50/50 dark:bg-gray-800/30'
                         }`}>
                           <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => handleView(visit)}
+                              className="p-1 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded transition-colors"
+                              title="View Details"
+                            >
+                              <Eye size={14} />
+                            </button>
                             <button
                               onClick={() => handleEdit(visit)}
                               className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
@@ -411,6 +661,9 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
       />
+
+      {/* Details Modal */}
+      {showDetailsModal && renderDetailsModal()}
 
       {/* Attachment List Modal */}
       {showAttachmentModal && (

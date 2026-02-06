@@ -142,49 +142,64 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
         {/* Controls */}
         <div className="flex items-center gap-2 flex-wrap">
           {expanded && (
-            <select
-              value={sampleType}
-              onChange={(e) => setSampleType(e.target.value as 'Received' | 'Screened')}
-              className="h-8 px-3 text-xs rounded-lg border
-                bg-white dark:bg-gray-700
-                border-gray-300 dark:border-gray-600
-                text-gray-800 dark:text-gray-100
-                focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="Received">Received</option>
-              <option value="Screened">Screened</option>
-            </select>
-          )}
+            <>
+              <select
+                value={sampleType}
+                onChange={(e) => setSampleType(e.target.value as 'Received' | 'Screened')}
+                className="h-8 px-3 text-xs rounded-lg border
+                  bg-white dark:bg-gray-700
+                  border-gray-300 dark:border-gray-600
+                  text-gray-800 dark:text-gray-100
+                  focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Received">Received</option>
+                <option value="Screened">Screened</option>
+              </select>
 
-          {/* Show/Hide Table Button */}
-          {expanded && !isLoading && !error && chartData.length > 0 && (
-            <button
-              onClick={() => setShowTable(!showTable)}
-              className="h-8 px-3 text-xs rounded-lg font-medium
-                bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600
-                text-gray-800 dark:text-gray-100 transition-colors flex items-center gap-1.5"
-              title={showTable ? "Show Chart" : "Show Table"}
-            >
-              {showTable ? (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  Chart
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  Table
-                </>
+              {/* Show/Hide Table Button */}
+              {!isLoading && !error && chartData.length > 0 && (
+                <button
+                  onClick={() => setShowTable(!showTable)}
+                  className="h-8 px-3 text-xs rounded-lg font-medium
+                    bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600
+                    text-gray-800 dark:text-gray-100 transition-colors flex items-center gap-1.5"
+                  title={showTable ? "Show Chart" : "Show Table"}
+                >
+                  {showTable ? (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      Chart
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      Table
+                    </>
+                  )}
+                </button>
               )}
-            </button>
+
+              {/* Refresh Button */}
+              <button
+                onClick={() => refetch()}
+                className="h-8 px-3 text-xs rounded-lg font-medium
+                  bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600
+                  text-gray-800 dark:text-gray-100 transition-colors flex items-center gap-1.5"
+                title="Refresh data"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </>
           )}
 
-          {/* Export Dropdown */}
-          {expanded && !isLoading && !error && chartData.length > 0 && (
+          {/* Export Dropdown - Always visible */}
+          {!isLoading && !error && chartData.length > 0 && (
             <div className="relative">
               <button
                 onClick={() => setExportMenuOpen(!exportMenuOpen)}
@@ -252,22 +267,6 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
             </div>
           )}
 
-          {/* Refresh Button 
-          {expanded && (
-            <button
-              onClick={() => refetch()}
-              className="h-8 px-3 text-xs rounded-lg font-medium
-                bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600
-                text-gray-800 dark:text-gray-100 transition-colors flex items-center gap-1.5"
-              title="Refresh data"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
-          )}
-          */}
-          
           {/* Expand / Collapse */}
           <button
             onClick={onExpand}

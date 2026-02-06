@@ -4,7 +4,7 @@ import { DailyComparisonChart } from './components/DailyComparisonChart';
 import { TrackingSystemTable } from './components/TrackingSystemTable';
 import { YTDComparisonChart } from './components/YTDComparisonChart';
 import { CumulativeMonthlyChart } from './components/CumulativeMonthlyChart';
-import { CumulativeAnnualChart, UnsatRateChart } from './components/CumulativeAnnualChart';
+import { CumulativeAnnualChart } from './components/CumulativeAnnualChart';
 import { LaboratorySupplies } from './components/LaboratorySupplies';
 import { ReagentSupplies } from './components/ReagentSupplies';
 

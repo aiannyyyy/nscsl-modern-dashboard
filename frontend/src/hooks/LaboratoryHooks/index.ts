@@ -44,3 +44,24 @@ export { useLabSupplies } from './useLabSupplies';
 export { useLabReagents } from './useLabReagents';
 
 export { useCumulativeMonthlyCensus, useReceivedCensus, useScreenedCensus } from './useCensus';
+
+export { useCumulativeAnnualCensus } from './useCumulativeAnnualCencus';
+
+// useDemogSummaryCards hooks
+export {
+    useDemogCurrentMonth,
+    useDemogDateRange,
+    useDemogMonth,
+    useDemogYear,
+    useDemogStats,
+    useDemogTotals
+} from './useDemogSummaryCards';
+
+// Export types from useDemogSummaryCards
+export type {
+    DemogSummaryStats,
+    DemogSummaryStatsWithDateRange,
+    DateRangeParams
+} from '../../services/LaboratoryServices/demogSummaryCardService';
+
+export { useSpeedMonitoring } from './useSpeedMonitoring';

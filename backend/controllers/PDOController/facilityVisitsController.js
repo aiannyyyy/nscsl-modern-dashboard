@@ -30,8 +30,7 @@ const createVisit = async (req, res) => {
             mark,
         } = req.body;
 
-        // Get user info from session/token (you'll need to implement authentication)
-        // For now, using placeholder - replace with actual user from auth middleware
+        // Get user info from session/token
         const userName = req.user?.name || req.body.userName || 'System';
 
         // Handle file uploads
@@ -42,7 +41,7 @@ const createVisit = async (req, res) => {
         // Convert the datetime from frontend to MySQL datetime format
         const mysqlDateTime = date_visited.replace('T', ' ') + ':00';
 
-        // Get current timestamp for created_at
+        // Get current timestamp
         const now = new Date();
 
         const sql = `
@@ -161,7 +160,7 @@ const updateVisit = async (req, res) => {
             ? date_visited.replace('T', ' ') + ':00'
             : date_visited;
 
-        // Get current timestamp for modified_at
+        // Get current timestamp - just use new Date() object, mysql2 handles it
         const now = new Date();
 
         // Update database

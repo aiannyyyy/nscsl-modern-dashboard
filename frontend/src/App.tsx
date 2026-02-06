@@ -14,6 +14,7 @@ import { SampleScreened } from './pages/pdo/SampleScreened';
 import { Unsatisfactory } from './pages/pdo/Unsatisfactory';
 import ListCar from './pages/pdo/ListCar';
 import NSFPerformance from './pages/pdo/NSFPerformance';
+import DemoAndUnsat from './pages/laboratory/DemoAndUnsat';
 
 // Create a QueryClient instance
 const queryClient = new QueryClient({
@@ -59,7 +60,7 @@ function App() {
 
               {/* Laboratory Routes */}
               <Route path="laboratory" element={<LaboratoryOverview />} />
-              <Route path="laboratory/demo-unsat" element={<div>Demo & Unsat Page</div>} />
+              <Route path="laboratory/demo-unsat" element={<DemoAndUnsat />} />
 
               {/* Followup Routes */}
               <Route path="followup" element={<FollowupOverview />} />

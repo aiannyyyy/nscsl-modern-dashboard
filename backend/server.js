@@ -210,6 +210,15 @@ app.use("/api/laboratory/lab-reagents", require("./routes/LaboratoryRoutes/labRe
 // Laboratory Cumulative Census
 app.use("/api/laboratory/census", require("./routes/LaboratoryRoutes/censusRoutes"));
 
+// Laboratory Cumulative Annual Census
+app.use("/api/laboratory/cumulative-annual-census", require("./routes/LaboratoryRoutes/cumulativeAnnualCencusRoutes"));
+
+// Laboratory Demographic Summary Cards
+app.use("/api/laboratory/demog-summary-cards", require("./routes/LaboratoryRoutes/demogSummaryCardsRoutes"));
+
+// Laboratory Speed Monitoring
+app.use("/api/speed-monitoring", require("./routes/LaboratoryRoutes/speedMonitoringRoutes"));
+
 // Unsatisfactory Analysis
 app.use("/api/unsat", require("./routes/PDORoutes/unsatRoutes"));
 
