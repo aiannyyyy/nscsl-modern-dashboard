@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   BarChart,
   Bar,
@@ -7,8 +7,12 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  LabelList
 } from 'recharts';
+import { Download, ChevronDown } from 'lucide-react';
+import { useLabTotalDailySamples } from '../../../hooks/LaboratoryHooks';
+import { downloadChart } from '../../../utils/chartDownloadUtils';
 
 interface ChartData {
   day: string;
@@ -22,44 +26,150 @@ interface Props {
 }
 
 export const DailyComparisonChart: React.FC<Props> = ({ expanded, onExpand }) => {
-  const [year1, setYear1] = useState('2024');
-  const [year2, setYear2] = useState('2025');
-  const [month, setMonth] = useState('January');
-  const [chartData, setChartData] = useState<ChartData[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Get current year and month dynamically
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().toLocaleString('en-US', { month: 'long' }).toLowerCase();
+  
+  const [year1, setYear1] = useState((currentYear - 1).toString());
+  const [year2, setYear2] = useState(currentYear.toString());
+  const [month, setMonth] = useState(currentMonth);
+  const [sampleType, setSampleType] = useState<'received' | 'screened'>('received');
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  
+  const chartRef = useRef<HTMLDivElement>(null);
 
-  const years = Array.from({ length: 12 }, (_, i) => (2025 - i).toString());
+  const years = Array.from({ length: 12 }, (_, i) => (currentYear - i).toString());
   const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    'january', 'february', 'march', 'april', 'may', 'june',
+    'july', 'august', 'september', 'october', 'november', 'december'
   ];
 
-  useEffect(() => {
-    fetchChartData();
-  }, [year1, year2, month]);
+  const sampleTypes = [
+    { value: 'received', label: 'Received' },
+    { value: 'screened', label: 'Screened' }
+  ];
 
-  const fetchChartData = async () => {
+  // Use React Query for both years
+  const { data: year1Response, isLoading: isLoadingYear1, error: errorYear1 } = useLabTotalDailySamples({
+    year: year1,
+    month: month,
+    sampleType: sampleType
+  });
+
+  const { data: year2Response, isLoading: isLoadingYear2, error: errorYear2 } = useLabTotalDailySamples({
+    year: year2,
+    month: month,
+    sampleType: sampleType
+  });
+
+  // Combine loading and error states
+  const loading = isLoadingYear1 || isLoadingYear2;
+  const error = errorYear1 || errorYear2;
+
+  // Process chart data
+  const chartData: ChartData[] = React.useMemo(() => {
+    if (!year1Response?.data || !year2Response?.data) return [];
+
+    // Create a map for year2 data for easy lookup
+    const year2Map = new Map(
+      year2Response.data.map(item => [item.RECEIVED_DATE.split('-')[2], item.TOTAL_SAMPLES])
+    );
+
+    // Combine data by day
+    const combinedData: ChartData[] = year1Response.data.map(item => {
+      const day = item.RECEIVED_DATE.split('-')[2]; // Extract day from YYYY-MM-DD
+      return {
+        day: day,
+        year1: item.TOTAL_SAMPLES,
+        year2: year2Map.get(day) || 0
+      };
+    });
+
+    // Add any days from year2 that aren't in year1
+    year2Response.data.forEach(item => {
+      const day = item.RECEIVED_DATE.split('-')[2];
+      if (!combinedData.find(d => d.day === day)) {
+        combinedData.push({
+          day: day,
+          year1: 0,
+          year2: item.TOTAL_SAMPLES
+        });
+      }
+    });
+
+    // Sort by day number
+    combinedData.sort((a, b) => parseInt(a.day) - parseInt(b.day));
+
+    return combinedData;
+  }, [year1Response, year2Response]);
+
+  // Custom label renderer for bar labels - positioned lower
+  const renderCustomLabel = (props: any) => {
+    const { x, y, width, value } = props;
+    
+    // Only show label if value > 0
+    if (value === 0) return null;
+    
+    // Check if dark mode is active
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    
+    return (
+      <text
+        x={x + width / 2}
+        y={y - 8}  // Moved down from -5 to -8 for more spacing
+        fill={isDarkMode ? '#e5e7eb' : '#374151'}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize={11}
+        fontWeight="600"
+      >
+        {value}
+      </text>
+    );
+  };
+
+  // Handle chart download
+  const handleDownload = async (format: 'png' | 'svg' | 'excel') => {
+    setShowDownloadMenu(false);
+
+    // Capitalize month for filename
+    const monthCapitalized = month.charAt(0).toUpperCase() + month.slice(1);
+    const filename = `daily-${sampleType}-samples-${monthCapitalized}-${year1}-vs-${year2}`;
+
     try {
-      setLoading(true);
-      // TODO: Replace with actual API call
-      // const response = await fetch(`/api/laboratory/daily-comparison?year1=${year1}&year2=${year2}&month=${month}`);
-      // const result = await response.json();
+      if (format === 'excel') {
+        // Prepare data for Excel export
+        const excelData = chartData.map(item => ({
+          Day: `${monthCapitalized.substring(0, 3)} ${item.day}`,
+          [year1]: item.year1,
+          [year2]: item.year2,
+        }));
 
-      // Simulated data
-      const daysInMonth = 31;
-      const data = Array.from({ length: daysInMonth }, (_, i) => ({
-        day: (i + 1).toString(),
-        year1: Math.floor(Math.random() * 100) + 50,
-        year2: Math.floor(Math.random() * 100) + 50
-      }));
-
-      setChartData(data);
+        await downloadChart({
+          elementId: 'daily-comparison-chart',
+          filename,
+          format: 'excel',
+          data: excelData,
+          sheetName: `${sampleType} Samples`,
+        });
+      } else {
+        await downloadChart({
+          elementId: 'daily-comparison-chart',
+          filename,
+          format,
+          backgroundColor: document.documentElement.classList.contains('dark') 
+            ? '#1f2937' 
+            : '#ffffff',
+          scale: 2,
+        });
+      }
     } catch (error) {
-      console.error('Error fetching chart data:', error);
-    } finally {
-      setLoading(false);
+      console.error('Download failed:', error);
     }
   };
+
+  // Capitalize month for display
+  const displayMonth = month.charAt(0).toUpperCase() + month.slice(1);
 
   return (
     <div
@@ -78,13 +188,32 @@ export const DailyComparisonChart: React.FC<Props> = ({ expanded, onExpand }) =>
           <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
-          Daily Received Samples
+          Daily {sampleType === 'received' ? 'Received' : 'Screened'} Samples
         </h3>
 
         {/* Controls */}
         <div className="flex items-center gap-2 flex-wrap">
           {expanded && (
             <>
+              {/* Sample Type Dropdown */}
+              <select
+                value={sampleType}
+                onChange={(e) => setSampleType(e.target.value as 'received' | 'screened')}
+                className="h-8 px-3 text-xs rounded-lg border font-semibold
+                  bg-white dark:bg-gray-700
+                  border-gray-300 dark:border-gray-600
+                  text-gray-800 dark:text-gray-100
+                  focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {sampleTypes.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+
+              <span className="text-xs font-semibold text-gray-400 dark:text-gray-500">|</span>
+
               {/* Year 1 */}
               <select
                 value={year1}
@@ -128,11 +257,75 @@ export const DailyComparisonChart: React.FC<Props> = ({ expanded, onExpand }) =>
                   focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {months.map((m) => (
-                  <option key={m} value={m}>{m}</option>
+                  <option key={m} value={m}>
+                    {m.charAt(0).toUpperCase() + m.slice(1)}
+                  </option>
                 ))}
               </select>
             </>
           )}
+
+          {/* Download Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+              disabled={loading || chartData.length === 0}
+              className="h-8 px-3 text-xs rounded-lg border
+                bg-white dark:bg-gray-700
+                border-gray-300 dark:border-gray-600
+                text-gray-800 dark:text-gray-100
+                hover:bg-gray-50 dark:hover:bg-gray-600
+                disabled:opacity-50 disabled:cursor-not-allowed
+                flex items-center gap-1.5 transition-colors"
+            >
+              <Download size={14} />
+              Export
+              <ChevronDown size={12} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {showDownloadMenu && (
+              <>
+                {/* Backdrop */}
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowDownloadMenu(false)}
+                />
+
+                {/* Menu */}
+                <div className="absolute right-0 mt-1 w-48 rounded-lg shadow-lg border
+                  bg-white dark:bg-gray-800
+                  border-gray-200 dark:border-gray-700
+                  z-20 overflow-hidden"
+                >
+                  <button
+                    onClick={() => handleDownload('png')}
+                    className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                      text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                  >
+                    <Download size={14} />
+                    Download as PNG
+                  </button>
+                  <button
+                    onClick={() => handleDownload('svg')}
+                    className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                      text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                  >
+                    <Download size={14} />
+                    Download as SVG
+                  </button>
+                  <button
+                    onClick={() => handleDownload('excel')}
+                    className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                      text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                  >
+                    <Download size={14} />
+                    Export to Excel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Expand / Collapse */}
           <button
@@ -147,7 +340,7 @@ export const DailyComparisonChart: React.FC<Props> = ({ expanded, onExpand }) =>
       </div>
 
       {/* Chart */}
-      <div className="flex-1 p-5">
+      <div id="daily-comparison-chart" ref={chartRef} className="flex-1 p-5">
         {loading ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
@@ -155,20 +348,31 @@ export const DailyComparisonChart: React.FC<Props> = ({ expanded, onExpand }) =>
               <p className="text-sm text-gray-500 dark:text-gray-400">Loading chart...</p>
             </div>
           </div>
+        ) : error ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-sm text-red-500 dark:text-red-400">
+                {error instanceof Error ? error.message : 'Failed to load chart data'}
+              </p>
+            </div>
+          </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
-              margin={{ top: 20, right: 30, left: 20, bottom: expanded ? 60 : 40 }}
+              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis
                 dataKey="day"
                 angle={-45}
                 textAnchor="end"
-                height={expanded ? 80 : 60}
-                tick={{ fontSize: expanded ? 12 : 10 }}
+                tick={{ fontSize: 12 }}
                 stroke="#6b7280"
+                interval={0}
+                tickFormatter={(value) => {
+                  return `${displayMonth.substring(0, 3)} ${value}`;
+                }}
               />
               <YAxis tick={{ fontSize: 12 }} stroke="#6b7280" />
               <Tooltip
@@ -179,13 +383,18 @@ export const DailyComparisonChart: React.FC<Props> = ({ expanded, onExpand }) =>
                   fontSize: '12px',
                 }}
                 cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }}
+                labelFormatter={(value) => `${displayMonth} ${value}`}
               />
               <Legend
                 wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
                 iconType="circle"
               />
-              <Bar dataKey="year1" fill="#3b82f6" name={year1} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="year2" fill="#ec4899" name={year2} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="year1" fill="#3b82f6" name={year1} radius={[4, 4, 0, 0]}>
+                <LabelList dataKey="year1" content={renderCustomLabel} />
+              </Bar>
+              <Bar dataKey="year2" fill="#ec4899" name={year2} radius={[4, 4, 0, 0]}>
+                <LabelList dataKey="year2" content={renderCustomLabel} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}

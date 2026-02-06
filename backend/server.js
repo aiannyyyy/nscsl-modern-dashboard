@@ -188,13 +188,30 @@ app.use("/api/sample-receive", require("./routes/PDORoutes/sampleReceiveRoutes")
 // Sample Screened
 app.use("/api/sample-screened", require("./routes/PDORoutes/sampleScreenedRoutes"));
 
+
+// Laboratory Card Summary
+app.use("/api/laboratory/card-summary", require("./routes/LaboratoryRoutes/cardSummaryRoutes"));
+
+// Laboratory Total Daily Samples
+app.use("/api/laboratory/total-daily-samples", require("./routes/LaboratoryRoutes/labTotalDailySamplesRoutes"));
+
+// Laboratory YTD Sample Comparison
+app.use("/api/laboratory/ytd-sample-comparison", require("./routes/LaboratoryRoutes/ytdSampleComparisonRoutes"));
+
+// Laboratory Tracking Stats
+app.use("/api/laboratory/tracking-stats", require("./routes/LaboratoryRoutes/labTrackingRoutes"));
+
+// Laboratory Lab Supplies
+app.use("/api/laboratory/lab-supplies", require("./routes/LaboratoryRoutes/labSuppliesRoutes"));
+
+// Laboratory Reagents
+app.use("/api/laboratory/lab-reagents", require("./routes/LaboratoryRoutes/labReagentRoutes"));
+
 // Unsatisfactory Analysis
 app.use("/api/unsat", require("./routes/PDORoutes/unsatRoutes"));
 
 // NSF Performance
 app.use("/api", require("./routes/PDORoutes/nsfPerformanceRoutes"));
-
-
 
 console.log("📋 API Routes loaded");
 

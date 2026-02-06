@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight
 } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
 interface MenuItem {
   title: string;
@@ -24,7 +25,8 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed }) => {
   const location = useLocation();
-  const [expandedMenu, setExpandedMenu] = useState<string>('PDO');
+  const { user } = useAuth();
+  const [expandedMenu, setExpandedMenu] = useState<string>('');
 
   const menuItems: MenuItem[] = [
     {
@@ -71,6 +73,72 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed })
       ],
     },
   ];
+
+  // Function to determine which menu should be expanded based on current route
+  const getMenuFromPath = (path: string): string => {
+    if (path.includes('/dashboard/admin')) return 'ADMIN';
+    if (path.includes('/dashboard/pdo')) return 'PDO';
+    if (path.includes('/dashboard/laboratory')) return 'LABORATORY';
+    if (path.includes('/dashboard/followup')) return 'FOLLOWUP';
+    if (path.includes('/dashboard/it-job-order')) return 'IT JOB ORDER';
+    return '';
+  };
+
+  // Function to map user department to menu title
+  const getDepartmentMenu = (dept: string): string => {
+    const deptMap: { [key: string]: string } = {
+      'admin': 'ADMIN',
+      'Admin': 'ADMIN',
+      'ADMIN': 'ADMIN',
+      'administration': 'ADMIN',
+      'Administration': 'ADMIN',
+      
+      'pdo': 'PDO',
+      'PDO': 'PDO',
+      'program': 'PDO',
+      'Program': 'PDO',
+      'PROGRAM': 'PDO',
+      
+      'laboratory': 'LABORATORY',
+      'Laboratory': 'LABORATORY',
+      'LABORATORY': 'LABORATORY',
+      'lab': 'LABORATORY',
+      'Lab': 'LABORATORY',
+      
+      'followup': 'FOLLOWUP',
+      'Followup': 'FOLLOWUP',
+      'Follow-up': 'FOLLOWUP',
+      'follow-up': 'FOLLOWUP',
+      'FOLLOWUP': 'FOLLOWUP',
+      
+      'it-job-order': 'IT JOB ORDER',
+      'it': 'IT JOB ORDER',
+      'IT': 'IT JOB ORDER',
+      'Information Technology': 'IT JOB ORDER',
+      
+      'all': 'PDO',  // Default for super users
+      'All': 'PDO',
+      'ALL': 'PDO',
+    };
+    
+    return deptMap[dept] || 'PDO';
+  };
+
+  // Auto-expand based on user department and current route
+  useEffect(() => {
+    // First priority: expand based on current route
+    const menuFromPath = getMenuFromPath(location.pathname);
+    if (menuFromPath) {
+      setExpandedMenu(menuFromPath);
+      return;
+    }
+
+    // Second priority: expand based on user's department
+    if (user?.department) {
+      const userDeptMenu = getDepartmentMenu(user.department);
+      setExpandedMenu(userDeptMenu);
+    }
+  }, [location.pathname, user?.department]);
 
   const toggleMenu = (title: string) => {
     if (isCollapsed) {

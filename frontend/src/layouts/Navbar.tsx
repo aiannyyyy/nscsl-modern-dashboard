@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, LogOut, Settings, Menu } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useDarkMode } from '../hooks';
 import { useAuth } from '../hooks/useAuth';
 import { Notifications } from '../components';
@@ -14,6 +14,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, setIsCollapsed }) =
   const [_darkMode] = useDarkMode();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
 
   // Get user info from auth context
@@ -21,6 +22,19 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, setIsCollapsed }) =
   const userEmail = user?.email || "";
   const userRole = user?.role || "user";
   const userDept = user?.department || "";
+
+  // Function to get current dashboard from route
+  const getCurrentDashboard = (pathname: string): string => {
+    if (pathname.includes('/dashboard/admin')) return 'Admin';
+    if (pathname.includes('/dashboard/pdo')) return 'PDO';
+    if (pathname.includes('/dashboard/laboratory')) return 'Laboratory';
+    if (pathname.includes('/dashboard/followup')) return 'Follow-up';
+    if (pathname.includes('/dashboard/it-job-order')) return 'IT Job Order';
+    return 'Dashboard';
+  };
+
+  // Get the current dashboard name from the route
+  const currentDashboard = getCurrentDashboard(location.pathname);
 
   // Handle logout
   const handleLogout = () => {
@@ -38,7 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, setIsCollapsed }) =
     return roleMap[role] || role;
   };
 
-  // Format department for display
+  // Format department for display (user's actual department)
   const formatDept = (dept: string) => {
     const deptMap: { [key: string]: string } = {
       'pdo': 'PDO',
@@ -72,7 +86,7 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, setIsCollapsed }) =
               Hello, <span className="font-semibold text-gray-900 dark:text-white">{userName}</span>
             </h1>
             <p className="text-xs text-gray-500 dark:text-gray-500">
-              Welcome to {formatDept(userDept)} Dashboard
+              Welcome to {currentDashboard} Dashboard
             </p>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   BarChart,
   Bar,
@@ -7,8 +7,12 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  LabelList
 } from 'recharts';
+import { Download, ChevronDown } from 'lucide-react';
+import { useYTDComparison } from '../../../hooks/LaboratoryHooks/useYTDSampleComparison';
+import { downloadChart } from '../../../utils/chartDownloadUtils';
 
 interface MonthData {
   month: string;
@@ -23,42 +27,115 @@ interface Props {
 }
 
 export const YTDComparisonChart: React.FC<Props> = ({ expanded, onExpand }) => {
-  const [year1, setYear1] = useState('2024');
-  const [year2, setYear2] = useState('2025');
-  const [sampleType, setSampleType] = useState('Received');
-  const [chartData, setChartData] = useState<MonthData[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Get current year dynamically
+  const currentYear = new Date().getFullYear();
+  
+  const [year1, setYear1] = useState(currentYear - 1);
+  const [year2, setYear2] = useState(currentYear);
+  const [sampleType, setSampleType] = useState<'received' | 'screened'>('received');
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
-  const years = Array.from({ length: 12 }, (_, i) => (2025 - i).toString());
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const chartRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    fetchChartData();
-  }, [year1, year2, sampleType]);
+  const years = Array.from({ length: 12 }, (_, i) => (currentYear - i));
 
-  const fetchChartData = async () => {
+  const sampleTypes = [
+    { value: 'received', label: 'Received' },
+    { value: 'screened', label: 'Screened' }
+  ];
+
+  // Use the custom hook
+  const {
+    chartData: apiChartData,
+    tableData,
+    summaryStats,
+    isLoading,
+    error
+  } = useYTDComparison({
+    year1,
+    year2,
+    type: sampleType,
+    enabled: true
+  });
+
+  // Transform data for the chart
+  const chartData: MonthData[] = React.useMemo(() => {
+    if (!tableData) return [];
+
+    return tableData.map(row => ({
+      month: row.monthShort,
+      year1: row.year1,
+      year2: row.year2,
+      percentDiff: row.percentChangeValue
+    }));
+  }, [tableData]);
+
+  // Prepare data for Excel export
+  const excelData = React.useMemo(() => {
+    if (!tableData) return [];
+
+    return tableData.map(row => ({
+      Month: row.month,
+      [year1]: row.year1,
+      [year2]: row.year2,
+      Difference: row.difference,
+      'Percent Change': row.percentChange
+    }));
+  }, [tableData, year1, year2]);
+
+  // Custom label renderer for bar labels - positioned lower
+  const renderCustomLabel = (props: any) => {
+    const { x, y, width, value } = props;
+    
+    // Only show label if value > 0
+    if (value === 0) return null;
+    
+    // Check if dark mode is active
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    
+    return (
+      <text
+        x={x + width / 2}
+        y={y - 8}  // Position above the bar
+        fill={isDarkMode ? '#e5e7eb' : '#374151'}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize={11}
+        fontWeight="600"
+      >
+        {value.toLocaleString()}
+      </text>
+    );
+  };
+
+  // Handle chart download
+  const handleDownload = async (format: 'png' | 'svg' | 'excel') => {
+    setShowDownloadMenu(false);
+
+    const filename = `ytd-${sampleType}-samples-${year1}-vs-${year2}`;
+
     try {
-      setLoading(true);
-      // TODO: Replace with actual API call
-
-      // Simulated data
-      const data = months.map((month) => ({
-        month,
-        year1: Math.floor(Math.random() * 5000) + 1000,
-        year2: Math.floor(Math.random() * 5000) + 1000,
-        percentDiff: 0
-      }));
-
-      // Calculate percent difference
-      data.forEach((item) => {
-        item.percentDiff = ((item.year2 - item.year1) / item.year1) * 100;
-      });
-
-      setChartData(data);
+      if (format === 'excel') {
+        await downloadChart({
+          elementId: 'ytd-comparison-chart',
+          filename,
+          format: 'excel',
+          data: excelData,
+          sheetName: `YTD ${sampleType.charAt(0).toUpperCase() + sampleType.slice(1)}`,
+        });
+      } else {
+        await downloadChart({
+          elementId: 'ytd-comparison-chart',
+          filename,
+          format,
+          backgroundColor: document.documentElement.classList.contains('dark') 
+            ? '#1f2937' 
+            : '#ffffff',
+          scale: 2,
+        });
+      }
     } catch (error) {
-      console.error('Error fetching YTD data:', error);
-    } finally {
-      setLoading(false);
+      console.error('Download failed:', error);
     }
   };
 
@@ -79,16 +156,36 @@ export const YTDComparisonChart: React.FC<Props> = ({ expanded, onExpand }) => {
           <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
-          YTD {sampleType} Samples
+          YTD {sampleType === 'received' ? 'Received' : 'Screened'} Samples
         </h3>
 
         {/* Controls */}
         <div className="flex items-center gap-2 flex-wrap">
           {expanded && (
             <>
+              {/* Sample Type Dropdown */}
+              <select
+                value={sampleType}
+                onChange={(e) => setSampleType(e.target.value as 'received' | 'screened')}
+                className="h-8 px-3 text-xs rounded-lg border font-semibold
+                  bg-white dark:bg-gray-700
+                  border-gray-300 dark:border-gray-600
+                  text-gray-800 dark:text-gray-100
+                  focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {sampleTypes.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+
+              <span className="text-xs font-semibold text-gray-400 dark:text-gray-500">|</span>
+
+              {/* Year 1 */}
               <select
                 value={year1}
-                onChange={(e) => setYear1(e.target.value)}
+                onChange={(e) => setYear1(Number(e.target.value))}
                 className="h-8 px-3 text-xs rounded-lg border
                   bg-white dark:bg-gray-700
                   border-gray-300 dark:border-gray-600
@@ -102,9 +199,10 @@ export const YTDComparisonChart: React.FC<Props> = ({ expanded, onExpand }) => {
 
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">VS</span>
 
+              {/* Year 2 */}
               <select
                 value={year2}
-                onChange={(e) => setYear2(e.target.value)}
+                onChange={(e) => setYear2(Number(e.target.value))}
                 className="h-8 px-3 text-xs rounded-lg border
                   bg-white dark:bg-gray-700
                   border-gray-300 dark:border-gray-600
@@ -115,21 +213,70 @@ export const YTDComparisonChart: React.FC<Props> = ({ expanded, onExpand }) => {
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
-
-              <select
-                value={sampleType}
-                onChange={(e) => setSampleType(e.target.value)}
-                className="h-8 px-3 text-xs rounded-lg border
-                  bg-white dark:bg-gray-700
-                  border-gray-300 dark:border-gray-600
-                  text-gray-800 dark:text-gray-100
-                  focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Received">Received</option>
-                <option value="Screened">Screened</option>
-              </select>
             </>
           )}
+
+          {/* Download Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+              disabled={isLoading || chartData.length === 0}
+              className="h-8 px-3 text-xs rounded-lg border
+                bg-white dark:bg-gray-700
+                border-gray-300 dark:border-gray-600
+                text-gray-800 dark:text-gray-100
+                hover:bg-gray-50 dark:hover:bg-gray-600
+                disabled:opacity-50 disabled:cursor-not-allowed
+                flex items-center gap-1.5 transition-colors"
+            >
+              <Download size={14} />
+              Export
+              <ChevronDown size={12} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {showDownloadMenu && (
+              <>
+                {/* Backdrop */}
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowDownloadMenu(false)}
+                />
+
+                {/* Menu */}
+                <div className="absolute right-0 mt-1 w-48 rounded-lg shadow-lg border
+                  bg-white dark:bg-gray-800
+                  border-gray-200 dark:border-gray-700
+                  z-20 overflow-hidden"
+                >
+                  <button
+                    onClick={() => handleDownload('png')}
+                    className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                      text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                  >
+                    <Download size={14} />
+                    Download as PNG
+                  </button>
+                  <button
+                    onClick={() => handleDownload('svg')}
+                    className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                      text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                  >
+                    <Download size={14} />
+                    Download as SVG
+                  </button>
+                  <button
+                    onClick={() => handleDownload('excel')}
+                    className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                      text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                  >
+                    <Download size={14} />
+                    Export to Excel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Expand / Collapse */}
           <button
@@ -144,12 +291,22 @@ export const YTDComparisonChart: React.FC<Props> = ({ expanded, onExpand }) => {
       </div>
 
       {/* Chart */}
-      <div className="flex-1 p-5">
-        {loading ? (
+      <div id="ytd-comparison-chart" ref={chartRef} className="flex-1 p-5">
+        {isLoading ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
               <p className="text-sm text-gray-500 dark:text-gray-400">Loading chart...</p>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <svg className="w-12 h-12 text-red-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm text-red-600 dark:text-red-400">Error loading chart data</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{error.message}</p>
             </div>
           </div>
         ) : (
@@ -171,23 +328,27 @@ export const YTDComparisonChart: React.FC<Props> = ({ expanded, onExpand }) => {
                 wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
                 iconType="circle"
               />
-              <Bar dataKey="year1" fill="#3b82f6" name={year1} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="year2" fill="#ec4899" name={year2} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="year1" fill="#3b82f6" name={year1.toString()} radius={[4, 4, 0, 0]}>
+                <LabelList dataKey="year1" content={renderCustomLabel} />
+              </Bar>
+              <Bar dataKey="year2" fill="#ec4899" name={year2.toString()} radius={[4, 4, 0, 0]}>
+                <LabelList dataKey="year2" content={renderCustomLabel} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}
       </div>
 
       {/* Data Table — only visible when expanded */}
-      {expanded && !loading && chartData.length > 0 && (
+      {expanded && !isLoading && chartData.length > 0 && (
         <div className="px-5 pb-4 overflow-x-auto">
           <table className="w-full text-center border-collapse text-sm">
             <thead>
               <tr className="bg-blue-600 dark:bg-blue-700 text-white">
                 <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">Year</th>
-                {months.map((month) => (
-                  <th key={month} className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">
-                    {month}
+                {chartData.map((data) => (
+                  <th key={data.month} className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">
+                    {data.month}
                   </th>
                 ))}
               </tr>
