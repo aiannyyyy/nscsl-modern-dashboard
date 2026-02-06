@@ -95,11 +95,12 @@ export const LaboratoryOverview: React.FC = () => {
         </div>
       </div>
 
-      {/* Row 4: Unsat Rate — full width */}
+      {/* Row 4: Unsat Rate — full width 
       <UnsatRateChart
         expanded={false}
         onExpand={() => {}}
       />
+      */}
     </div>
   );
 };

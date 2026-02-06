@@ -207,6 +207,9 @@ app.use("/api/laboratory/lab-supplies", require("./routes/LaboratoryRoutes/labSu
 // Laboratory Reagents
 app.use("/api/laboratory/lab-reagents", require("./routes/LaboratoryRoutes/labReagentRoutes"));
 
+// Laboratory Cumulative Census
+app.use("/api/laboratory/census", require("./routes/LaboratoryRoutes/censusRoutes"));
+
 // Unsatisfactory Analysis
 app.use("/api/unsat", require("./routes/PDORoutes/unsatRoutes"));
 

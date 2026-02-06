@@ -42,3 +42,5 @@ export * from './useLabTrackingStats';
 export { useLabSupplies } from './useLabSupplies';
 
 export { useLabReagents } from './useLabReagents';
+
+export { useCumulativeMonthlyCensus, useReceivedCensus, useScreenedCensus } from './useCensus';
