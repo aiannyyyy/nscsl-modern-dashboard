@@ -6,9 +6,16 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  Sector,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
 } from "recharts";
-import { Download, ChevronDown } from "lucide-react";
+import { Download, ChevronDown, Loader2, X, User } from "lucide-react";
 import { downloadChart } from "../../../utils/chartDownloadUtils";
+import { useCommonErrors, useCommonErrorBreakdown } from "../../../hooks/LaboratoryHooks/useCommonError";
 
 interface ErrorData {
   error: string;
@@ -22,41 +29,396 @@ interface Props {
 
 const COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6"];
 
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+// ─────────────────────────────────────────────
+// Breakdown Modal Component
+// ─────────────────────────────────────────────
+interface BreakdownModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  tableColumn: string;
+  year: number;
+  month: number;
+}
+
+const BreakdownModal: React.FC<BreakdownModalProps> = ({
+  isOpen,
+  onClose,
+  tableColumn,
+  year,
+  month,
+}) => {
+  const { data, isLoading, isError } = useCommonErrorBreakdown(
+    { year, month, tableColumn },
+    { enabled: isOpen && !!tableColumn }
+  );
+
+  const techData = useMemo(() => {
+    if (!data?.data?.technicianSummary) return [];
+
+    return data.data.technicianSummary.map((tech) => ({
+      name: tech.tech_name,
+      count: tech.count,
+      percentage:
+        data.data.totalRecords > 0
+          ? ((tech.count / data.data.totalRecords) * 100).toFixed(1)
+          : "0",
+    }));
+  }, [data]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div
+        className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl
+        bg-white dark:bg-gray-900
+        border border-gray-200 dark:border-gray-700"
+      >
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-6 py-4 border-b
+          bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800
+          border-gray-200 dark:border-gray-700"
+        >
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+              Error Breakdown: {tableColumn}
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              {MONTHS[month - 1]} {year}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg transition-colors
+              hover:bg-white dark:hover:bg-gray-700
+              text-gray-500 dark:text-gray-400
+              hover:text-gray-700 dark:hover:text-gray-200"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="text-center">
+                <Loader2 className="w-10 h-10 animate-spin mx-auto mb-3 text-blue-500" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Loading breakdown data...
+                </p>
+              </div>
+            </div>
+          ) : isError ? (
+            <div className="flex items-center justify-center py-16">
+              <p className="text-sm text-red-500">Failed to load breakdown data</p>
+            </div>
+          ) : techData.length === 0 ? (
+            <div className="flex items-center justify-center py-16">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                No breakdown data available
+              </p>
+            </div>
+          ) : (
+            <div className="p-6 space-y-6">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div
+                  className="p-4 rounded-xl border
+                  bg-blue-50 dark:bg-blue-900/20
+                  border-blue-200 dark:border-blue-800"
+                >
+                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                    Total Errors
+                  </p>
+                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100 mt-1">
+                    {data?.data.totalRecords || 0}
+                  </p>
+                </div>
+                <div
+                  className="p-4 rounded-xl border
+                  bg-purple-50 dark:bg-purple-900/20
+                  border-purple-200 dark:border-purple-800"
+                >
+                  <p className="text-sm font-medium text-purple-600 dark:text-purple-400">
+                    Error Type
+                  </p>
+                  <p className="text-2xl font-bold text-purple-900 dark:text-purple-100 mt-1">
+                    {tableColumn}
+                  </p>
+                </div>
+                <div
+                  className="p-4 rounded-xl border
+                  bg-green-50 dark:bg-green-900/20
+                  border-green-200 dark:border-green-800"
+                >
+                  <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                    Technicians
+                  </p>
+                  <p className="text-2xl font-bold text-green-900 dark:text-green-100 mt-1">
+                    {techData.length}
+                  </p>
+                </div>
+              </div>
+
+              {/* Bar Chart */}
+              <div className="p-4 rounded-xl border bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                  Errors by Technician
+                </h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={techData}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                    <XAxis
+                      dataKey="name"
+                      tick={{ fontSize: 12 }}
+                      stroke="currentColor"
+                      className="text-gray-600 dark:text-gray-400"
+                    />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      stroke="currentColor"
+                      className="text-gray-600 dark:text-gray-400"
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: document.documentElement.classList.contains("dark")
+                          ? "#1f2937"
+                          : "#ffffff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: any, name: string) => [
+                        value,
+                        name === "count" ? "Errors" : name,
+                      ]}
+                    />
+                    <Bar dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Technician Details Table */}
+              <div className="rounded-xl border overflow-hidden bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-600">
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                          Rank
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                          Technician
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                          Error Count
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                          Percentage
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {techData
+                        .sort((a, b) => b.count - a.count)
+                        .map((tech, index) => (
+                          <tr
+                            key={tech.name}
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span
+                                className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold
+                                ${
+                                  index === 0
+                                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                    : index === 1
+                                    ? "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                                    : index === 2
+                                    ? "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+                                    : "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
+                                }`}
+                              >
+                                {index + 1}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-10 h-10 rounded-full flex items-center justify-center
+                                  bg-gradient-to-br from-blue-500 to-indigo-600
+                                  text-white font-semibold"
+                                >
+                                  <User size={20} />
+                                </div>
+                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                  {tech.name}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                {tech.count}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <div className="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-blue-500 rounded-full transition-all"
+                                    style={{ width: `${tech.percentage}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-12 text-right">
+                                  {tech.percentage}%
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// Custom Active Shape for Hover Effect
+// ─────────────────────────────────────────────
+const renderActiveShape = (props: any) => {
+  const {
+    cx,
+    cy,
+    innerRadius,
+    outerRadius,
+    startAngle,
+    endAngle,
+    fill,
+    payload,
+    percent,
+    value,
+  } = props;
+
+  return (
+    <g>
+      <Sector
+        cx={cx}
+        cy={cy}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius + 15}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+        style={{ filter: "drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2))" }}
+      />
+      <Sector
+        cx={cx}
+        cy={cy}
+        innerRadius={innerRadius - 5}
+        outerRadius={innerRadius}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+        opacity={0.3}
+      />
+      <text
+        x={cx}
+        y={cy - 20}
+        textAnchor="middle"
+        fill={fill}
+        className="font-bold text-lg"
+      >
+        {payload.error}
+      </text>
+      <text
+        x={cx}
+        y={cy + 5}
+        textAnchor="middle"
+        fill="#666"
+        className="text-base"
+      >
+        {`Count: ${value}`}
+      </text>
+      <text
+        x={cx}
+        y={cy + 25}
+        textAnchor="middle"
+        fill="#999"
+        className="text-sm"
+      >
+        {`${(percent * 100).toFixed(1)}%`}
+      </text>
+    </g>
+  );
+};
+
 export const DemogCommonErrorChart: React.FC<Props> = ({
   expanded,
   onExpand,
 }) => {
-  const [year, setYear] = useState("2025");
-  const [month, setMonth] = useState("January");
+  const currentDate = new Date();
+  const [year, setYear] = useState(currentDate.getFullYear());
+  const [month, setMonth] = useState(currentDate.getMonth() + 1);
   const [exportOpen, setExportOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
+  const [showAll, setShowAll] = useState(false);
+  const [selectedError, setSelectedError] = useState<string | null>(null);
 
-  /* 🔹 MOCK DATA (TOP 5) */
-  const chartData: ErrorData[] = useMemo(
-    () => [
-      { error: "Wrong Date of Birth", count: 152 },
-      { error: "Misspelled Last Name", count: 124 },
-      { error: "Invalid Sex Entry", count: 98 },
-      { error: "Wrong Facility Code", count: 76 },
-      { error: "Missing Middle Name", count: 64 },
-    ],
-    []
-  );
+  // Fetch data using React Query
+  const { data: apiData, isLoading, isError, error } = useCommonErrors({
+    year,
+    month,
+  });
 
-  const exportData = useMemo(
-    () =>
-      chartData.map((d) => ({
-        Error: d.error,
-        Occurrences: d.count,
-      })),
-    [chartData]
-  );
+  // Transform API data to chart format
+  const chartData: ErrorData[] = useMemo(() => {
+    if (!apiData?.data || apiData.data.length === 0) return [];
+
+    const sorted = apiData.data.sort((a, b) => b.TOTAL_COUNT - a.TOTAL_COUNT);
+    const dataToShow = showAll ? sorted : sorted.slice(0, 5);
+
+    return dataToShow.map((item) => ({
+      error: item.TABLECOLUMN,
+      count: item.TOTAL_COUNT,
+    }));
+  }, [apiData, showAll]);
+
+  // Transform data for Excel export
+  const exportData = useMemo(() => {
+    if (!apiData?.data) return [];
+
+    return apiData.data
+      .sort((a, b) => b.TOTAL_COUNT - a.TOTAL_COUNT)
+      .map((item, index) => ({
+        Rank: index + 1,
+        "Error Type": item.TABLECOLUMN,
+        "Total Count": item.TOTAL_COUNT,
+        MRGOMEZ: item.MRGOMEZ_COUNT,
+        JMAPELADO: item.JMAPELADO_COUNT,
+        ABBRUTAS: item.ABBRUTAS_COUNT,
+        AAMORFE: item.AAMORFE_COUNT,
+        Percentage: `${item.PERCENTAGE.toFixed(2)}%`,
+      }));
+  }, [apiData]);
 
   const handleExport = async (format: "png" | "svg" | "excel") => {
     setExportOpen(false);
 
     await downloadChart({
       elementId: "demog-common-error-container",
-      filename: `demog-common-errors-${year}-${month.toLowerCase()}`,
+      filename: `demog-common-errors-${year}-${MONTHS[month - 1].toLowerCase()}`,
       format,
       data: format === "excel" ? exportData : undefined,
       sheetName: "Common Errors",
@@ -67,139 +429,254 @@ export const DemogCommonErrorChart: React.FC<Props> = ({
     });
   };
 
+  const onPieEnter = (_: any, index: number) => {
+    setActiveIndex(index);
+  };
+
+  const onPieLeave = () => {
+    setActiveIndex(undefined);
+  };
+
+  const handlePieClick = (_: any, index: number) => {
+    const errorType = chartData[index]?.error;
+    if (errorType) {
+      setSelectedError(errorType);
+    }
+  };
+
+  const years = Array.from(
+    { length: 10 },
+    (_, i) => currentDate.getFullYear() - i
+  );
+
   return (
-    <div
-        className="flex flex-col rounded-2xl shadow-lg overflow-hidden
-            bg-white dark:bg-gray-900
-            transition-all duration-300
-            h-[500px]"
-     >
-      {/* ================= Header ================= */}
+    <>
       <div
-        className="flex items-center justify-between px-5 py-3 border-b
-        bg-gray-50 dark:bg-gray-800
-        border-gray-200 dark:border-gray-700"
+        className="flex flex-col rounded-2xl shadow-lg overflow-hidden
+        bg-white dark:bg-gray-900
+        transition-all duration-300
+        h-[500px]"
       >
-        <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
-          Demographic Encoders – Most Common Errors (Top 5)
-          <div className="text-sm font-normal text-gray-500 dark:text-gray-400">
-            {month} {year}
-          </div>
-        </h3>
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-5 py-3 border-b
+          bg-gray-50 dark:bg-gray-800
+          border-gray-200 dark:border-gray-700"
+        >
+          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
+            Demographic Encoders – Most Common Errors
+            <div className="text-sm font-normal text-gray-500 dark:text-gray-400">
+              {MONTHS[month - 1]} {year} • {showAll ? "All Errors" : "Top 5"}
+            </div>
+          </h3>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {expanded && (
-            <>
-              <Select value={year} setValue={setYear} />
-              <Select
-                value={month}
-                setValue={setMonth}
-                options={[
-                  "January","February","March","April","May","June",
-                  "July","August","September","October","November","December",
-                ]}
-              />
-            </>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {expanded && (
+              <>
+                <select
+                  value={showAll ? "all" : "top5"}
+                  onChange={(e) => setShowAll(e.target.value === "all")}
+                  className="h-8 px-3 text-xs rounded-lg border
+                    bg-white dark:bg-gray-700
+                    border-gray-300 dark:border-gray-600
+                    text-gray-800 dark:text-gray-100
+                    focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="top5">Top 5</option>
+                  <option value="all">Show All</option>
+                </select>
 
-          {/* Export */}
-          <div className="relative">
-            <button
-              onClick={() => setExportOpen(!exportOpen)}
-              className="h-8 px-3 text-xs rounded-lg border
-                bg-white dark:bg-gray-700
-                border-gray-300 dark:border-gray-600
-                text-gray-800 dark:text-gray-100
-                hover:bg-gray-50 dark:hover:bg-gray-600
-                flex items-center gap-1.5"
-            >
-              <Download size={14} />
-              Export
-              <ChevronDown size={12} />
-            </button>
+                <select
+                  value={year}
+                  onChange={(e) => setYear(Number(e.target.value))}
+                  className="h-8 px-3 text-xs rounded-lg border
+                    bg-white dark:bg-gray-700
+                    border-gray-300 dark:border-gray-600
+                    text-gray-800 dark:text-gray-100
+                    focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {years.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
 
-            {exportOpen && (
-              <div
-                className="absolute right-0 mt-1 w-44 rounded-lg shadow-lg border z-20
-                bg-white dark:bg-gray-800
-                border-gray-200 dark:border-gray-700"
-              >
-                {["png", "svg", "excel"].map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => handleExport(f as any)}
-                    className="w-full px-4 py-2.5 text-left text-xs
-                      hover:bg-gray-50 dark:hover:bg-gray-700
-                      text-gray-700 dark:text-gray-300"
-                  >
-                    Export {f.toUpperCase()}
-                  </button>
-                ))}
-              </div>
+                <select
+                  value={month}
+                  onChange={(e) => setMonth(Number(e.target.value))}
+                  className="h-8 px-3 text-xs rounded-lg border
+                    bg-white dark:bg-gray-700
+                    border-gray-300 dark:border-gray-600
+                    text-gray-800 dark:text-gray-100
+                    focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {MONTHS.map((m, idx) => (
+                    <option key={m} value={idx + 1}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </>
             )}
-          </div>
 
-          <button
-            onClick={onExpand}
-            className="h-8 px-4 text-xs rounded-lg font-medium
-              bg-blue-600 hover:bg-blue-700
-              text-white shadow"
-          >
-            {expanded ? "Collapse" : "Expand"}
-          </button>
+            {/* Export */}
+            <div className="relative">
+              <button
+                onClick={() => setExportOpen(!exportOpen)}
+                disabled={isLoading || chartData.length === 0}
+                className="h-8 px-3 text-xs rounded-lg border
+                  bg-white dark:bg-gray-700
+                  border-gray-300 dark:border-gray-600
+                  text-gray-800 dark:text-gray-100
+                  hover:bg-gray-50 dark:hover:bg-gray-600
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  flex items-center gap-1.5"
+              >
+                <Download size={14} />
+                Export
+                <ChevronDown size={12} />
+              </button>
+
+              {exportOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setExportOpen(false)}
+                  />
+                  <div
+                    className="absolute right-0 mt-1 w-44 rounded-lg shadow-lg border z-20
+                    bg-white dark:bg-gray-800
+                    border-gray-200 dark:border-gray-700"
+                  >
+                    {["png", "svg", "excel"].map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => handleExport(f as any)}
+                        className="w-full px-4 py-2.5 text-left text-xs
+                          hover:bg-gray-50 dark:hover:bg-gray-700
+                          text-gray-700 dark:text-gray-300
+                          first:rounded-t-lg last:rounded-b-lg"
+                      >
+                        Export as {f.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={onExpand}
+              className="h-8 px-4 text-xs rounded-lg font-medium
+                bg-blue-600 hover:bg-blue-700
+                text-white shadow"
+            >
+              {expanded ? "Collapse" : "Expand"}
+            </button>
+          </div>
+        </div>
+
+        {/* Chart Content */}
+        <div id="demog-common-error-container" className="flex-1 p-4 min-h-0">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-blue-500" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Loading data...
+                </p>
+              </div>
+            </div>
+          ) : isError ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <p className="text-sm text-red-500 mb-2">
+                  Error loading data: {error?.message || "Unknown error"}
+                </p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="text-xs text-blue-500 hover:text-blue-600"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          ) : chartData.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                No data available for {MONTHS[month - 1]} {year}
+              </p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: document.documentElement.classList.contains(
+                      "dark"
+                    )
+                      ? "#1f2937"
+                      : "#ffffff",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "8px",
+                  }}
+                />
+                <Legend
+                  verticalAlign="bottom"
+                  height={36}
+                  wrapperStyle={{
+                    fontSize: "12px",
+                  }}
+                />
+                <Pie
+                  data={chartData}
+                  dataKey="count"
+                  nameKey="error"
+                  innerRadius={expanded ? 80 : 60}
+                  outerRadius={expanded ? 130 : 100}
+                  paddingAngle={4}
+                  activeIndex={activeIndex}
+                  activeShape={renderActiveShape}
+                  onMouseEnter={onPieEnter}
+                  onMouseLeave={onPieLeave}
+                  onClick={handlePieClick}
+                  label={
+                    activeIndex === undefined
+                      ? ({ error, count, percent }) =>
+                          `${error}: ${count} (${(percent * 100).toFixed(1)}%)`
+                      : false
+                  }
+                  style={{ cursor: "pointer" }}
+                >
+                  {chartData.map((_, index) => (
+                    <Cell
+                      key={index}
+                      fill={COLORS[index % COLORS.length]}
+                      style={{
+                        transition: "all 0.3s ease",
+                        opacity:
+                          activeIndex === undefined || activeIndex === index
+                            ? 1
+                            : 0.6,
+                      }}
+                    />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
-      {/* ================= Pie Chart ================= */}
-      <div
-        id="demog-common-error-container"
-        className="flex-1 p-4 min-h-0"
-      >
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Tooltip />
-            <Legend verticalAlign="bottom" height={36} />
-            <Pie
-              data={chartData}
-              dataKey="count"
-              nameKey="error"
-              innerRadius={expanded ? 80 : 60}
-              outerRadius={expanded ? 130 : 100}
-              paddingAngle={4}
-              label
-            >
-              {chartData.map((_, index) => (
-                <Cell key={index} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+      {/* Breakdown Modal */}
+      <BreakdownModal
+        isOpen={!!selectedError}
+        onClose={() => setSelectedError(null)}
+        tableColumn={selectedError || ""}
+        year={year}
+        month={month}
+      />
+    </>
   );
 };
-
-/* ================= Shared Select ================= */
-
-const Select = ({
-  value,
-  setValue,
-  options = ["2025", "2024", "2023", "2022", "2021"],
-}: {
-  value: string;
-  setValue: (v: string) => void;
-  options?: string[];
-}) => (
-  <select
-    value={value}
-    onChange={(e) => setValue(e.target.value)}
-    className="h-8 px-3 text-xs rounded-lg border
-      bg-white dark:bg-gray-700
-      border-gray-300 dark:border-gray-600
-      text-gray-800 dark:text-gray-100"
-  >
-    {options.map((o) => (
-      <option key={o}>{o}</option>
-    ))}
-  </select>
-);

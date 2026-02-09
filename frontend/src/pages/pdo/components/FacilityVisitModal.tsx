@@ -240,9 +240,10 @@ export const FacilityVisitModal: React.FC<FacilityVisitModalProps> = ({
                 name="facility_name"
                 value={formData.facility_name}
                 onChange={handleChange}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white bg-gray-100 dark:bg-gray-700 cursor-not-allowed"
                 required
-                readOnly={lookupLoading}
+                disabled
+                readOnly
               />
             </div>
 
@@ -257,9 +258,10 @@ export const FacilityVisitModal: React.FC<FacilityVisitModalProps> = ({
                   name="province"
                   value={formData.province}
                   onChange={handleChange}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white bg-gray-100 dark:bg-gray-700 cursor-not-allowed"
                   required
-                  readOnly={lookupLoading}
+                  disabled
+                  readOnly
                 />
               </div>
 
@@ -281,33 +283,19 @@ export const FacilityVisitModal: React.FC<FacilityVisitModalProps> = ({
               </div>
             </div>
 
-            {/* Date Visited */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Date & Time Visited <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="datetime-local"
-                name="date_visited"
-                value={formData.date_visited}
-                onChange={handleChange}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                required
-              />
-            </div>
-
-            {/* Two Columns: Remarks & Mark */}
+            {/* Two Columns: Date Visited & Mark */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Remarks
+                  Date & Time Visited <span className="text-red-500">*</span>
                 </label>
-                <textarea
-                  name="remarks"
-                  value={formData.remarks}
+                <input
+                  type="datetime-local"
+                  name="date_visited"
+                  value={formData.date_visited}
                   onChange={handleChange}
-                  rows={2}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white resize-none"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                  required
                 />
               </div>
 
@@ -323,6 +311,20 @@ export const FacilityVisitModal: React.FC<FacilityVisitModalProps> = ({
                   className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                 />
               </div>
+            </div>
+
+            {/* Remarks - Full Width */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Remarks
+              </label>
+              <textarea
+                name="remarks"
+                value={formData.remarks}
+                onChange={handleChange}
+                rows={4}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white resize-none"
+              />
             </div>
 
             {/* Existing Files */}

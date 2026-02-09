@@ -65,3 +65,13 @@ export type {
 } from '../../services/LaboratoryServices/demogSummaryCardService';
 
 export { useSpeedMonitoring } from './useSpeedMonitoring';
+
+// Common Error Hooks
+export {
+    useCommonErrors, // Changed from useCommonError to useCommonErrors
+    useCommonErrorBreakdown, // Add this new hook
+    useCurrentMonthCommonErrors, // Changed from useCurrentMonthCommonError
+    useCommonErrorStats,
+    useCommonErrorBreakdownStats, // Add this new hook
+    commonErrorKeys,
+} from './useCommonError';

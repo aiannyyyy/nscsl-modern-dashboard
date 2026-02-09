@@ -37,6 +37,19 @@ interface GroupedEntry {
     createTimestamp: number;
 }
 
+// Tech ID to Name mapping for Oracle legacy entries
+const TECH_ID_MAPPING: Record<string, string> = {
+    "222": "AAMORFE",
+    "202": "ABBRUTAS",
+    "223": "ATDELEON",
+    "148": "GEYEDRA",
+    "87": "MCDIMAILIG",
+    "145": "KGSTAROSA",
+    "210": "MRGOMEZ",
+    "86": "VMWAGAN",
+    "129": "JMAPELADO"
+};
+
 export const NotebookDetailsModal: React.FC<NotebookDetailsModalProps> = ({
     isOpen,
     onClose,
@@ -123,18 +136,8 @@ export const NotebookDetailsModal: React.FC<NotebookDetailsModalProps> = ({
                         mod.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
                 }
 
-                const techMapping: Record<string, string> = {
-                    "222": "AAMORFE",
-                    "202": "ABBRUTAS",
-                    "223": "ATDELEON",
-                    "148": "GEYEDRA",
-                    "87": "MCDIMAILIG",
-                    "145": "KGSTAROSA",
-                    "210": "MRGOMEZ",
-                    "86": "VMWAGAN",
-                    "129": "JMAPELADO"
-                };
-                techName = techMapping[entry.USER_ID] || entry.USER_ID || 'N/A';
+                // Use the TECH_ID_MAPPING constant
+                techName = TECH_ID_MAPPING[entry.USER_ID] || entry.USER_ID || 'N/A';
                 
                 // Oracle entries don't group - each is unique
                 groupKey = `oracle_${entry.LABNO}_${entry.CREATE_DT}_${entry.USER_ID}_${Math.random()}`;

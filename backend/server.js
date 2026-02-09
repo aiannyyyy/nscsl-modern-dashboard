@@ -219,6 +219,9 @@ app.use("/api/laboratory/demog-summary-cards", require("./routes/LaboratoryRoute
 // Laboratory Speed Monitoring
 app.use("/api/speed-monitoring", require("./routes/LaboratoryRoutes/speedMonitoringRoutes"));
 
+// In app.js - change this line:
+app.use("/api/common-errors", require("./routes/LaboratoryRoutes/commonErrorRoutes"));
+
 // Unsatisfactory Analysis
 app.use("/api/unsat", require("./routes/PDORoutes/unsatRoutes"));
 

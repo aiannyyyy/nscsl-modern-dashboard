@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Download, FileText, Edit, Trash2, X, Eye } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Download, FileText, Edit, Trash2, X, Eye, Filter } from 'lucide-react';
 import facilityVisitsService from '../../../services/PDOServices/facilityVisitsService';
 import type { FacilityVisit } from '../../../services/PDOServices/facilityVisitsService';
 import { FacilityVisitModal } from './FacilityVisitModal';
@@ -22,6 +22,10 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
   const [selectedVisit, setSelectedVisit] = useState<FacilityVisit | null>(null);
   const [editingVisit, setEditingVisit] = useState<FacilityVisit | null>(null);
   const [viewingFile, setViewingFile] = useState<{ path: string; name: string; type: string } | null>(null);
+  
+  // Filter states
+  const [selectedProvince, setSelectedProvince] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
   
   const { user } = useAuth();
 
@@ -47,6 +51,21 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
       setLoading(false);
     }
   };
+
+  // Get unique provinces from visits
+  const provinces = useMemo(() => {
+    const uniqueProvinces = Array.from(new Set(visits.map(v => v.province).filter(Boolean)));
+    return uniqueProvinces.sort();
+  }, [visits]);
+
+  // Filter visits based on selected filters
+  const filteredVisits = useMemo(() => {
+    return visits.filter(visit => {
+      const matchesProvince = selectedProvince === 'all' || visit.province === selectedProvince;
+      const matchesStatus = selectedStatus === 'all' || visit.status === selectedStatus;
+      return matchesProvince && matchesStatus;
+    });
+  }, [visits, selectedProvince, selectedStatus]);
 
   const handleView = (visit: FacilityVisit) => {
     setSelectedVisit(visit);
@@ -83,7 +102,6 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
     const downloadUrl = `http://localhost:5000/${filePath}`;
     console.log('📂 Downloading file:', downloadUrl);
     
-    // Create a temporary anchor element to trigger download
     const link = document.createElement('a');
     link.href = downloadUrl;
     link.download = filePath.split('/').pop() || 'download';
@@ -96,16 +114,13 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
     const fileName = filePath.split('/').pop() || 'Unknown file';
     const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
     
-    // List of file types that should be downloaded instead of viewed
     const downloadOnlyTypes = ['doc', 'docx', 'xls', 'xlsx', 'xlsm', 'ppt', 'pptx', 'csv', 'zip', 'rar'];
     
-    // If it's a download-only type, trigger download directly
     if (downloadOnlyTypes.includes(fileExtension)) {
       handleDownloadFile(filePath);
       return;
     }
     
-    // Otherwise, show in viewer modal
     setViewingFile({
       path: filePath,
       name: fileName,
@@ -121,6 +136,11 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
   const handleModalSuccess = () => {
     console.log('🔄 Modal success - fetching visits and triggering chart refresh');
     fetchVisits();
+  };
+
+  const handleClearFilters = () => {
+    setSelectedProvince('all');
+    setSelectedStatus('all');
   };
 
   const getStatusBadge = (status: string) => {
@@ -362,7 +382,6 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
 
     const fileUrl = `http://localhost:5000/${viewingFile.path}`;
     
-    // Categorize file types
     const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
     const pdfTypes = ['pdf'];
     const downloadOnlyTypes = ['doc', 'docx', 'xls', 'xlsx', 'xlsm', 'ppt', 'pptx', 'csv', 'zip', 'rar'];
@@ -371,8 +390,6 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
     const isPdf = pdfTypes.includes(viewingFile.type);
     const isDownloadOnly = downloadOnlyTypes.includes(viewingFile.type);
 
-    // For Excel/Word files, automatically download instead of showing preview
-    // This should not happen if handleViewFile works correctly, but as a safety measure
     if (isDownloadOnly) {
       handleDownloadFile(viewingFile.path);
       setViewingFile(null);
@@ -421,7 +438,6 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
                   onError={(e) => {
                     console.error('Image failed to load:', fileUrl);
                     e.currentTarget.style.display = 'none';
-                    // Show error message
                     const parent = e.currentTarget.parentElement;
                     if (parent) {
                       parent.innerHTML = `
@@ -487,26 +503,84 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
     );
   }
 
+  const hasActiveFilters = selectedProvince !== 'all' || selectedStatus !== 'all';
+
   return (
     <>
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 transition-colors h-[600px] max-h-[600px] flex flex-col">
         {/* Header - Fixed */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
-          <div className="flex justify-between items-center">
-            <h4 className="text-base font-semibold text-gray-900 dark:text-white">
+          <div className="flex justify-between items-center gap-4">
+            <h4 className="text-base font-semibold text-gray-900 dark:text-white whitespace-nowrap">
               Facility Visits
+              {hasActiveFilters && (
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                  ({filteredVisits.length} of {visits.length})
+                </span>
+              )}
             </h4>
-            <div className="flex gap-2">
+            
+            <div className="flex items-center gap-2 flex-1 justify-end flex-wrap">
+              {/* Filters */}
+              <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                <Filter size={14} />
+                <span className="font-medium">Filters:</span>
+              </div>
+              
+              <select
+                value={selectedProvince}
+                onChange={(e) => setSelectedProvince(e.target.value)}
+                className="h-8 px-2 text-xs rounded-lg border
+                  bg-white dark:bg-gray-800
+                  border-gray-300 dark:border-gray-600
+                  text-gray-800 dark:text-gray-100
+                  focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Provinces</option>
+                {provinces.map((province) => (
+                  <option key={province} value={province}>
+                    {province}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="h-8 px-2 text-xs rounded-lg border
+                  bg-white dark:bg-gray-800
+                  border-gray-300 dark:border-gray-600
+                  text-gray-800 dark:text-gray-100
+                  focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Status</option>
+                <option value="1">Active</option>
+                <option value="0">Inactive</option>
+                <option value="2">Closed</option>
+              </select>
+
+              {hasActiveFilters && (
+                <button
+                  onClick={handleClearFilters}
+                  className="h-8 px-2 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                >
+                  Clear filters
+                </button>
+              )}
+
+              {/* Action Buttons */}
+              <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-1"></div>
+              
               <button
                 onClick={() => setShowAddModal(true)}
-                className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 text-xs font-medium"
+                className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 text-xs font-medium whitespace-nowrap"
               >
                 <Plus size={16} />
                 Add Visit
               </button>
               <button
                 onClick={() => setShowExportModal(true)}
-                className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 text-xs font-medium"
+                className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 text-xs font-medium whitespace-nowrap"
               >
                 <Download size={16} />
                 Export
@@ -555,14 +629,14 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                  {visits.length === 0 ? (
+                  {filteredVisits.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="px-3 py-8 text-center text-xs text-gray-500 dark:text-gray-400">
-                        No facility visits found
+                        {hasActiveFilters ? 'No facility visits found matching the filters' : 'No facility visits found'}
                       </td>
                     </tr>
                   ) : (
-                    visits.map((visit, index) => (
+                    filteredVisits.map((visit, index) => (
                       <tr
                         key={visit.id}
                         className={`transition-colors ${

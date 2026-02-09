@@ -270,7 +270,6 @@ export const CumulativeAnnualChart: React.FC<Props> = ({ expanded, onExpand }) =
               )}
             </div>
           )}
-
           <button
             onClick={onExpand}
             className="h-8 px-4 text-xs rounded-lg font-medium
