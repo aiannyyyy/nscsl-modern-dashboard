@@ -586,7 +586,7 @@ export const EndorsementTable: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 h-[600px] max-h-[600px]">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 h-[500px] max-h-[500px]">
         <div className="flex items-center justify-center h-full">
           <div className="text-sm text-gray-500 dark:text-gray-400">Loading...</div>
         </div>
@@ -598,7 +598,7 @@ export const EndorsementTable: React.FC = () => {
 
   return (
     <>
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 transition-colors h-[600px] max-h-[600px] flex flex-col">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 transition-colors h-[500px] max-h-[500px] flex flex-col">
         {/* Header - Fixed */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
           <div className="flex justify-between items-center gap-4">

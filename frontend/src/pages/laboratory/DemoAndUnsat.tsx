@@ -3,16 +3,17 @@ import { EncodersCard } from "../laboratory/components/EncodersCard";
 import { SpeedMonitoringChart } from "./components/SpeedMonitoringChart";
 import { DemogCommonErrorChart } from "./components/DemogCommonErrorChart";
 import { EndorsementTable } from "./components/EndorsementTable";
+import { EndorsementChart } from "./components/EndorsementChart";
 
 export const DemoAndUnsat: React.FC = () => {
   // expand state for row
   const [row1Expanded, setRow1Expanded] = useState<"speed" | "error" | null>(null);
-
+  
   return (
     <div className="space-y-6">
       {/* Row 0 — Encoder Summary */}
       <EncodersCard />
-
+      
       {/* Row 1 — Speed Monitoring + Demographic Errors */}
       <div className="grid grid-cols-12 gap-6">
         {/* Speed Monitoring */}
@@ -33,7 +34,7 @@ export const DemoAndUnsat: React.FC = () => {
             }
           />
         </div>
-
+        
         {/* Demographic Common Errors */}
         <div
           className={`transition-all duration-300
@@ -53,11 +54,14 @@ export const DemoAndUnsat: React.FC = () => {
           />
         </div>
       </div>
-
-      {/* Row 2 — Endorsement Table (50% width) */}
-      <div className="grid grid-cols-9 gap-6">
-        <div className="col-span-6">
+      
+      {/* Row 2 — Endorsement Table (75%) + Chart (25%) */}
+      <div className="grid grid-cols-12 gap-6">
+        <div className="col-span-8">
           <EndorsementTable />
+        </div>
+        <div className="col-span-4">
+          <EndorsementChart />
         </div>
       </div>
     </div>
