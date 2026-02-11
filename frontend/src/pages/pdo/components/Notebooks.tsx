@@ -6,6 +6,8 @@ import { NotebookDetailsModal } from './NotebookDetailsModal';
 import type { SearchCriteria } from './NotebookSearchModal';
 import * as notebooksApi from '../../../services/PDOServices/notebooksApi';
 import type { PatientSearchResult } from '../../../services/PDOServices/notebooksApi';
+import { usePermissions } from '../../../hooks/usePermission';
+
 
 interface PatientResult {
     labno: string;
@@ -77,6 +79,8 @@ export const Notebooks: React.FC = () => {
     
     // ✅ Add refresh counter to force re-fetch
     const [refreshCounter, setRefreshCounter] = useState(0);
+
+    const { canCreate } = usePermissions(['program', 'administrator']);
 
     // ✅ Function to fetch recent notebook entries
     const fetchRecentNotebooks = useCallback(async () => {
@@ -316,7 +320,7 @@ export const Notebooks: React.FC = () => {
                             )}
                         </h4>
                         <div className="flex gap-2">
-                            {/* ✅ Manual refresh button */}
+                            {/* ✅ Manual refresh button - always visible */}
                             <button
                                 onClick={handleManualRefresh}
                                 disabled={notebooksLoading}
@@ -326,13 +330,17 @@ export const Notebooks: React.FC = () => {
                                 <RefreshCw size={14} className={notebooksLoading ? 'animate-spin' : ''} />
                                 Refresh
                             </button>
-                            <button
-                                onClick={() => setShowSearchModal(true)}
-                                className="px-2.5 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-xs font-medium flex items-center gap-1.5"
-                            >
-                                <Search size={14} />
-                                Online Search
-                            </button>
+                            
+                            {/* ✅ Only show Online Search if user has permission */}
+                            {canCreate && (
+                                <button
+                                    onClick={() => setShowSearchModal(true)}
+                                    className="px-2.5 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-xs font-medium flex items-center gap-1.5"
+                                >
+                                    <Search size={14} />
+                                    Online Search
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

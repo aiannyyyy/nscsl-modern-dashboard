@@ -13,6 +13,7 @@ import * as notebooksApi from '../../../services/PDOServices/notebooksApi';
 import type { NotebookEntry } from '../../../services/PDOServices/notebooksApi';
 import { AddNotebookModal } from './AddNotebookModal';
 import { ViewImageModal } from "./ViewImageModal";
+import { usePermissions } from '../../../hooks/usePermission';
 
 interface NotebookDetailsModalProps {
     isOpen: boolean;
@@ -59,6 +60,7 @@ export const NotebookDetailsModal: React.FC<NotebookDetailsModalProps> = ({
     loading,
     onNotebookAdded
 }) => {
+    const { canCreate } = usePermissions(['program', 'administrator']);
     const [notebookEntries, setNotebookEntries] = useState<NotebookEntry[]>([]);
     const [notebooksLoading, setNotebooksLoading] = useState(false);
     const [notebooksError, setNotebooksError] = useState<string | null>(null);
@@ -453,12 +455,15 @@ export const NotebookDetailsModal: React.FC<NotebookDetailsModalProps> = ({
                                                 Notebook Details ({groupedEntries.length})
                                             </h4>
                                             <div className="flex gap-1.5">
-                                                <button 
-                                                    onClick={() => setShowAddNotebookModal(true)}
-                                                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[11px] rounded flex items-center gap-1"
-                                                >
-                                                    <span>📝</span> Add Notebook
-                                                </button>
+                                                {/* ✅ Only show Add Notebook if user has permission */}
+                                                {canCreate && (
+                                                    <button 
+                                                        onClick={() => setShowAddNotebookModal(true)}
+                                                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[11px] rounded flex items-center gap-1"
+                                                    >
+                                                        <span>📝</span> Add Notebook
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => setShowViewImageModal(true)}
                                                     className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[11px] rounded flex items-center gap-1"
@@ -581,21 +586,25 @@ export const NotebookDetailsModal: React.FC<NotebookDetailsModalProps> = ({
                                                                                     <button
                                                                                         onClick={() => handleViewAttachment(attachment)}
                                                                                         className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white text-[10px] 
-                                                                                                 rounded flex items-center gap-1 transition-colors"
+                                                                                                rounded flex items-center gap-1 transition-colors"
                                                                                         title="View attachment"
                                                                                     >
                                                                                         <Eye size={13} />
                                                                                         View
                                                                                     </button>
-                                                                                    <button
-                                                                                        onClick={() => handleDownloadAttachment(attachment)}
-                                                                                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] 
-                                                                                                 rounded flex items-center gap-1 transition-colors"
-                                                                                        title="Download attachment"
-                                                                                    >
-                                                                                        <Download size={13} />
-                                                                                        Download
-                                                                                    </button>
+                                                                                    
+                                                                                    {/* ✅ Only show Download if user has permission */}
+                                                                                    {canCreate && (
+                                                                                        <button
+                                                                                            onClick={() => handleDownloadAttachment(attachment)}
+                                                                                            className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] 
+                                                                                                    rounded flex items-center gap-1 transition-colors"
+                                                                                            title="Download attachment"
+                                                                                        >
+                                                                                            <Download size={13} />
+                                                                                            Download
+                                                                                        </button>
+                                                                                    )}
                                                                                 </div>
                                                                             </div>
                                                                         ))}
@@ -717,13 +726,16 @@ export const NotebookDetailsModal: React.FC<NotebookDetailsModalProps> = ({
 
                             {/* Footer */}
                             <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
-                                <button
-                                    onClick={() => handleDownloadAttachment(selectedAttachment)}
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-2"
-                                >
-                                    <Download size={16} />
-                                    Download
-                                </button>
+                                {/* ✅ Only show Download if user has permission */}
+                                {canCreate && (
+                                    <button
+                                        onClick={() => handleDownloadAttachment(selectedAttachment)}
+                                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-2"
+                                    >
+                                        <Download size={16} />
+                                        Download
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => setShowAttachmentModal(false)}
                                     className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded"

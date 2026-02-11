@@ -151,6 +151,8 @@ export const NotebookResultsModal: React.FC<NotebookResultsModalProps> = ({
                                                     {patient.submid}
                                                 </td>
                                                 <td className="px-3 py-2 text-center">
+                                                {/* ✅ Only show View button if user has permission */}
+                                                {canCreate ? (
                                                     <button
                                                         onClick={() => onViewDetails(patient)}
                                                         className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
@@ -158,7 +160,10 @@ export const NotebookResultsModal: React.FC<NotebookResultsModalProps> = ({
                                                     >
                                                         <Eye size={16} />
                                                     </button>
-                                                </td>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400 dark:text-gray-600">—</span>
+                                                )}
+                                            </td>
                                             </tr>
                                         ))}
                                     </tbody>

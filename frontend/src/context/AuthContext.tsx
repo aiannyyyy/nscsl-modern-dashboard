@@ -6,7 +6,7 @@ import authService from '../services/authService';
 export type UserRole = 'admin' | 'super-user' | 'user';
 
 // Define departments
-export type Department = 'pdo' | 'admin' | 'laboratory' | 'followup' | 'it-job-order' | 'all';
+export type Department = 'administrator' | 'admin' | 'laboratory' | 'followup' | 'program' | 'all';
 
 // Define user interface
 export interface User {
