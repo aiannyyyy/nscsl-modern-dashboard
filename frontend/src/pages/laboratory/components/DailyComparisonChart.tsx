@@ -66,42 +66,45 @@ export const DailyComparisonChart: React.FC<Props> = ({ expanded, onExpand }) =>
   const loading = isLoadingYear1 || isLoadingYear2;
   const error = errorYear1 || errorYear2;
 
+  // Helper function to get days in month
+  const getDaysInMonth = (year: string, monthName: string): number => {
+    const monthIndex = months.indexOf(monthName.toLowerCase());
+    return new Date(parseInt(year), monthIndex + 1, 0).getDate();
+  };
+
   // Process chart data
   const chartData: ChartData[] = React.useMemo(() => {
     if (!year1Response?.data || !year2Response?.data) return [];
+
+    // Determine the number of days in the month
+    const daysInMonth = Math.max(
+      getDaysInMonth(year1, month),
+      getDaysInMonth(year2, month)
+    );
 
     // Create a map for year2 data for easy lookup
     const year2Map = new Map(
       year2Response.data.map(item => [item.RECEIVED_DATE.split('-')[2], item.TOTAL_SAMPLES])
     );
 
-    // Combine data by day
-    const combinedData: ChartData[] = year1Response.data.map(item => {
-      const day = item.RECEIVED_DATE.split('-')[2]; // Extract day from YYYY-MM-DD
-      return {
-        day: day,
-        year1: item.TOTAL_SAMPLES,
-        year2: year2Map.get(day) || 0
-      };
-    });
+    // Create a map for year1 data
+    const year1Map = new Map(
+      year1Response.data.map(item => [item.RECEIVED_DATE.split('-')[2], item.TOTAL_SAMPLES])
+    );
 
-    // Add any days from year2 that aren't in year1
-    year2Response.data.forEach(item => {
-      const day = item.RECEIVED_DATE.split('-')[2];
-      if (!combinedData.find(d => d.day === day)) {
-        combinedData.push({
-          day: day,
-          year1: 0,
-          year2: item.TOTAL_SAMPLES
-        });
-      }
-    });
+    // Create data for ALL days in the month
+    const allDaysData: ChartData[] = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayStr = day.toString().padStart(2, '0');
+      allDaysData.push({
+        day: dayStr,
+        year1: year1Map.get(dayStr) || 0,
+        year2: year2Map.get(dayStr) || 0
+      });
+    }
 
-    // Sort by day number
-    combinedData.sort((a, b) => parseInt(a.day) - parseInt(b.day));
-
-    return combinedData;
-  }, [year1Response, year2Response]);
+    return allDaysData;
+  }, [year1Response, year2Response, year1, year2, month]);
 
   // Custom label renderer for bar labels - positioned lower
   const renderCustomLabel = (props: any) => {
@@ -110,18 +113,15 @@ export const DailyComparisonChart: React.FC<Props> = ({ expanded, onExpand }) =>
     // Only show label if value > 0
     if (value === 0) return null;
     
-    // Check if dark mode is active
-    const isDarkMode = document.documentElement.classList.contains('dark');
-    
     return (
       <text
         x={x + width / 2}
-        y={y - 8}  // Moved down from -5 to -8 for more spacing
-        fill={isDarkMode ? '#e5e7eb' : '#374151'}
+        y={y - 8}
         textAnchor="middle"
         dominantBaseline="middle"
         fontSize={11}
         fontWeight="600"
+        className="fill-gray-700 dark:fill-gray-300"
       >
         {value}
       </text>

@@ -1,68 +1,67 @@
 // middleware/authMiddleware.js
 const jwt = require('jsonwebtoken');
-const { database } = require('../config'); // Using your existing config
+const { database } = require('../config');
 
-// Get MySQL pool from config
 const db = database.mysqlPool;
 
 module.exports = async (req, res, next) => {
   try {
-    // Get token from header
     const authHeader = req.headers.authorization;
 
+    console.log('🔍 [AUTH] Request received');
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ [AUTH] No Bearer token');
       return res.status(401).json({
         success: false,
         message: 'No token provided'
       });
     }
 
-    // Extract token
     const token = authHeader.split(' ')[1];
+    console.log('🔍 [AUTH] Token received');
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production');
+    console.log('🔍 [AUTH] Token verified, user ID:', decoded.id);
 
-    // Get user from database
+    // ✅ USE PROMISE-BASED QUERY WITH AWAIT
     const query = 'SELECT user_id, username, name, dept, position, role FROM user WHERE user_id = ?';
-    
-    db.query(query, [decoded.id], (error, results) => {
-      if (error) {
-        console.error('Database error:', error);
-        return res.status(500).json({
-          success: false,
-          message: 'Server error during authentication'
-        });
-      }
+    const [results] = await db.query(query, [decoded.id]);
 
-      if (results.length === 0) {
-        return res.status(401).json({
-          success: false,
-          message: 'User not found'
-        });
-      }
+    console.log('🔍 [AUTH] Database query completed, results:', results.length);
 
-      const user = results[0];
+    if (results.length === 0) {
+      console.log('❌ [AUTH] User not found');
+      return res.status(401).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
 
-      // Map role
-      let role = 'user';
-      if (user.role === 'admin') role = 'admin';
-      else if (user.role === 'super-user' || user.role === 'super_user') role = 'super-user';
+    const user = results[0];
+    console.log('🔍 [AUTH] User found:', user.username, 'Dept:', user.dept);
 
-      // Attach user to request
-      req.user = {
-        id: user.user_id,
-        username: user.username,
-        name: user.name,
-        dept: user.dept,
-        position: user.position,
-        role: role
-      };
+    // Map role
+    let role = 'user';
+    if (user.role === 'admin') role = 'admin';
+    else if (user.role === 'super-user' || user.role === 'super_user') role = 'super-user';
 
-      next();
-    });
+    // Attach user to request
+    req.user = {
+      id: user.user_id,
+      username: user.username,
+      name: user.name,
+      dept: user.dept,
+      position: user.position,
+      role: role
+    };
+
+    console.log('✅ [AUTH] Auth successful, proceeding to route');
+    next();
+
   } catch (error) {
-    console.error('Auth middleware error:', error);
+    console.error('❌ [AUTH] Auth middleware error:', error.message);
     
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({

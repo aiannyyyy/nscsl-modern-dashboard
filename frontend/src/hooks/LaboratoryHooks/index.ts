@@ -75,3 +75,34 @@ export {
     useCommonErrorBreakdownStats, // Add this new hook
     commonErrorKeys,
 } from './useCommonError';
+
+// Endorsement Hooks
+export {
+    useLookupLabNumber,
+    useGetAllEndorsements,
+    useGetEndorsementById,
+    useGetEndorsementsByLabNo,
+    useGetEndorsementsByFacility,
+    useGetEndorsementsByStatus,
+    useGetEndorsementStats,
+    useCreateEndorsement,
+    useUpdateEndorsement,
+    useUpdateEndorsementStatus,
+    useDeleteEndorsement,
+    useUpdateEndorsementOptimistic,
+    useDeleteEndorsementOptimistic,
+    endorsementKeys,
+    useGetUniqueTestResults
+} from './useUnsatEndorsement';
+
+// Export types from endorsement service
+export type {
+    EndorsementData,
+    OracleLookupResponse,
+    EndorsementStats,
+    DateRange,
+    StatusFilter,
+} from '../../services/LaboratoryServices/unsatEndorsementService';
+
+// Export helper function from endorsement service
+export { createEndorsementFormData } from '../../services/LaboratoryServices/unsatEndorsementService';

@@ -1,63 +1,95 @@
 import api from './api';
 
+// Base endpoint
+const NOTIFICATION_ENDPOINT = '/notifications';
+
+// Types
 export interface Notification {
-    notification_id: number;
+    id: number;
+    department: 'admin' | 'program' | 'laboratory' | 'followup';
+    user_id: number | null;
     type: string;
     title: string;
     message: string;
-    source_module: string | null;
+    link: string | null;
     reference_id: number | null;
-    priority: 'low' | 'normal' | 'high';
-    created_at: string;
+    reference_type: string | null;
     is_read: boolean;
+    created_by: string;
+    created_at: string;
     read_at: string | null;
-    created_by_username: string | null;
-}
-
-export interface NotificationResponse {
-    success: boolean;
-    data: Notification[];
-    unread_count: number;
-    total: number;
 }
 
 export interface UnreadCountResponse {
-    success: boolean;
     count: number;
 }
 
-class NotificationService {
-    async getUserNotifications(unreadOnly = false, limit = 50, offset = 0): Promise<NotificationResponse> {
-        const response = await api.get('/notifications', {
-            params: { unreadOnly, limit, offset }
-        });
-        return response.data;
-    }
-
-    async getUnreadCount(): Promise<UnreadCountResponse> {
-        const response = await api.get('/notifications/unread-count');
-        return response.data;
-    }
-
-    async markAsRead(notificationId: number): Promise<void> {
-        await api.patch(`/notifications/${notificationId}/read`);
-    }
-
-    async markAllAsRead(): Promise<void> {
-        await api.patch('/notifications/read-all');
-    }
-
-    async deleteNotification(notificationId: number): Promise<void> {
-        await api.delete(`/notifications/${notificationId}`);
-    }
-
-    async getNotificationById(notificationId: number): Promise<Notification> {
-        const response = await api.get(`/notifications/${notificationId}`);
-        return response.data.data;
-    }
+export interface CreateNotificationPayload {
+    department: string;
+    user_id?: number;
+    type: string;
+    title: string;
+    message: string;
+    link?: string;
+    reference_id?: number;
+    reference_type?: string;
 }
 
-// Export both the service instance and the types
-const notificationService = new NotificationService();
-export { notificationService };
-export default notificationService;
+export interface NotificationResponse {
+    message: string;
+    id?: number;
+    updated?: number;
+    deleted?: number;
+}
+
+// Get all notifications for current user's department
+export const getNotifications = async (limit = 50, offset = 0): Promise<Notification[]> => {
+    const response = await api.get(`${NOTIFICATION_ENDPOINT}?limit=${limit}&offset=${offset}`);
+    return response.data;
+};
+
+// Get unread notification count
+export const getUnreadCount = async (): Promise<UnreadCountResponse> => {
+    const response = await api.get(`${NOTIFICATION_ENDPOINT}/unread-count`);
+    return response.data;
+};
+
+// Create a new notification
+export const createNotification = async (data: CreateNotificationPayload): Promise<NotificationResponse> => {
+    const response = await api.post(NOTIFICATION_ENDPOINT, data);
+    return response.data;
+};
+
+// Mark notification as read
+export const markAsRead = async (id: number): Promise<NotificationResponse> => {
+    const response = await api.patch(`${NOTIFICATION_ENDPOINT}/${id}/read`);
+    return response.data;
+};
+
+// Mark all notifications as read
+export const markAllAsRead = async (): Promise<NotificationResponse> => {
+    const response = await api.patch(`${NOTIFICATION_ENDPOINT}/mark-all-read`);
+    return response.data;
+};
+
+// Delete notification
+export const deleteNotification = async (id: number): Promise<NotificationResponse> => {
+    const response = await api.delete(`${NOTIFICATION_ENDPOINT}/${id}`);
+    return response.data;
+};
+
+// Delete all notifications
+export const deleteAllNotifications = async (): Promise<NotificationResponse> => {
+    const response = await api.delete(`${NOTIFICATION_ENDPOINT}/delete-all`);
+    return response.data;
+};
+
+export default {
+    getNotifications,
+    getUnreadCount,
+    createNotification,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    deleteAllNotifications,
+};

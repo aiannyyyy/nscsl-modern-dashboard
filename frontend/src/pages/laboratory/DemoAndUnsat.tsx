@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { EncodersCard } from "../laboratory/components/EncodersCard";
 import { SpeedMonitoringChart } from "./components/SpeedMonitoringChart";
 import { DemogCommonErrorChart } from "./components/DemogCommonErrorChart";
+import { EndorsementTable } from "./components/EndorsementTable";
 
 export const DemoAndUnsat: React.FC = () => {
   // expand state for row
@@ -50,6 +51,13 @@ export const DemoAndUnsat: React.FC = () => {
               setRow1Expanded(row1Expanded === "error" ? null : "error")
             }
           />
+        </div>
+      </div>
+
+      {/* Row 2 — Endorsement Table (50% width) */}
+      <div className="grid grid-cols-9 gap-6">
+        <div className="col-span-6">
+          <EndorsementTable />
         </div>
       </div>
     </div>

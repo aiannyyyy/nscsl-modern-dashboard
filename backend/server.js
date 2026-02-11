@@ -222,8 +222,14 @@ app.use("/api/speed-monitoring", require("./routes/LaboratoryRoutes/speedMonitor
 // In app.js - change this line:
 app.use("/api/common-errors", require("./routes/LaboratoryRoutes/commonErrorRoutes"));
 
+// Unsat Endorsement
+app.use("/api/endorsements", require("./routes/LaboratoryRoutes/unsatEndorsementRoutes"))
+
 // Unsatisfactory Analysis
 app.use("/api/unsat", require("./routes/PDORoutes/unsatRoutes"));
+
+// Notification Routes
+app.use('/api/notifications', require('./routes/notificationRoutes'));
 
 // NSF Performance
 app.use("/api", require("./routes/PDORoutes/nsfPerformanceRoutes"));

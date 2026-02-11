@@ -90,18 +90,15 @@ export const YTDComparisonChart: React.FC<Props> = ({ expanded, onExpand }) => {
     // Only show label if value > 0
     if (value === 0) return null;
     
-    // Check if dark mode is active
-    const isDarkMode = document.documentElement.classList.contains('dark');
-    
     return (
       <text
         x={x + width / 2}
-        y={y - 8}  // Position above the bar
-        fill={isDarkMode ? '#e5e7eb' : '#374151'}
+        y={y - 8}
         textAnchor="middle"
         dominantBaseline="middle"
         fontSize={11}
         fontWeight="600"
+        className="fill-gray-700 dark:fill-gray-300"
       >
         {value.toLocaleString()}
       </text>

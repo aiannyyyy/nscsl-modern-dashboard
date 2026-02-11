@@ -138,16 +138,14 @@ export const CumulativeAnnualChart: React.FC<Props> = ({ expanded, onExpand }) =
     const { x, y, width, value } = props;
     if (value === 0) return null;
     
-    const isDarkMode = document.documentElement.classList.contains('dark');
-    
     return (
       <text
         x={x + width / 2}
         y={y - 5}
-        fill={isDarkMode ? '#e5e7eb' : '#374151'}
         textAnchor="middle"
         fontSize={10}
         fontWeight="600"
+        className="fill-gray-700 dark:fill-gray-300"
       >
         {value.toLocaleString()}
       </text>
@@ -159,16 +157,14 @@ export const CumulativeAnnualChart: React.FC<Props> = ({ expanded, onExpand }) =
     const { x, y, value } = props;
     if (value === 0) return null;
     
-    const isDarkMode = document.documentElement.classList.contains('dark');
-    
     return (
       <text
         x={x}
         y={y - 10}
-        fill="#000"
         textAnchor="middle"
         fontSize={11}
         fontWeight="700"
+        className="fill-gray-900 dark:fill-gray-100"
       >
         {value.toLocaleString()}
       </text>
@@ -326,50 +322,30 @@ export const CumulativeAnnualChart: React.FC<Props> = ({ expanded, onExpand }) =
             <ComposedChart data={chartData} margin={{ top: 30, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid 
                 strokeDasharray="3 3" 
-                className="dark:opacity-20"
-                stroke="#e5e7eb" 
+                className="dark:opacity-20 stroke-gray-300 dark:stroke-gray-600"
               />
               <XAxis 
                 dataKey="year" 
-                tick={{ fontSize: 12, fill: 'currentColor' }}
-                className="text-gray-600 dark:text-gray-400"
-                stroke="currentColor"
+                tick={{ fontSize: 12 }}
+                className="fill-gray-600 dark:fill-gray-400"
               />
               <YAxis 
-                tick={{ fontSize: 12, fill: 'currentColor' }}
-                className="text-gray-600 dark:text-gray-400"
-                stroke="currentColor"
+                tick={{ fontSize: 12 }}
+                className="fill-gray-600 dark:fill-gray-400"
                 tickFormatter={(value) => value.toLocaleString()}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: document.documentElement.classList.contains('dark') 
-                    ? 'rgba(31, 41, 55, 0.95)' 
-                    : 'rgba(255, 255, 255, 0.95)',
-                  border: '1px solid',
-                  borderColor: document.documentElement.classList.contains('dark') 
-                    ? '#374151' 
-                    : '#e5e7eb',
                   borderRadius: '8px',
                   fontSize: '12px',
-                  color: document.documentElement.classList.contains('dark') 
-                    ? '#f3f4f6' 
-                    : '#1f2937',
                 }}
                 formatter={(value: number) => value.toLocaleString()}
-                labelStyle={{
-                  color: document.documentElement.classList.contains('dark') 
-                    ? '#f3f4f6' 
-                    : '#1f2937',
-                }}
+                wrapperClassName="[&_.recharts-tooltip-wrapper]:!bg-white dark:[&_.recharts-tooltip-wrapper]:!bg-gray-800 [&_.recharts-tooltip-wrapper]:!border [&_.recharts-tooltip-wrapper]:!border-gray-200 dark:[&_.recharts-tooltip-wrapper]:!border-gray-700"
               />
               <Legend 
                 wrapperStyle={{ 
                   fontSize: '12px', 
                   paddingTop: '10px',
-                  color: document.documentElement.classList.contains('dark') 
-                    ? '#f3f4f6' 
-                    : '#1f2937',
                 }} 
               />
               

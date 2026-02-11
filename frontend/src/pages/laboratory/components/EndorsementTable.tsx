@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Download, FileText, Edit, Trash2, X, Eye, Filter, Calendar } from 'lucide-react';
-import { DateRangeModal } from '../../laboratory/components/DateRangeModal';
+import { AddEndorsementModal } from './AddEndorsementModal';
+import { DateRangeModal } from './DateRangeModal';
 import { useAuth } from '../../../hooks/useAuth';
 import {
   useGetAllEndorsements,
@@ -47,12 +48,13 @@ const mapEndorsementData = (data: EndorsementData): EndorsementRecord => {
   };
 };
 
-export const Endorsements: React.FC = () => {
+export const EndorsementTable: React.FC = () => {
   // API Hooks
   const { data: endorsementsData, isLoading, refetch } = useGetAllEndorsements();
   const deleteMutation = useDeleteEndorsement();
   const { data: uniqueTestResults = [] } = useGetUniqueTestResults();
   
+  const [showAddModal, setShowAddModal] = useState(false);
   const [showDateRangeModal, setShowDateRangeModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -89,8 +91,22 @@ export const Endorsements: React.FC = () => {
 
   const handleEdit = (record: EndorsementRecord) => {
     setEditingRecord(record);
+    setShowAddModal(true);
   };
 
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this endorsement?')) {
+      return;
+    }
+
+    try {
+      await deleteMutation.mutateAsync(id);
+      alert('Endorsement deleted successfully');
+    } catch (err: any) {
+      console.error('Error deleting endorsement:', err);
+      alert(err.response?.data?.message || 'Failed to delete endorsement');
+    }
+  };
 
   const handleViewAttachments = (attachmentPath: string) => {
     const files = attachmentPath.split(',').map(f => f.trim());
@@ -129,6 +145,7 @@ export const Endorsements: React.FC = () => {
   };
 
   const handleModalClose = () => {
+    setShowAddModal(false);
     setEditingRecord(null);
   };
 
@@ -569,7 +586,7 @@ export const Endorsements: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 h-[600px] max-h-[500px]">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 h-[600px] max-h-[600px]">
         <div className="flex items-center justify-center h-full">
           <div className="text-sm text-gray-500 dark:text-gray-400">Loading...</div>
         </div>
@@ -581,12 +598,12 @@ export const Endorsements: React.FC = () => {
 
   return (
     <>
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 transition-colors h-[500px] max-h-[500px] flex flex-col">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 transition-colors h-[600px] max-h-[600px] flex flex-col">
         {/* Header - Fixed */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
           <div className="flex justify-between items-center gap-4">
             <h4 className="text-base font-semibold text-gray-900 dark:text-white whitespace-nowrap">
-              Endorsement from Unsat
+              Endorsement to PDO
               {hasActiveFilters && (
                 <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                   ({filteredRecords.length} of {records.length})
@@ -642,7 +659,14 @@ export const Endorsements: React.FC = () => {
 
               {/* Action Buttons */}
               <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-1"></div>
-
+              
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 text-xs font-medium whitespace-nowrap"
+              >
+                <Plus size={16} />
+                Add Endorsement
+              </button>
               <button
                 onClick={() => setShowDateRangeModal(true)}
                 className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 text-xs font-medium whitespace-nowrap"
@@ -764,6 +788,20 @@ export const Endorsements: React.FC = () => {
                             >
                               <Eye size={14} />
                             </button>
+                            <button
+                              onClick={() => handleEdit(record)}
+                              className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                              title="Edit"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(record.id)}
+                              className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -775,6 +813,14 @@ export const Endorsements: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      <AddEndorsementModal
+        isOpen={showAddModal}
+        onClose={handleModalClose}
+        onSuccess={handleModalSuccess}
+        record={editingRecord}
+      />
 
       <DateRangeModal
         open={showDateRangeModal}

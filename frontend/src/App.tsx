@@ -15,6 +15,7 @@ import { Unsatisfactory } from './pages/pdo/Unsatisfactory';
 import ListCar from './pages/pdo/ListCar';
 import NSFPerformance from './pages/pdo/NSFPerformance';
 import DemoAndUnsat from './pages/laboratory/DemoAndUnsat';
+import AccountingOverview from './pages/admin/AccountingOverview';
 
 // Create a QueryClient instance
 const queryClient = new QueryClient({
@@ -55,7 +56,7 @@ function App() {
 
               {/* Admin Routes */}
               <Route path="admin" element={<AdminOverview />} />
-              <Route path="admin/accounting" element={<div>Accounting Page</div>} />
+              <Route path="admin/accounting" element={<AccountingOverview />} />
               <Route path="admin/supply" element={<div>Supply & Purchasing Page</div>} />
 
               {/* Laboratory Routes */}
