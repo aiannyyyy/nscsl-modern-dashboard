@@ -21,7 +21,7 @@ import { downloadChart } from '../../../utils/chartDownloadUtils';
 import axios from "axios";
 
 const years = Array.from({ length: 16 }, (_, i) => 2028 - i);
-const provinces = ["BATANGAS", "CAVITE", "LAGUNA", "QUEZON", "RIZAL"];
+const provinces = ["BATANGAS", "CAVITE", "LAGUNA", "QUEZON", "RIZAL", "LOPEZ_NEARBY"];
 const months = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -46,7 +46,6 @@ const CustomLabel = (props: any) => {
   const { x, y, width, value } = props;
   const isDarkMode = document.documentElement.classList.contains('dark');
   
-  // Don't show label if value is 0
   if (value === 0) return null;
   
   return (
@@ -67,13 +66,11 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
   expanded,
   onExpand,
 }) => {
-  // ✅ Get current date
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
-  const currentMonthIndex = currentDate.getMonth(); // 0-11
+  const currentMonthIndex = currentDate.getMonth();
   const currentMonthName = months[currentMonthIndex];
 
-  // ✅ Set defaults: Last year vs Current year, Current month
   const [yearA, setYearA] = useState(String(currentYear - 1));
   const [yearB, setYearB] = useState(String(currentYear));
   const [province, setProvince] = useState("BATANGAS");
@@ -84,51 +81,46 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
   const [error, setError] = useState<string | null>(null);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
-  // Comparison stats
-  const [yearATotal, setYearATotal] = useState(0);
-  const [yearBTotal, setYearBTotal] = useState(0);
+  // ✅ Per-month totals (not cumulative)
+  const [yearAMonthTotal, setYearAMonthTotal] = useState(0);
+  const [yearBMonthTotal, setYearBMonthTotal] = useState(0);
 
-  // ✅ Get selected month index for highlighting
   const selectedMonthIndex = months.indexOf(month);
 
-  /**
-   * Fetch data for both years
-   */
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      console.log("📅 Fetching data for:", { yearA, yearB, province, month });
-
-      // ✅ Determine the date range based on current date
       const today = new Date();
       const currentYear = today.getFullYear();
-      const currentMonth = today.getMonth() + 1; // 1-12
+      const currentMonth = today.getMonth() + 1;
 
-      // Determine end dates for both years
       let yearAEndDate = `${yearA}-12-31`;
       let yearBEndDate = `${yearB}-12-31`;
 
-      // Only limit to current month if the year IS the current year
       if (Number(yearA) === currentYear) {
         const lastDayOfMonth = new Date(Number(yearA), currentMonth, 0).getDate();
         yearAEndDate = `${yearA}-${String(currentMonth).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
       }
-      
+
       if (Number(yearB) === currentYear) {
         const lastDayOfMonth = new Date(Number(yearB), currentMonth, 0).getDate();
         yearBEndDate = `${yearB}-${String(currentMonth).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
       }
 
-      // Note: We no longer limit past years to match current year's period
-      // Each year fetches its full available data
+      const emptyResponse = (year: string, endDate: string) => ({
+        monthlyData: [],
+        summary: { totalRecords: 0, totalSamples: 0, totalLabNo: 0 },
+        parameters: {
+          type: 'monthly',
+          spectypes: [],
+          province,
+          dateRange: { from: `${year}-01-01`, to: endDate }
+        },
+        rawData: []
+      });
 
-      console.log("📊 Date ranges:");
-      console.log(`Year A (${yearA}): ${yearA}-01-01 to ${yearAEndDate}`);
-      console.log(`Year B (${yearB}): ${yearB}-01-01 to ${yearBEndDate}`);
-
-      // ✅ Fetch data with error handling for each year
       let responseA;
       let responseB;
 
@@ -136,112 +128,61 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
         responseA = await getMonthlyLabNoCount({
           from: `${yearA}-01-01`,
           to: yearAEndDate,
-          province: province,
+          province,
         });
-        console.log("✅ Year A data received:", responseA);
-      } catch (err: any) {
-        // Check if it's a 404 (no data) or other error
-        if (axios.isAxiosError(err)) {
-          if (err.response?.status === 404) {
-            console.warn(`⚠️ No data found for Year A (${yearA})`);
-          } else {
-            console.warn(`⚠️ Error fetching Year A (${yearA}):`, err.message);
-          }
-        }
-        // Return empty data structure
-        responseA = { 
-          monthlyData: [], 
-          summary: { totalRecords: 0, totalSamples: 0, totalLabNo: 0 },
-          parameters: {
-            type: 'monthly',
-            spectypes: [],
-            province: province,
-            dateRange: { from: `${yearA}-01-01`, to: yearAEndDate }
-          },
-          rawData: []
-        };
+      } catch {
+        responseA = emptyResponse(yearA, yearAEndDate);
       }
 
       try {
         responseB = await getMonthlyLabNoCount({
           from: `${yearB}-01-01`,
           to: yearBEndDate,
-          province: province,
+          province,
         });
-        console.log("✅ Year B data received:", responseB);
-      } catch (err: any) {
-        // Check if it's a 404 (no data) or other error
-        if (axios.isAxiosError(err)) {
-          if (err.response?.status === 404) {
-            console.warn(`⚠️ No data found for Year B (${yearB})`);
-          } else {
-            console.warn(`⚠️ Error fetching Year B (${yearB}):`, err.message);
-          }
-        }
-        // Return empty data structure
-        responseB = { 
-          monthlyData: [], 
-          summary: { totalRecords: 0, totalSamples: 0, totalLabNo: 0 },
-          parameters: {
-            type: 'monthly',
-            spectypes: [],
-            province: province,
-            dateRange: { from: `${yearB}-01-01`, to: yearBEndDate }
-          },
-          rawData: []
-        };
+      } catch {
+        responseB = emptyResponse(yearB, yearBEndDate);
       }
 
-      console.log("📊 Year A Response:", responseA);
-      console.log("📊 Year B Response:", responseB);
-
-      // Process data into chart format
+      // Build chart data
       const dataByMonth: { [key: string]: ChartDataPoint } = {};
-
-      // Initialize all months
       months.forEach((monthName, index) => {
         dataByMonth[monthName] = {
-          month: monthName.substring(0, 3), // Short month name
+          month: monthName.substring(0, 3),
           monthIndex: index,
           year1: 0,
           year2: 0,
         };
       });
 
-      // Fill Year A data
       responseA.monthlyData?.forEach((item: MonthlyDataItem) => {
         const monthName = months[item.month - 1];
-        if (dataByMonth[monthName]) {
-          dataByMonth[monthName].year1 = item.total_samples;
-        }
+        if (dataByMonth[monthName]) dataByMonth[monthName].year1 = item.total_samples;
       });
 
-      // Fill Year B data
       responseB.monthlyData?.forEach((item: MonthlyDataItem) => {
         const monthName = months[item.month - 1];
-        if (dataByMonth[monthName]) {
-          dataByMonth[monthName].year2 = item.total_samples;
-        }
+        if (dataByMonth[monthName]) dataByMonth[monthName].year2 = item.total_samples;
       });
 
-      // Convert to array
       const chartArray = months.map((monthName) => dataByMonth[monthName]);
       setChartData(chartArray);
 
-      // ✅ Calculate totals from the actual data received
-      const totalA = responseA.summary?.totalSamples || 0;
-      const totalB = responseB.summary?.totalSamples || 0;
-      setYearATotal(totalA);
-      setYearBTotal(totalB);
+      // ✅ Find exact value for the selected month only
+      const selectedMonthNum = selectedMonthIndex + 1;
 
-      console.log("✅ Chart data processed:", chartArray);
-      console.log("📈 Totals - Year A:", totalA, "Year B:", totalB);
+      const monthAItem = responseA.monthlyData?.find(
+        (item: MonthlyDataItem) => item.month === selectedMonthNum
+      );
+      const monthBItem = responseB.monthlyData?.find(
+        (item: MonthlyDataItem) => item.month === selectedMonthNum
+      );
+
+      setYearAMonthTotal(monthAItem?.total_samples ?? 0);
+      setYearBMonthTotal(monthBItem?.total_samples ?? 0);
 
     } catch (err) {
-      console.error("❌ Failed to load monthly samples data", err);
       setError(err instanceof Error ? err.message : "Failed to load data");
-      
-      // ✅ Even on error, initialize empty chart data instead of showing error
       const emptyData = months.map((monthName, index) => ({
         month: monthName.substring(0, 3),
         monthIndex: index,
@@ -249,8 +190,8 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
         year2: 0,
       }));
       setChartData(emptyData);
-      setYearATotal(0);
-      setYearBTotal(0);
+      setYearAMonthTotal(0);
+      setYearBMonthTotal(0);
     } finally {
       setLoading(false);
     }
@@ -258,38 +199,27 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
 
   useEffect(() => {
     fetchData();
-  }, [yearA, yearB, province]);
+  }, [yearA, yearB, province, month]);
 
-  // Calculate comparison stats
-  const diff = yearBTotal - yearATotal;
-  const percentDiff = calculatePercentageDiff(yearATotal, yearBTotal);
+  const diff = yearBMonthTotal - yearAMonthTotal;
+  const percentDiff = calculatePercentageDiff(yearAMonthTotal, yearBMonthTotal);
   const isIncrease = diff > 0;
   const isDecrease = diff < 0;
 
-  // Download handler
   const handleDownload = async (format: 'png' | 'svg' | 'excel') => {
     setShowDownloadMenu(false);
-
     try {
       if (format === 'excel') {
-        const excelData = chartData.map(item => ({
-          'Month': item.month,
+        const excelData = chartData.map((item, index) => ({
+          'Month': months[index],
           [yearA]: item.year1,
           [yearB]: item.year2,
           'Difference': item.year2 - item.year1,
         }));
 
-        // Add totals row
-        excelData.push({
-          'Month': 'TOTAL',
-          [yearA]: yearATotal,
-          [yearB]: yearBTotal,
-          'Difference': yearBTotal - yearATotal,
-        });
-
         await downloadChart({
           elementId: 'monthly-total-screened-chart',
-          filename: `Monthly_Total_Screened_${yearA}_vs_${yearB}_${province}`,
+          filename: `Monthly_Total_Screened_${yearA}_vs_${yearB}_${province}_${month}`,
           format: 'excel',
           data: excelData,
           sheetName: 'Monthly Data',
@@ -297,7 +227,7 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
       } else {
         await downloadChart({
           elementId: 'monthly-total-screened-chart',
-          filename: `Monthly_Total_Screened_${yearA}_vs_${yearB}_${province}`,
+          filename: `Monthly_Total_Screened_${yearA}_vs_${yearB}_${province}_${month}`,
           format,
           backgroundColor: '#ffffff',
           scale: 2,
@@ -320,7 +250,6 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
         bg-gray-50 dark:bg-gray-800
         border-gray-200 dark:border-gray-700"
       >
-        {/* Title */}
         <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
           <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -328,7 +257,6 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
           Monthly Total Samples
         </h3>
 
-        {/* Controls */}
         <div className="flex items-center gap-2 flex-wrap">
           {expanded && (
             <>
@@ -341,9 +269,7 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
                 value={yearA}
                 onChange={(e) => setYearA(e.target.value)}
               >
-                {years.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
+                {years.map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
 
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">VS</span>
@@ -357,9 +283,7 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
                 value={yearB}
                 onChange={(e) => setYearB(e.target.value)}
               >
-                {years.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
+                {years.map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
 
               <select
@@ -371,12 +295,9 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
                 value={province}
                 onChange={(e) => setProvince(e.target.value)}
               >
-                {provinces.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
+                {provinces.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
 
-              {/* ✅ Month selector */}
               <select
                 className="h-8 px-3 text-xs rounded-lg border
                   bg-white dark:bg-gray-700
@@ -386,9 +307,7 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
                 value={month}
                 onChange={(e) => setMonth(e.target.value)}
               >
-                {months.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
+                {months.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
 
               {/* Download Button */}
@@ -411,39 +330,23 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
 
                 {showDownloadMenu && (
                   <>
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setShowDownloadMenu(false)}
-                    />
+                    <div className="fixed inset-0 z-10" onClick={() => setShowDownloadMenu(false)} />
                     <div className="absolute right-0 mt-1 w-44 rounded-lg shadow-lg border
                       bg-white dark:bg-gray-800
                       border-gray-200 dark:border-gray-700
                       z-20 overflow-hidden"
                     >
-                      <button
-                        onClick={() => handleDownload('png')}
-                        className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
-                          text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
-                      >
-                        <Download size={12} />
-                        Download as PNG
-                      </button>
-                      <button
-                        onClick={() => handleDownload('svg')}
-                        className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
-                          text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
-                      >
-                        <Download size={12} />
-                        Download as SVG
-                      </button>
-                      <button
-                        onClick={() => handleDownload('excel')}
-                        className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
-                          text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
-                      >
-                        <Download size={12} />
-                        Export Data to Excel
-                      </button>
+                      {(['png', 'svg', 'excel'] as const).map((fmt) => (
+                        <button
+                          key={fmt}
+                          onClick={() => handleDownload(fmt)}
+                          className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                            text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                        >
+                          <Download size={12} />
+                          {fmt === 'excel' ? 'Export Data to Excel' : `Download as ${fmt.toUpperCase()}`}
+                        </button>
+                      ))}
                     </div>
                   </>
                 )}
@@ -451,7 +354,6 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
             </>
           )}
 
-          {/* Expand / Collapse */}
           <button
             onClick={onExpand}
             className="h-8 px-4 text-xs rounded-lg font-medium
@@ -474,13 +376,12 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart 
+            <BarChart
               data={chartData}
               margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
-              
-              {/* ✅ Highlight selected month with a box */}
+
               <ReferenceArea
                 x1={selectedMonthIndex - 0.5}
                 x2={selectedMonthIndex + 0.5}
@@ -490,14 +391,13 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
                 strokeWidth={2}
                 strokeDasharray="4 4"
               />
-              
-              <XAxis 
+
+              <XAxis
                 dataKey="month"
                 tick={(props) => {
                   const { x, y, payload } = props;
                   const isSelected = payload.index === selectedMonthIndex;
                   const isDarkMode = document.documentElement.classList.contains('dark');
-                  
                   return (
                     <text
                       x={x}
@@ -519,13 +419,13 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
                   style: { fontSize: 12, fill: '#6b7280' }
                 }}
               />
-              
-              <YAxis 
+
+              <YAxis
                 tick={{ fontSize: 12, fill: '#6b7280' }}
                 axisLine={{ stroke: '#d1d5db' }}
               />
-              
-              <Tooltip 
+
+              <Tooltip
                 contentStyle={{
                   backgroundColor: 'rgba(255, 255, 255, 0.95)',
                   border: '1px solid #e5e7eb',
@@ -534,29 +434,17 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
                 }}
                 cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }}
               />
-              
-              <Legend 
+
+              <Legend
                 wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
                 iconType="circle"
               />
-              
-              {/* Year 1 Bar - Blue */}
-              <Bar 
-                dataKey="year1" 
-                name={yearA}
-                fill="#3b82f6"
-                radius={[4, 4, 0, 0]}
-              >
+
+              <Bar dataKey="year1" name={yearA} fill="#3b82f6" radius={[4, 4, 0, 0]}>
                 <LabelList content={CustomLabel} />
               </Bar>
-              
-              {/* Year 2 Bar - Pink/Red */}
-              <Bar 
-                dataKey="year2" 
-                name={yearB}
-                fill="#ec4899"
-                radius={[4, 4, 0, 0]}
-              >
+
+              <Bar dataKey="year2" name={yearB} fill="#ec4899" radius={[4, 4, 0, 0]}>
                 <LabelList content={CustomLabel} />
               </Bar>
             </BarChart>
@@ -564,13 +452,16 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Comparison Table */}
+      {/* ✅ Single-row table — shows selected month's data only (not cumulative) */}
       {expanded && !loading && chartData.length > 0 && (
         <div className="px-5 pb-4">
+          <div className="mb-2 text-xs text-gray-600 dark:text-gray-400 font-medium">
+            Showing data for {month} only
+          </div>
           <table className="w-full text-sm border-collapse text-center border border-gray-300 dark:border-gray-700">
             <thead className="bg-blue-600 dark:bg-blue-700 text-white">
               <tr>
-                <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">Year</th>
+                <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">Period</th>
                 <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">{yearA}</th>
                 <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">{yearB}</th>
                 <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">INC/DEC</th>
@@ -580,27 +471,27 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
             <tbody>
               <tr className="bg-gray-50 dark:bg-gray-800">
                 <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 font-medium text-gray-800 dark:text-gray-100">
-                  Total Screened
+                  {month}
                 </td>
                 <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-gray-800 dark:text-gray-100">
-                  {yearATotal.toLocaleString()}
+                  {yearAMonthTotal.toLocaleString()}
                 </td>
                 <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-gray-800 dark:text-gray-100">
-                  {yearBTotal.toLocaleString()}
+                  {yearBMonthTotal.toLocaleString()}
                 </td>
                 <td className={`border border-gray-300 dark:border-gray-700 px-3 py-2 font-semibold ${
-                  isIncrease ? 'text-green-600 dark:text-green-400' : 
-                  isDecrease ? 'text-red-600 dark:text-red-400' : 
+                  isIncrease ? 'text-green-600 dark:text-green-400' :
+                  isDecrease ? 'text-red-600 dark:text-red-400' :
                   'text-gray-600 dark:text-gray-400'
                 }`}>
                   {diff > 0 ? '+' : ''}{diff.toLocaleString()}
                 </td>
                 <td className={`border border-gray-300 dark:border-gray-700 px-3 py-2 font-semibold ${
-                  isIncrease ? 'text-green-600 dark:text-green-400' : 
-                  isDecrease ? 'text-red-600 dark:text-red-400' : 
+                  isIncrease ? 'text-green-600 dark:text-green-400' :
+                  isDecrease ? 'text-red-600 dark:text-red-400' :
                   'text-gray-600 dark:text-gray-400'
                 }`}>
-                  {percentDiff} {isIncrease ? 'Increase' : isDecrease ? 'Decrease' : ''}
+                  {percentDiff} {isIncrease ? '↑' : isDecrease ? '↓' : ''}
                 </td>
               </tr>
             </tbody>

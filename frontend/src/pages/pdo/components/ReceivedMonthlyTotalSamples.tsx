@@ -21,7 +21,7 @@ import { downloadChart } from '../../../utils/chartDownloadUtils';
 import axios from "axios";
 
 const years = Array.from({ length: 16 }, (_, i) => 2028 - i);
-const provinces = ["BATANGAS", "CAVITE", "LAGUNA", "QUEZON", "RIZAL"];
+const provinces = ["BATANGAS", "CAVITE", "LAGUNA", "QUEZON", "RIZAL", "LOPEZ_NEARBY"];
 const months = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -57,7 +57,7 @@ const CustomLabel = (props: any) => {
       fontSize={11}
       fontWeight={600}
     >
-      {value}
+      {value.toLocaleString()}
     </text>
   );
 };
@@ -78,9 +78,11 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [yearATotal, setYearATotal] = useState(0);
-  const [yearBTotal, setYearBTotal] = useState(0);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+
+  // Store full monthly data
+  const [yearAMonthlyData, setYearAMonthlyData] = useState<MonthlyDataItem[]>([]);
+  const [yearBMonthlyData, setYearBMonthlyData] = useState<MonthlyDataItem[]>([]);
 
   const selectedMonthIndex = months.indexOf(month);
 
@@ -121,7 +123,8 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
           to: yearAEndDate,
           province: province,
         });
-        console.log("✅ Year A data received:", responseA);
+        console.log("✅ Year A RAW Response:", responseA);
+        console.log("✅ Year A Monthly Data Items:", responseA.monthlyData);
       } catch (err: any) {
         if (axios.isAxiosError(err)) {
           if (err.response?.status === 404) {
@@ -149,7 +152,8 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
           to: yearBEndDate,
           province: province,
         });
-        console.log("✅ Year B data received:", responseB);
+        console.log("✅ Year B RAW Response:", responseB);
+        console.log("✅ Year B Monthly Data Items:", responseB.monthlyData);
       } catch (err: any) {
         if (axios.isAxiosError(err)) {
           if (err.response?.status === 404) {
@@ -171,11 +175,27 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
         };
       }
 
-      console.log("📊 Year A Response:", responseA);
-      console.log("📊 Year B Response:", responseB);
+      // ✅ CRITICAL: Store the raw monthly data directly (DO NOT ACCUMULATE)
+      const monthlyDataA = responseA.monthlyData || [];
+      const monthlyDataB = responseB.monthlyData || [];
+      
+      setYearAMonthlyData(monthlyDataA);
+      setYearBMonthlyData(monthlyDataB);
 
+      console.log("🔍 DIAGNOSTIC - Year A Monthly Data:");
+      monthlyDataA.forEach(item => {
+        console.log(`  Month ${item.month} (${months[item.month - 1]}): ${item.total_samples} samples`);
+      });
+
+      console.log("🔍 DIAGNOSTIC - Year B Monthly Data:");
+      monthlyDataB.forEach(item => {
+        console.log(`  Month ${item.month} (${months[item.month - 1]}): ${item.total_samples} samples`);
+      });
+
+      // ✅ Build chart data - use EXACT values from API, no accumulation
       const dataByMonth: { [key: string]: ChartDataPoint } = {};
 
+      // Initialize all months with zero
       months.forEach((monthName, index) => {
         dataByMonth[monthName] = {
           month: monthName.substring(0, 3),
@@ -185,30 +205,30 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
         };
       });
 
-      responseA.monthlyData?.forEach((item: MonthlyDataItem) => {
+      // Populate Year A data - DIRECT VALUES, NO SUMMING
+      monthlyDataA.forEach((item: MonthlyDataItem) => {
         const monthName = months[item.month - 1];
         if (dataByMonth[monthName]) {
+          // ✅ Use the exact value from the API
           dataByMonth[monthName].year1 = item.total_samples;
+          console.log(`✅ Setting ${monthName} Year A to ${item.total_samples}`);
         }
       });
 
-      responseB.monthlyData?.forEach((item: MonthlyDataItem) => {
+      // Populate Year B data - DIRECT VALUES, NO SUMMING
+      monthlyDataB.forEach((item: MonthlyDataItem) => {
         const monthName = months[item.month - 1];
         if (dataByMonth[monthName]) {
+          // ✅ Use the exact value from the API
           dataByMonth[monthName].year2 = item.total_samples;
+          console.log(`✅ Setting ${monthName} Year B to ${item.total_samples}`);
         }
       });
 
       const chartArray = months.map((monthName) => dataByMonth[monthName]);
       setChartData(chartArray);
 
-      const totalA = responseA.summary?.totalSamples || 0;
-      const totalB = responseB.summary?.totalSamples || 0;
-      setYearATotal(totalA);
-      setYearBTotal(totalB);
-
-      console.log("✅ Chart data processed:", chartArray);
-      console.log("📈 Totals (Same Period) - Year A:", totalA, "Year B:", totalB);
+      console.log("✅ Final Chart Data:", chartArray);
 
     } catch (err) {
       console.error("❌ Failed to load monthly samples data", err);
@@ -221,8 +241,8 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
         year2: 0,
       }));
       setChartData(emptyData);
-      setYearATotal(0);
-      setYearBTotal(0);
+      setYearAMonthlyData([]);
+      setYearBMonthlyData([]);
     } finally {
       setLoading(false);
     }
@@ -232,8 +252,32 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
     fetchData();
   }, [yearA, yearB, province]);
 
-  const diff = yearBTotal - yearATotal;
-  const percentDiff = calculatePercentageDiff(yearATotal, yearBTotal);
+  // ✅ Get data for SELECTED MONTH ONLY
+  const getSelectedMonthData = () => {
+    const selectedMonthNum = selectedMonthIndex + 1;
+
+    // Find the specific month's data
+    const yearAMonthData = yearAMonthlyData.find(item => item.month === selectedMonthNum);
+    const yearBMonthData = yearBMonthlyData.find(item => item.month === selectedMonthNum);
+
+    const yearAValue = yearAMonthData?.total_samples || 0;
+    const yearBValue = yearBMonthData?.total_samples || 0;
+
+    console.log(`📊 Selected Month (${month}):`, {
+      yearA: yearAValue,
+      yearB: yearBValue,
+      diff: yearBValue - yearAValue
+    });
+
+    return {
+      yearAValue,
+      yearBValue,
+      diff: yearBValue - yearAValue,
+      percentDiff: calculatePercentageDiff(yearAValue, yearBValue)
+    };
+  };
+
+  const { yearAValue, yearBValue, diff, percentDiff } = getSelectedMonthData();
   const isIncrease = diff > 0;
   const isDecrease = diff < 0;
 
@@ -244,17 +288,21 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
     try {
       if (format === 'excel') {
         const excelData = chartData.map(item => ({
-          'Month': item.month,
+          'Month': months[item.monthIndex],
           [yearA]: item.year1,
           [yearB]: item.year2,
           'Difference': item.year2 - item.year1,
         }));
 
+        // Add totals row
+        const year1Total = chartData.reduce((sum, item) => sum + item.year1, 0);
+        const year2Total = chartData.reduce((sum, item) => sum + item.year2, 0);
+        
         excelData.push({
           'Month': 'TOTAL',
-          [yearA]: yearATotal,
-          [yearB]: yearBTotal,
-          'Difference': yearBTotal - yearATotal,
+          [yearA]: year1Total,
+          [yearB]: year2Total,
+          'Difference': year2Total - year1Total,
         });
 
         await downloadChart({
@@ -527,13 +575,16 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Comparison Table */}
+      {/* Comparison Table - Shows SELECTED MONTH ONLY */}
       {expanded && !loading && chartData.length > 0 && (
         <div className="px-5 pb-4">
+          <div className="mb-2 text-xs text-gray-600 dark:text-gray-400 italic">
+            Showing data for {month} only
+          </div>
           <table className="w-full text-sm border-collapse text-center border border-gray-300 dark:border-gray-700">
             <thead className="bg-blue-600 dark:bg-blue-700 text-white">
               <tr>
-                <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">Year</th>
+                <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">Month</th>
                 <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">{yearA}</th>
                 <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">{yearB}</th>
                 <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">INC/DEC</th>
@@ -543,13 +594,13 @@ export const MonthlyTotalSamples: React.FC<Props> = ({
             <tbody>
               <tr className="bg-gray-50 dark:bg-gray-800">
                 <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 font-medium text-gray-800 dark:text-gray-100">
-                  Total Received
+                  {month}
                 </td>
                 <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-gray-800 dark:text-gray-100">
-                  {yearATotal.toLocaleString()}
+                  {yearAValue.toLocaleString()}
                 </td>
                 <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-gray-800 dark:text-gray-100">
-                  {yearBTotal.toLocaleString()}
+                  {yearBValue.toLocaleString()}
                 </td>
                 <td className={`border border-gray-300 dark:border-gray-700 px-3 py-2 font-semibold ${
                   isIncrease ? 'text-green-600 dark:text-green-400' : 

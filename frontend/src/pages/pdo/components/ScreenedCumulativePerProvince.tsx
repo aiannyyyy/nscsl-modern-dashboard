@@ -20,7 +20,6 @@ import { downloadChart } from '../../../utils/chartDownloadUtils';
 
 const years = Array.from({ length: 16 }, (_, i) => 2028 - i);
 
-// Cumulative month ranges (abbreviated format)
 const cumulativeMonths = [
   "Jan",
   "Jan-Feb",
@@ -43,16 +42,9 @@ interface Props {
 
 type ChartType = "single-province" | "all-provinces";
 
-/**
- * Custom Label Component for bar values
- * Chart 1 (horizontal/vertical bars) - Dark text in dark mode
- * Chart 2 (horizontal bars) - Light text in dark mode
- */
 const CustomLabel = ({ x, y, width, height, value }: any) => {
   const isDarkMode = document.documentElement.classList.contains("dark");
   
-  // For Chart 1 - Horizontal layout (vertical bars)
-  // Bar is taller than wide (height > width means vertical bar)
   if (height && height > width) {
     return (
       <text
@@ -62,16 +54,13 @@ const CustomLabel = ({ x, y, width, height, value }: any) => {
         fontSize={11}
         fontWeight={600}
         fill={isDarkMode ? "#f9fafb" : "#1f2937"}
-        style={{
-          textShadow: "none",
-        }}
+        style={{ textShadow: "none" }}
       >
         {value?.toLocaleString()}
       </text>
     );
   }
   
-  // For Chart 2 - Horizontal bars (same as before)
   return (
     <text
       x={x + width / 2}
@@ -94,9 +83,8 @@ export const CumulativePerProvince: React.FC<Props> = ({
   onExpand,
 }) => {
   const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth(); // 0-based (0 = January, 11 = December)
+  const currentMonth = new Date().getMonth();
 
-  // ✅ Default: Chart 1 (Single Province), Year B = current year, Year A = last year
   const [yearA, setYearA] = useState((currentYear - 1).toString());
   const [yearB, setYearB] = useState(currentYear.toString());
   const [province, setProvince] = useState("BATANGAS");
@@ -109,14 +97,9 @@ export const CumulativePerProvince: React.FC<Props> = ({
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   
-  // Stats for comparison table
   const [yearATotal, setYearATotal] = useState(0);
   const [yearBTotal, setYearBTotal] = useState(0);
 
-  /**
-   * Convert abbreviated month range to full month name for API
-   * "Jan" -> "January", "Jan-Feb" -> "February", etc.
-   */
   const getFullMonthName = (abbreviatedRange: string): string => {
     const monthMap: { [key: string]: string } = {
       "Jan": "January",
@@ -135,7 +118,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
     return monthMap[abbreviatedRange] || "December";
   };
 
-  // Detect dark mode
   useEffect(() => {
     const checkDarkMode = () => {
       setIsDarkMode(document.documentElement.classList.contains("dark"));
@@ -152,7 +134,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
     return () => observer.disconnect();
   }, []);
 
-  // Fetch data when dependencies change
   useEffect(() => {
     fetchData();
   }, [chartType, yearA, yearB, province, monthRange]);
@@ -175,17 +156,7 @@ export const CumulativePerProvince: React.FC<Props> = ({
     }
   };
 
-  /**
-   * Chart 1: Single Province Comparison
-   */
   const fetchSingleProvinceData = async () => {
-    console.log("📊 Fetching Chart 1 - Single Province:", {
-      yearA,
-      yearB,
-      province,
-      monthRange,
-    });
-
     const fullMonthName = getFullMonthName(monthRange);
 
     const result = await getTwoYearComparisonUpToMonth(
@@ -194,10 +165,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
       fullMonthName
     );
 
-    console.log("📦 Raw Year 1 Data:", result.raw.year1.data.cumulativeData);
-    console.log("📦 Raw Year 2 Data:", result.raw.year2.data.cumulativeData);
-
-    // Filter for selected province - TRIM whitespace from backend
     const provinceDataA = result.raw.year1.data.cumulativeData?.find(
       (d) => d.province.trim().toUpperCase() === province.toUpperCase()
     );
@@ -205,16 +172,12 @@ export const CumulativePerProvince: React.FC<Props> = ({
       (d) => d.province.trim().toUpperCase() === province.toUpperCase()
     );
 
-    console.log("🔍 Found Province A:", provinceDataA);
-    console.log("🔍 Found Province B:", provinceDataB);
-
     const totalA = provinceDataA?.total_samples || 0;
     const totalB = provinceDataB?.total_samples || 0;
 
     setYearATotal(totalA);
     setYearBTotal(totalB);
 
-    // Single bar chart data
     const transformedData = [
       {
         name: province.toUpperCase(),
@@ -223,20 +186,10 @@ export const CumulativePerProvince: React.FC<Props> = ({
       },
     ];
 
-    console.log("✅ Chart 1 Data:", transformedData);
     setChartData(transformedData);
   };
 
-  /**
-   * Chart 2: All Provinces Comparison
-   */
   const fetchAllProvincesData = async () => {
-    console.log("📊 Fetching Chart 2 - All Provinces:", {
-      yearA,
-      yearB,
-      monthRange,
-    });
-
     const fullMonthName = getFullMonthName(monthRange);
 
     const result = await getTwoYearComparisonUpToMonth(
@@ -245,26 +198,22 @@ export const CumulativePerProvince: React.FC<Props> = ({
       fullMonthName
     );
 
-    console.log("📦 Raw Year 1 Data:", result.raw.year1.data.cumulativeData);
-    console.log("📦 Raw Year 2 Data:", result.raw.year2.data.cumulativeData);
+    // ✅ Filter out LOPEZ_NEARBY from Chart 2
+    const transformedData = result.formatted
+      .filter((item) => item.province.trim().toUpperCase() !== "LOPEZ_NEARBY")
+      .map((item) => ({
+        name: item.province.trim(),
+        [yearA]: item.year1Total,
+        [yearB]: item.year2Total,
+      }));
 
-    // Transform for chart - TRIM whitespace from province names
-    const transformedData = result.formatted.map((item) => ({
-      name: item.province.trim(), // Trim whitespace
-      [yearA]: item.year1Total,
-      [yearB]: item.year2Total,
-    }));
-
-    // Calculate totals
-    const totalA = result.formatted.reduce((sum, item) => sum + item.year1Total, 0);
-    const totalB = result.formatted.reduce((sum, item) => sum + item.year2Total, 0);
+    // Calculate totals (also excluding LOPEZ_NEARBY)
+    const totalA = transformedData.reduce((sum, item) => sum + item[yearA], 0);
+    const totalB = transformedData.reduce((sum, item) => sum + item[yearB], 0);
 
     setYearATotal(totalA);
     setYearBTotal(totalB);
 
-    console.log("✅ Chart 2 Data:", transformedData);
-    console.log("📊 Totals - Year A:", totalA, "Year B:", totalB);
-    
     if (transformedData.every(item => item[yearA] === 0 && item[yearB] === 0)) {
       console.warn("⚠️ No data found for any province!");
       setError("No data available for the selected years");
@@ -278,7 +227,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
     setChartType(chartType === "single-province" ? "all-provinces" : "single-province");
   };
 
-  // Get Excel data for export
   const getExcelData = () => {
     const data = chartData.map(item => ({
       Province: item.name,
@@ -288,7 +236,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
       'Change %': calculatePercentageDiff(item[yearA], item[yearB]),
     }));
 
-    // Add totals row
     data.push({
       Province: 'TOTAL',
       [yearA]: yearATotal,
@@ -300,7 +247,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
     return data;
   };
 
-  // Handle chart download
   const handleDownload = async (format: 'png' | 'svg' | 'excel') => {
     setShowDownloadMenu(false);
 
@@ -334,7 +280,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
     }
   };
 
-  // Calculate comparison stats
   const diff = yearBTotal - yearATotal;
   const percentDiff = calculatePercentageDiff(yearATotal, yearBTotal);
   const isIncrease = diff > 0;
@@ -352,7 +297,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
         bg-gray-50 dark:bg-gray-800
         border-gray-200 dark:border-gray-700"
       >
-        {/* Title */}
         <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
           <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -360,11 +304,9 @@ export const CumulativePerProvince: React.FC<Props> = ({
           Cumulative Per Province
         </h3>
 
-        {/* Controls */}
         <div className="flex items-center gap-2 flex-wrap">
           {expanded && (
             <>
-              {/* Year A */}
               <select
                 className="h-8 px-3 text-xs rounded-lg border
                   bg-white dark:bg-gray-700
@@ -381,7 +323,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
 
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">VS</span>
 
-              {/* Year B */}
               <select
                 className="h-8 px-3 text-xs rounded-lg border
                   bg-white dark:bg-gray-700
@@ -396,7 +337,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
                 ))}
               </select>
 
-              {/* Province - Only show for Chart 1 */}
               {chartType === "single-province" && (
                 <select
                   className="h-8 px-3 text-xs rounded-lg border
@@ -413,7 +353,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
                 </select>
               )}
 
-              {/* Cumulative Month Range */}
               <select
                 className="h-8 px-3 text-xs rounded-lg border
                   bg-white dark:bg-gray-700
@@ -428,7 +367,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
                 ))}
               </select>
 
-              {/* Change Chart Button */}
               <button
                 onClick={toggleChartType}
                 className="h-8 px-4 text-xs rounded-lg font-medium
@@ -438,7 +376,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
                 {chartType === "single-province" ? "Show All Provinces" : "Show Single Province"}
               </button>
 
-              {/* Download Button */}
               <div className="relative">
                 <button
                   onClick={() => setShowDownloadMenu(!showDownloadMenu)}
@@ -467,30 +404,17 @@ export const CumulativePerProvince: React.FC<Props> = ({
                       border-gray-200 dark:border-gray-700
                       z-20 overflow-hidden"
                     >
-                      <button
-                        onClick={() => handleDownload('png')}
-                        className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
-                          text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
-                      >
-                        <Download size={12} />
-                        Download as PNG
-                      </button>
-                      <button
-                        onClick={() => handleDownload('svg')}
-                        className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
-                          text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
-                      >
-                        <Download size={12} />
-                        Download as SVG
-                      </button>
-                      <button
-                        onClick={() => handleDownload('excel')}
-                        className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
-                          text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
-                      >
-                        <Download size={12} />
-                        Export Data to Excel
-                      </button>
+                      {(['png', 'svg', 'excel'] as const).map((fmt) => (
+                        <button
+                          key={fmt}
+                          onClick={() => handleDownload(fmt)}
+                          className="w-full px-4 py-2 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                            text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                        >
+                          <Download size={12} />
+                          {fmt === 'excel' ? 'Export Data to Excel' : `Download as ${fmt.toUpperCase()}`}
+                        </button>
+                      ))}
                     </div>
                   </>
                 )}
@@ -498,7 +422,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
             </>
           )}
 
-          {/* Expand / Collapse */}
           <button
             onClick={onExpand}
             className="h-8 px-4 text-xs rounded-lg font-medium
@@ -548,12 +471,7 @@ export const CumulativePerProvince: React.FC<Props> = ({
             <BarChart
               data={chartData}
               layout="horizontal"
-              margin={{ 
-                top: 20, 
-                right: 30, 
-                left: 20, 
-                bottom: 5 
-              }}
+              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
               barGap={8}
               barCategoryGap="20%"
             >
@@ -585,7 +503,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
                 iconType="circle"
               />
               
-              {/* Year A Bar - Blue */}
               <Bar 
                 dataKey={yearA} 
                 name={yearA}
@@ -596,7 +513,6 @@ export const CumulativePerProvince: React.FC<Props> = ({
                 <LabelList content={CustomLabel} />
               </Bar>
               
-              {/* Year B Bar - Pink */}
               <Bar 
                 dataKey={yearB} 
                 name={yearB}

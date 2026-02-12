@@ -1,4 +1,4 @@
-// src/services/receiveApi.ts
+// src/services/screenedApi.ts
 import axios from "axios";
 
 /**
@@ -21,7 +21,7 @@ const api = axios.create({
 export interface MonthlyLabNoParams {
   from: string;        // YYYY-MM-DD
   to: string;          // YYYY-MM-DD
-  province: string;    // e.g., "BATANGAS", "CAVITE", etc.
+  province: string;    // e.g., "BATANGAS", "CAVITE", "LOPEZ_NEARBY", etc.
 }
 
 export interface CumulativeAllProvinceParams {
@@ -32,7 +32,7 @@ export interface CumulativeAllProvinceParams {
 export interface SpectypeData {
   spectype: string;
   samples: number;
-  labno: number;
+  labno?: number;
 }
 
 export interface MonthlyDataItem {
@@ -40,7 +40,7 @@ export interface MonthlyDataItem {
   month: number;
   month_year: string;
   province: string;
-  category: string;
+  category?: string;
   total_samples: number;
   total_labno: number;
   spectypes: SpectypeData[];
@@ -119,7 +119,7 @@ export const getMonthlyLabNoCount = async (
 };
 
 /**
- * Fetch cumulative data for all provinces (BATANGAS, LAGUNA, CAVITE, RIZAL, QUEZON)
+ * Fetch cumulative data for all provinces (BATANGAS, LAGUNA, CAVITE, RIZAL, QUEZON, LOPEZ_NEARBY)
  * Used for Chart: Cumulative per year - all provinces
  */
 export const getCumulativeAllProvince = async (
@@ -144,7 +144,7 @@ export const getCumulativeAllProvince = async (
  * Fetch 2-year comparison for a single province (Chart 1)
  * @param year1 - First year to compare (e.g., 2023)
  * @param year2 - Second year to compare (e.g., 2024)
- * @param province - Province name (e.g., "BATANGAS")
+ * @param province - Province name (e.g., "BATANGAS", "LOPEZ_NEARBY")
  * @returns Filtered data for the selected province across 2 years
  */
 export const getTwoYearComparisonForProvince = async (
@@ -191,7 +191,7 @@ export const getTwoYearComparisonForProvince = async (
  * Fetch 2-year comparison for all provinces (Chart 2)
  * @param year1 - First year to compare (e.g., 2023)
  * @param year2 - Second year to compare (e.g., 2024)
- * @returns Comparison data for all 5 provinces
+ * @returns Comparison data for all 6 provinces (including LOPEZ_NEARBY)
  */
 export const getTwoYearComparisonAllProvinces = async (
   year1: number,
@@ -205,7 +205,8 @@ export const getTwoYearComparisonAllProvinces = async (
     getCumulativeAllProvince(getYearDateRange(year2))
   ]);
 
-  const provinces = ['BATANGAS', 'CAVITE', 'LAGUNA', 'QUEZON', 'RIZAL'];
+  // ✅ Updated to include LOPEZ_NEARBY
+  const provinces = ['BATANGAS', 'CAVITE', 'LAGUNA', 'QUEZON', 'RIZAL', 'LOPEZ_NEARBY'];
 
   const formatted = provinces.map(province => {
     // Trim whitespace when finding province data
@@ -260,7 +261,7 @@ export const getCumulativeUpToMonth = async (
  * @param year1 - First year
  * @param year2 - Second year  
  * @param endMonth - End month name (e.g., "June")
- * @returns Comparison for all provinces up to the specified month
+ * @returns Comparison for all provinces up to the specified month (including LOPEZ_NEARBY)
  */
 export const getTwoYearComparisonUpToMonth = async (
   year1: number,
@@ -275,7 +276,8 @@ export const getTwoYearComparisonUpToMonth = async (
     getCumulativeUpToMonth(year2, endMonth)
   ]);
 
-  const provinces = ['BATANGAS', 'CAVITE', 'LAGUNA', 'QUEZON', 'RIZAL'];
+  // ✅ Updated to include LOPEZ_NEARBY
+  const provinces = ['BATANGAS', 'CAVITE', 'LAGUNA', 'QUEZON', 'RIZAL', 'LOPEZ_NEARBY'];
 
   const formatted = provinces.map(province => {
     // Trim whitespace when finding province data
@@ -391,10 +393,10 @@ export const calculateDiff = (oldValue: number, newValue: number): string => {
 };
 
 /**
- * Get all available provinces
+ * Get all available provinces (including LOPEZ_NEARBY)
  */
 export const getAvailableProvinces = (): string[] => {
-  return ['BATANGAS', 'CAVITE', 'LAGUNA', 'QUEZON', 'RIZAL'];
+  return ['BATANGAS', 'CAVITE', 'LAGUNA', 'QUEZON', 'RIZAL', 'LOPEZ_NEARBY'];
 };
 
 /**

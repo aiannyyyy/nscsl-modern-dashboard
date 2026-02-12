@@ -119,7 +119,7 @@ export const getMonthlyLabNoCount = async (
 };
 
 /**
- * Fetch cumulative data for all provinces (BATANGAS, LAGUNA, CAVITE, RIZAL, QUEZON)
+ * Fetch cumulative data for all provinces (BATANGAS, LAGUNA, CAVITE, RIZAL, QUEZON, LOPEZ_NEARBY)
  * Used for Chart: Cumulative per year - all provinces
  */
 export const getCumulativeAllProvince = async (
@@ -191,7 +191,7 @@ export const getTwoYearComparisonForProvince = async (
  * Fetch 2-year comparison for all provinces (Chart 2)
  * @param year1 - First year to compare (e.g., 2023)
  * @param year2 - Second year to compare (e.g., 2024)
- * @returns Comparison data for all 5 provinces
+ * @returns Comparison data for all 5 provinces (excludes LOPEZ_NEARBY)
  */
 export const getTwoYearComparisonAllProvinces = async (
   year1: number,
@@ -205,6 +205,7 @@ export const getTwoYearComparisonAllProvinces = async (
     getCumulativeAllProvince(getYearDateRange(year2))
   ]);
 
+  // ✅ Only include the 5 main provinces (EXCLUDE LOPEZ_NEARBY from "Show All Provinces" chart)
   const provinces = ['BATANGAS', 'CAVITE', 'LAGUNA', 'QUEZON', 'RIZAL'];
 
   const formatted = provinces.map(province => {
@@ -260,7 +261,7 @@ export const getCumulativeUpToMonth = async (
  * @param year1 - First year
  * @param year2 - Second year  
  * @param endMonth - End month name (e.g., "June")
- * @returns Comparison for all provinces up to the specified month
+ * @returns Comparison for all provinces up to the specified month (excludes LOPEZ_NEARBY)
  */
 export const getTwoYearComparisonUpToMonth = async (
   year1: number,
@@ -275,6 +276,7 @@ export const getTwoYearComparisonUpToMonth = async (
     getCumulativeUpToMonth(year2, endMonth)
   ]);
 
+  // ✅ Only include the 5 main provinces (EXCLUDE LOPEZ_NEARBY from "Show All Provinces" chart)
   const provinces = ['BATANGAS', 'CAVITE', 'LAGUNA', 'QUEZON', 'RIZAL'];
 
   const formatted = provinces.map(province => {
@@ -391,10 +393,10 @@ export const calculateDiff = (oldValue: number, newValue: number): string => {
 };
 
 /**
- * Get all available provinces
+ * Get all available provinces (includes LOPEZ_NEARBY)
  */
 export const getAvailableProvinces = (): string[] => {
-  return ['BATANGAS', 'CAVITE', 'LAGUNA', 'QUEZON', 'RIZAL'];
+  return ['BATANGAS', 'CAVITE', 'LAGUNA', 'QUEZON', 'RIZAL', 'LOPEZ_NEARBY'];
 };
 
 /**
