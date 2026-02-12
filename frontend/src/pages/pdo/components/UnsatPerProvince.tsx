@@ -11,6 +11,7 @@ import {
   LabelList,
 } from "recharts";
 import { getUnsatProvince } from "../../../services/PDOServices/unsatApi";
+import { downloadChart } from "../../../utils/chartDownloadUtils"; // Adjust path as needed
 
 /* ================================
    Helpers
@@ -129,6 +130,30 @@ export const UnsatPerProvince: React.FC = () => {
 
   const shortMonth = month.substring(0, 3);
 
+  // ✅ NEW: Export handler
+  const handleExport = async (format: 'png' | 'svg' | 'excel') => {
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    const backgroundColor = isDarkMode ? '#111827' : '#ffffff'; // gray-900 : white
+    
+    try {
+      await downloadChart({
+        elementId: 'unsat-province-chart',
+        filename: `Unsat_Per_Province_${shortMonth}_${yearA}_vs_${yearB}`,
+        format,
+        data: format === 'excel' ? chartData.map(row => ({
+          Province: row.province,
+          [`${shortMonth} ${yearA}`]: row.period1,
+          [`${shortMonth} ${yearB}`]: row.period2,
+        })) : undefined,
+        sheetName: 'Unsat Per Province',
+        backgroundColor,
+        scale: 2,
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
   return (
     <div className="rounded-2xl bg-white dark:bg-gray-900 shadow-lg h-[550px]">
       {/* Header */}
@@ -163,6 +188,23 @@ export const UnsatPerProvince: React.FC = () => {
           >
             {months.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
+
+          {/* ✅ NEW: Export Dropdown */}
+          <select 
+            onChange={(e) => {
+              if (e.target.value) {
+                handleExport(e.target.value as 'png' | 'svg' | 'excel');
+                e.target.value = ''; // Reset after selection
+              }
+            }}
+            className="h-8 px-3 text-xs rounded-lg border dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+            disabled={loading || chartData.length === 0}
+          >
+            <option value="">Export</option>
+            <option value="png">PNG Image</option>
+            <option value="svg">SVG Vector</option>
+            <option value="excel">Excel Data</option>
+          </select>
         </div>
       </div>
 
@@ -177,36 +219,38 @@ export const UnsatPerProvince: React.FC = () => {
             No data available
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" className="dark:stroke-gray-700" />
-              <XAxis 
-                dataKey="province" 
-                tick={{ fill: 'currentColor' }}
-                className="dark:text-gray-300"
-              />
-              <YAxis 
-                tick={{ fill: 'currentColor' }}
-                className="dark:text-gray-300"
-              />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: 'var(--tooltip-bg, white)',
-                  border: '1px solid var(--tooltip-border, #e5e7eb)',
-                  borderRadius: '0.5rem'
-                }}
-              />
-              <Legend />
+          <div id="unsat-province-chart" className="w-full h-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="dark:stroke-gray-700" />
+                <XAxis 
+                  dataKey="province" 
+                  tick={{ fill: 'currentColor' }}
+                  className="dark:text-gray-300"
+                />
+                <YAxis 
+                  tick={{ fill: 'currentColor' }}
+                  className="dark:text-gray-300"
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: 'var(--tooltip-bg, white)',
+                    border: '1px solid var(--tooltip-border, #e5e7eb)',
+                    borderRadius: '0.5rem'
+                  }}
+                />
+                <Legend />
 
-              <Bar dataKey="period1" name={`${shortMonth} ${yearA}`} fill="#3b82f6" radius={[4, 4, 0, 0]}>
-                <LabelList content={CustomLabel} />
-              </Bar>
+                <Bar dataKey="period1" name={`${shortMonth} ${yearA}`} fill="#3b82f6" radius={[4, 4, 0, 0]}>
+                  <LabelList content={CustomLabel} />
+                </Bar>
 
-              <Bar dataKey="period2" name={`${shortMonth} ${yearB}`} fill="#ef4444" radius={[4, 4, 0, 0]}>
-                <LabelList content={CustomLabel} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+                <Bar dataKey="period2" name={`${shortMonth} ${yearB}`} fill="#ef4444" radius={[4, 4, 0, 0]}>
+                  <LabelList content={CustomLabel} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
     </div>

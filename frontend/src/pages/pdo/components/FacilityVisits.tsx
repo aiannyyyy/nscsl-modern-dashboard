@@ -333,13 +333,15 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
                               <Eye size={14} />
                               View
                             </button>
-                            <button
-                              onClick={() => handleDownloadFile(filePath.trim())}
-                              className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
-                            >
-                              <Download size={14} />
-                              Download
-                            </button>
+                            {canExport && (
+                              <button
+                                onClick={() => handleDownloadFile(filePath.trim())}
+                                className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
+                              >
+                                <Download size={14} />
+                                Download
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -429,13 +431,15 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleDownloadFile(viewingFile.path)}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
-              >
-                <Download size={14} />
-                Download
-              </button>
+              {canExport && (
+                <button
+                  onClick={() => handleDownloadFile(viewingFile.path)}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
+                >
+                  <Download size={14} />
+                  Download
+                </button>
+              )}
               <button
                 onClick={() => setViewingFile(null)}
                 className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -469,13 +473,15 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
                 <p className="text-sm text-gray-500 dark:text-gray-500 mb-4">
                   {viewingFile.name}
                 </p>
-                <button
-                  onClick={() => handleDownloadFile(viewingFile.path)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
-                >
-                  <Download size={16} />
-                  Download File
-                </button>
+                {canExport && (
+                  <button
+                    onClick={() => handleDownloadFile(viewingFile.path)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <Download size={16} />
+                    Download File
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -797,13 +803,15 @@ export const FacilityVisits: React.FC<FacilityVisitsProps> = ({ onDataChange }) 
                           <Eye size={14} />
                           View
                         </button>
-                        <button
-                          onClick={() => handleDownloadFile(filePath)}
-                          className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs flex-shrink-0"
-                        >
-                          <Download size={14} />
-                          Download
-                        </button>
+                        {canExport && (
+                          <button
+                            onClick={() => handleDownloadFile(filePath)}
+                            className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs flex-shrink-0"
+                          >
+                            <Download size={14} />
+                            Download
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

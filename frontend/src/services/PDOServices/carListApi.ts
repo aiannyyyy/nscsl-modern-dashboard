@@ -355,6 +355,65 @@ export const addCar = async (formData: AddCarFormData): Promise<ApiResponse<any>
 };
 
 /**
+ * Update existing car record with file upload
+ */
+export const updateCar = async (id: number, formData: AddCarFormData): Promise<ApiResponse<any>> => {
+  try {
+    const data = new FormData();
+
+    // Add the ID to the form data
+    data.append('id', id.toString());
+
+    // Map frontend field names to backend field names
+    data.append('case_no', formData.caseNo);
+    data.append('date_endorsed', formData.endorsedDate);
+    data.append('endorsed_by', formData.endorsedBy || '');
+    data.append('facility_code', formData.facilityCode);
+    data.append('facility_name', formData.facilityName || '');
+    data.append('city', formData.city || '');
+    data.append('province', formData.province || '');
+    data.append('labno', formData.labNo || '');
+    data.append('repeat_field', formData.repeat || '');
+    data.append('status', formData.status || 'open');
+    data.append('number_sample', formData.numSamples || '');
+    data.append('case_code', formData.caseCode || '');
+    data.append('sub_code1', formData.subCode1 || '');
+    data.append('sub_code2', formData.subCode2 || '');
+    data.append('sub_code3', formData.subCode3 || '');
+    data.append('sub_code4', formData.subCode4 || '');
+    data.append('remarks', formData.remarks || '');
+    data.append('frc', formData.frc || '');
+    data.append('wrc', formData.wrc || '');
+    data.append('prepared_by', formData.preparedBy || '');
+    data.append('followup_on', formData.followupOn || '');
+    data.append('reviewed_on', formData.reviewedOn || '');
+    data.append('closed_on', formData.closedOn || '');
+
+    // ⭐ Add userName for tracking
+    if (formData.userName) {
+      data.append('userName', formData.userName);
+    }
+
+    // Append file if exists (new file uploaded)
+    if (formData.attachment) {
+      data.append('attachment', formData.attachment);
+    }
+
+    const response = await axios.put(`${API_BASE_URL}/car-list/${id}`, data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 30000,
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error('Error updating car record:', error);
+    throw error;
+  }
+};
+
+/**
  * Update car record status
  */
 export const updateCarStatus = async (

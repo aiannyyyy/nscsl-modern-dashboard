@@ -410,6 +410,255 @@ const addCar = async (req, res) => {
     console.log("=== ADD-CAR CONTROLLER DEBUG END ===\n");
 };
 
+// Update car record (for edit functionality)
+const updateCar = async (req, res) => {
+    console.log("\n=== UPDATE-CAR CONTROLLER DEBUG START ===");
+    console.log("Timestamp:", new Date().toISOString());
+    console.log("Request body:", JSON.stringify(req.body, null, 2));
+    console.log("File info:", req.file ? {
+        fieldname: req.file.fieldname,
+        originalname: req.file.originalname,
+        filename: req.file.filename,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+        path: req.file.path
+    } : "No new file uploaded");
+
+    try {
+        // Extract form data
+        const {
+            id,
+            case_no,
+            date_endorsed,
+            endorsed_by,
+            facility_code,
+            facility_name,
+            city,
+            province,
+            labno,
+            repeat_field,
+            status,
+            number_sample,
+            case_code,
+            sub_code1,
+            sub_code2,
+            sub_code3,
+            sub_code4,
+            remarks,
+            frc,
+            wrc,
+            prepared_by,
+            followup_on,
+            reviewed_on,
+            closed_on,
+        } = req.body;
+
+        // ⭐ Get username from request
+        const userName = req.user?.name || req.body.userName || 'System';
+        const now = new Date();
+
+        console.log("Extracted form data:");
+        console.log("- id:", id);
+        console.log("- case_no:", case_no);
+        console.log("- facility_code:", facility_code);
+        console.log("- userName:", userName);
+
+        // Validate required fields
+        if (!id) {
+            return res.status(400).json({
+                error: "Validation Error",
+                message: "Record ID is required"
+            });
+        }
+
+        const missingFields = [];
+        if (!case_no || !case_no.trim()) missingFields.push('case_no');
+        if (!date_endorsed) missingFields.push('date_endorsed');
+        if (!facility_code || !facility_code.trim()) missingFields.push('facility_code');
+
+        if (missingFields.length > 0) {
+            console.error("Missing required fields:", missingFields);
+            return res.status(400).json({
+                error: "Validation Error",
+                message: `Missing required fields: ${missingFields.join(', ')}`,
+                missingFields: missingFields
+            });
+        }
+
+        // Check if record exists
+        const checkSql = "SELECT id, attachment_path FROM test_nscslcom_nscsl_dashboard.list_car WHERE id = ?";
+        const [checkResult] = await mysqlPool.query(checkSql, [id]);
+
+        if (!checkResult || checkResult.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: "Record not found",
+                message: "No record found with the provided ID"
+            });
+        }
+
+        const existingRecord = checkResult[0];
+        
+        // Handle file attachment
+        let attachment_path = existingRecord.attachment_path; // Keep existing if no new file
+        
+        if (req.file) {
+            // New file uploaded
+            attachment_path = `/uploads/${req.file.filename}`;
+            
+            // Delete old file if it exists
+            if (existingRecord.attachment_path) {
+                const oldFilePath = path.join(__dirname, '..', existingRecord.attachment_path);
+                fs.unlink(oldFilePath, (err) => {
+                    if (err) {
+                        console.error(`Error deleting old file ${oldFilePath}:`, err);
+                    } else {
+                        console.log(`Successfully deleted old file: ${oldFilePath}`);
+                    }
+                });
+            }
+        }
+
+        // Update SQL
+        const sql = `
+            UPDATE test_nscslcom_nscsl_dashboard.list_car 
+            SET 
+                case_no = ?,
+                date_endorsed = ?,
+                endorsed_by = ?,
+                facility_code = ?,
+                facility_name = ?,
+                city = ?,
+                province = ?,
+                labno = ?,
+                repeat_field = ?,
+                status = ?,
+                number_sample = ?,
+                case_code = ?,
+                sub_code1 = ?,
+                sub_code2 = ?,
+                sub_code3 = ?,
+                sub_code4 = ?,
+                remarks = ?,
+                frc = ?,
+                wrc = ?,
+                prepared_by = ?,
+                followup_on = ?,
+                reviewed_on = ?,
+                closed_on = ?,
+                attachment_path = ?,
+                modified_by = ?,
+                modified_at = ?
+            WHERE id = ?
+        `;
+
+        // Prepare values array with proper length limits
+        const values = [
+            safeTrim(case_no, 25),
+            date_endorsed || null,
+            safeTrim(endorsed_by, 25),
+            safeTrim(facility_code, 4),
+            safeTrim(facility_name, 50),
+            safeTrim(city, 25),
+            safeTrim(province, 25),
+            safeTrim(labno, 100),
+            safeTrim(repeat_field, 50),
+            safeTrim(status, 20),
+            number_sample ? parseInt(number_sample) : null,
+            safeTrim(case_code, 10),
+            safeTrim(sub_code1, 25),
+            safeTrim(sub_code2, 25),
+            safeTrim(sub_code3, 25),
+            safeTrim(sub_code4, 25),
+            safeTrim(remarks, 100),
+            safeTrim(frc, 10),
+            safeTrim(wrc, 10),
+            safeTrim(prepared_by, 15),
+            followup_on || null,
+            reviewed_on || null,
+            closed_on || null,
+            safeTrim(attachment_path, 255),
+            safeTrim(userName, 100),
+            now,
+            id
+        ];
+
+        console.log("SQL Query:", sql);
+        console.log("Values count:", values.length);
+
+        // Execute the update
+        const [result] = await mysqlPool.query(sql, values);
+
+        console.log("=== UPDATE SUCCESS ===");
+        console.log("Affected rows:", result.affectedRows);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                error: "Update failed",
+                message: "No record was updated"
+            });
+        }
+
+        // Success response
+        const response = {
+            success: true,
+            message: "Record updated successfully",
+            id: id,
+            affectedRows: result.affectedRows,
+            data: {
+                case_no: case_no,
+                date_endorsed: date_endorsed,
+                facility_code: facility_code,
+                modified_by: userName,
+                attachment: req.file ? {
+                    filename: req.file.filename,
+                    originalname: req.file.originalname,
+                    size: req.file.size
+                } : (attachment_path ? { existing: true } : null)
+            }
+        };
+
+        console.log("Sending success response:", response);
+        res.status(200).json(response);
+
+    } catch (error) {
+        console.error("\n=== DATABASE UPDATE ERROR ===");
+        console.error("Error message:", error.message);
+        console.error("Error code:", error.code);
+        console.error("Full error:", error);
+
+        // Handle specific MySQL errors
+        let errorMessage = "Database update failed";
+        let statusCode = 500;
+
+        switch (error.code) {
+            case 'ER_DUP_ENTRY':
+                errorMessage = "Duplicate entry: A record with this case number may already exist";
+                statusCode = 409;
+                break;
+            case 'ER_DATA_TOO_LONG':
+                errorMessage = "Data too long for one or more columns";
+                statusCode = 400;
+                break;
+            case 'ER_BAD_NULL_ERROR':
+                errorMessage = "NULL value not allowed in required field";
+                statusCode = 400;
+                break;
+        }
+
+        res.status(statusCode).json({
+            error: "Database Update Error",
+            message: errorMessage,
+            details: error.message,
+            code: error.code,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+
+    console.log("=== UPDATE-CAR CONTROLLER DEBUG END ===\n");
+};
+
 // Update status of a car record
 const updateStatus = async (req, res) => {
     try {
@@ -713,6 +962,7 @@ module.exports = {
     getCarListGrouped,
     getNextCaseNumber,  // ⭐ New export
     addCar,
+    updateCar,
     updateStatus,
     deleteCar,
     testDatabaseConnection,

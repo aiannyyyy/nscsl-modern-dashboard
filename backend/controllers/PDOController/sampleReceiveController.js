@@ -179,14 +179,20 @@ const getMonthlyLabNoCount = async (req, res) => {
 
         console.log(`✅ Query returned ${result.rows.length} raw rows`);
 
+        // ✅ Return empty data with 200 status instead of 404 error
         if (result.rows.length === 0) {
-            return res.status(404).json({ 
-                error: "No data found",
+            return res.json({
                 parameters: {
-                    type: 'monthly',
+                    type: 'Received', // or 'Screened' for the screened controller
                     spectypes: spectypeValues,
-                    province: provinceClean,
                     dateRange: { from, to }
+                },
+                cumulativeData: [], // ✅ Empty array instead of error
+                rawData: [],
+                summary: {
+                    totalRecords: 0,
+                    totalSamples: 0,
+                    totalLabNo: 0
                 }
             });
         }
@@ -265,21 +271,15 @@ const getCumulativeAllProvince = async (req, res) => {
 
         const { from, to } = req.query;
 
-        // Validate required parameters
         if (!from || !to) {
             return res.status(400).json({ 
                 error: "Missing required parameters: 'from' and 'to'" 
             });
         }
 
-        // Only "Received" type with spectypes
         const spectypeValues = ["1", "87", "20", "2", "3", "4", "5", "18"];
-
-        // Create IN clause placeholders for spectypes
         const spectypePlaceholders = spectypeValues.map((_, index) => `:spectype${index}`).join(', ');
 
-        // Modified query to aggregate by province only (cumulative across all months)
-        // ✅ NOW INCLUDES LOPEZ_NEARBY LOGIC
         const query = `
             SELECT 
                 CASE
@@ -395,13 +395,11 @@ const getCumulativeAllProvince = async (req, res) => {
                 province, SPECTYPE
         `;
 
-        // Build bind parameters object
         const bindParams = {
             date_from: from,
             date_to: to
         };
 
-        // Add spectype array parameters
         spectypeValues.forEach((value, index) => {
             bindParams[`spectype${index}`] = value;
         });
@@ -414,23 +412,30 @@ const getCumulativeAllProvince = async (req, res) => {
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );        
 
+        // ✅ Return empty data with 200 status instead of 404 error
         if (result.rows.length === 0) {
-            return res.status(404).json({ 
-                error: "No data found for the selected date range",
-                searchCriteria: {
-                    type: 'Received',
+            return res.json({
+                parameters: {
+                    type: 'Received', // or 'Screened' for the screened controller
                     spectypes: spectypeValues,
                     dateRange: { from, to }
+                },
+                cumulativeData: [], // ✅ Empty array instead of error
+                rawData: [],
+                summary: {
+                    totalRecords: 0,
+                    totalSamples: 0,
+                    totalLabNo: 0
                 }
             });
         }
 
-        // Group results by province only (cumulative)
+        // ✅ FIXED: Group results by province with .trim() to remove trailing spaces
         const cumulativeData = result.rows.reduce((acc, row) => {
-            const key = row.PROVINCE;
+            const key = row.PROVINCE.trim(); // ✅ Trim here
             if (!acc[key]) {
                 acc[key] = {
-                    province: row.PROVINCE,
+                    province: row.PROVINCE.trim(), // ✅ And here
                     category: 'Received',
                     total_samples: 0,
                     total_labno: 0,
@@ -482,6 +487,7 @@ const getCumulativeAllProvince = async (req, res) => {
         }
     }
 };
+
 
 module.exports = {
     getMonthlyLabNoCount,

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { getFacilityByCode, getNextCaseNumber } from "../../../services/PDOServices/carListApi";
-import type { AddCarFormData } from "../../../services/PDOServices/carListApi";
+import type { AddCarFormData, CarRecord } from "../../../services/PDOServices/carListApi";
 
 interface Props {
   show: boolean;
   onClose: () => void;
   onSave: (data: AddCarFormData) => Promise<void>;
+  editData?: CarRecord | null;
 }
 
 // Province code mapping
@@ -21,6 +22,7 @@ export const AddDocumentModal: React.FC<Props> = ({
   show,
   onClose,
   onSave,
+  editData,
 }) => {
   const [formData, setFormData] = useState<any>({});
   const [isLoadingFacility, setIsLoadingFacility] = useState(false);
@@ -28,24 +30,66 @@ export const AddDocumentModal: React.FC<Props> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingCaseNo, setIsGeneratingCaseNo] = useState(false);
 
-  // Auto-fill current date/time when modal opens
+  // Helper to format date for datetime-local input
+  const formatDateTimeLocal = (dateString: string | null) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 16);
+  };
+
+  // Initialize form data when modal opens or editData changes
   useEffect(() => {
     if (show) {
-      const now = new Date();
-      const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 16);
-      
-      setFormData((prev: any) => ({
-        ...prev,
-        endorsedDate: localDateTime,
-      }));
+      if (editData) {
+        // EDIT MODE: Populate form with existing data
+        setFormData({
+          id: editData.id,
+          caseNo: editData.case_no,
+          endorsedDate: formatDateTimeLocal(editData.date_endorsed),
+          endorsedBy: editData.endorsed_by || "",
+          facilityCode: editData.facility_code,
+          facilityName: editData.facility_name,
+          city: editData.city,
+          province: editData.province,
+          labNo: editData.labno || "",
+          repeat: editData.repeat || "",
+          status: editData.status || "",
+          numSamples: editData.number_sample || "",
+          subCode1: editData.sub_code1 || "",
+          subCode2: editData.sub_code2 || "",
+          subCode3: editData.sub_code3 || "",
+          subCode4: editData.sub_code4 || "",
+          remarks: editData.remarks || "",
+          caseCode: editData.case_code || "",
+          frc: editData.frc || "",
+          wrc: editData.wrc || "",
+          preparedBy: editData.prepared_by || "",
+          followupOn: formatDateTimeLocal(editData.followup_on),
+          reviewedOn: formatDateTimeLocal(editData.reviewed_on),
+          closedOn: formatDateTimeLocal(editData.closed_on),
+        });
+      } else {
+        // ADD MODE: Auto-fill current date/time
+        const now = new Date();
+        const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+          .toISOString()
+          .slice(0, 16);
+        
+        setFormData({
+          endorsedDate: localDateTime,
+        });
+      }
+    } else {
+      // Reset form when modal closes
+      setFormData({});
     }
-  }, [show]);
+  }, [show, editData]);
 
-  // Facility code lookup with debounce
+  // Facility code lookup with debounce (only in ADD mode)
   useEffect(() => {
-    if (!show) return;
+    if (!show || editData) return; // Skip in edit mode
 
     const facilityCode = formData.facilityCode;
 
@@ -116,7 +160,7 @@ export const AddDocumentModal: React.FC<Props> = ({
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [show, formData.facilityCode]);
+  }, [show, formData.facilityCode, editData]);
 
   // Generate case number based on province code
   const generateCaseNumber = async (provinceCode: string) => {
@@ -182,6 +226,8 @@ export const AddDocumentModal: React.FC<Props> = ({
 
   if (!show) return null;
 
+  const isEditMode = !!editData;
+
   const input =
     "mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-black focus:outline-none focus:ring-1 focus:ring-teal-500";
   const select = input;
@@ -199,7 +245,9 @@ export const AddDocumentModal: React.FC<Props> = ({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2 border-b">
-          <h5 className="text-base font-medium">Add Document</h5>
+          <h5 className="text-base font-medium">
+            {isEditMode ? 'Edit Document' : 'Add Document'}
+          </h5>
           <button onClick={onClose} className="text-gray-500 text-xl leading-none">
             ×
           </button>
@@ -213,7 +261,7 @@ export const AddDocumentModal: React.FC<Props> = ({
           className="px-4 py-3 max-h-[70vh] overflow-y-auto text-sm"
         >
           <div className="grid grid-cols-12 gap-3">
-            {/* Case No - AUTO GENERATED & DISABLED */}
+            {/* Case No - AUTO GENERATED & DISABLED in ADD mode, READONLY in EDIT mode */}
             <div className="col-span-12 md:col-span-3">
               <label className={label}>
                 Case No. <span className="text-red-500">*</span>
@@ -225,9 +273,9 @@ export const AddDocumentModal: React.FC<Props> = ({
                   required
                   disabled
                   value={formData.caseNo || ""}
-                  placeholder="Auto-generated"
+                  placeholder={isEditMode ? "" : "Auto-generated"}
                 />
-                {isGeneratingCaseNo && (
+                {isGeneratingCaseNo && !isEditMode && (
                   <div className="absolute right-2 top-1/2 -translate-y-1/2">
                     <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
                   </div>
@@ -235,7 +283,7 @@ export const AddDocumentModal: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* Date Endorsed - AUTO FILLED with current date/time */}
+            {/* Date Endorsed */}
             <div className="col-span-12 md:col-span-3">
               <label className={label}>
                 Date Endorsed <span className="text-red-500">*</span>
@@ -248,7 +296,9 @@ export const AddDocumentModal: React.FC<Props> = ({
                 onChange={handleChange}
                 value={formData.endorsedDate || ""}
               />
-              <p className="text-xs text-gray-500 mt-0.5">Auto-filled with current time</p>
+              {!isEditMode && (
+                <p className="text-xs text-gray-500 mt-0.5">Auto-filled with current time</p>
+              )}
             </div>
 
             {/* Endorsed By */}
@@ -282,19 +332,20 @@ export const AddDocumentModal: React.FC<Props> = ({
               <div className="relative">
                 <input
                   name="facilityCode"
-                  className={input}
+                  className={`${input} ${isEditMode ? 'bg-gray-100' : ''}`}
                   required
                   onChange={handleChange}
                   value={formData.facilityCode || ""}
                   placeholder="Enter facility code"
+                  readOnly={isEditMode}
                 />
-                {isLoadingFacility && (
+                {isLoadingFacility && !isEditMode && (
                   <div className="absolute right-2 top-1/2 -translate-y-1/2">
                     <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
                   </div>
                 )}
               </div>
-              {facilityError && (
+              {facilityError && !isEditMode && (
                 <p className="text-xs text-red-500 mt-1">{facilityError}</p>
               )}
             </div>
@@ -485,7 +536,9 @@ export const AddDocumentModal: React.FC<Props> = ({
 
             {/* Attachment */}
             <div className="col-span-12 md:col-span-6">
-              <label className="text-sm text-gray-700">Attachment</label>
+              <label className="text-sm text-gray-700">
+                Attachment {isEditMode && formData.attachment_path && '(leave blank to keep existing)'}
+              </label>
               <div className="mt-1 flex items-center gap-2">
                 <input
                   id="attachment"
@@ -501,7 +554,7 @@ export const AddDocumentModal: React.FC<Props> = ({
                   Choose File
                 </label>
                 <span className="text-sm text-gray-500 truncate max-w-[220px]">
-                  {formData.attachment?.name || "No file chosen"}
+                  {formData.attachment?.name || (isEditMode && editData?.attachment_path ? 'Current file attached' : 'No file chosen')}
                 </span>
               </div>
             </div>
@@ -527,7 +580,7 @@ export const AddDocumentModal: React.FC<Props> = ({
             {isSaving && (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
             )}
-            {isSaving ? "Saving..." : "Save"}
+            {isSaving ? "Saving..." : (isEditMode ? "Update" : "Save")}
           </button>
         </div>
       </div>

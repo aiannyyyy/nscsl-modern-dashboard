@@ -556,7 +556,7 @@ export const CumulativePerProvince: React.FC<Props> = ({
                   isDecrease ? 'text-red-600 dark:text-red-400' : 
                   'text-gray-600 dark:text-gray-400'
                 }`}>
-                  {diff > 0 ? '+' : ''}{diff.toLocaleString()}
+                  {diff > 0 ? '+' : ''}{diff.toLocaleString()} 
                 </td>
                 <td className={`border border-gray-300 dark:border-gray-700 px-3 py-2 font-semibold ${
                   isIncrease ? 'text-green-600 dark:text-green-400' : 

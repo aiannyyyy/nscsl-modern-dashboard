@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { FileDown, Hospital } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { NsfPerformanceData } from '../../../services/PDOServices/nsfPerformanceApi';
+import { usePermissions } from '../../../hooks/usePermission';
 
 interface FacilitiesListProps {
   facilities: NsfPerformanceData[];
@@ -14,6 +15,7 @@ const FacilitiesList: React.FC<FacilitiesListProps> = ({
   selectedProvince,
   onFacilitySelect,
 }) => {
+  const { canExport } = usePermissions(['program', 'administrator']);
   const [searchTerm, setSearchTerm] = useState('');
 
   const formatProvinceName = (province: string) =>
@@ -132,24 +134,25 @@ const FacilitiesList: React.FC<FacilitiesListProps> = ({
         {/* Search + Export */}
         <div className="flex items-center gap-3">
           {/* Export Button */}
-          <button
-            onClick={handleExportToExcel}
-            disabled={filteredFacilities.length === 0}
-            className="
-              h-10 px-4 text-sm rounded-lg
-              bg-green-600 hover:bg-green-700
-              disabled:bg-gray-400 disabled:cursor-not-allowed
-              text-white font-medium
-              flex items-center gap-2
-              transition-colors
-              shadow-sm hover:shadow-md
-            "
-            title="Export to Excel"
-          >
-            <FileDown size={16} />
-            Export
-          </button>
-
+          {canExport && (
+            <button
+              onClick={handleExportToExcel}
+              disabled={filteredFacilities.length === 0}
+              className="
+                h-10 px-4 text-sm rounded-lg
+                bg-green-600 hover:bg-green-700
+                disabled:bg-gray-400 disabled:cursor-not-allowed
+                text-white font-medium
+                flex items-center gap-2
+                transition-colors
+                shadow-sm hover:shadow-md
+              "
+              title="Export to Excel"
+            >
+              <FileDown size={16} />
+              Export
+            </button>
+          )}
           {/* Search */}
           <div className="flex items-center gap-2">
             <label

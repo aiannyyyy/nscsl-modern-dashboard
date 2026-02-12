@@ -179,20 +179,27 @@ const getMonthlyLabNoCount = async (req, res) => {
 
         console.log(`✅ Query returned ${result.rows.length} raw rows`);
 
+        // ✅ Return empty data with 200 status instead of 404 error
         if (result.rows.length === 0) {
-            return res.status(404).json({ 
-                error: "No data found",
+            return res.json({
                 parameters: {
-                    type: 'Screened',
+                    type: 'Screened', // or 'Screened' for the screened controller
                     spectypes: spectypeValues,
-                    province: provinceClean,
                     dateRange: { from, to }
+                },
+                cumulativeData: [], // ✅ Empty array instead of error
+                rawData: [],
+                summary: {
+                    totalRecords: 0,
+                    totalSamples: 0,
+                    totalLabNo: 0
                 }
             });
         }
 
         console.log("📊 Sample raw rows:", result.rows.slice(0, 5));
 
+        // ✅ FIXED: Added .trim() to province name
         const monthlyData = result.rows.reduce((acc, row) => {
             const key = `${row.YEAR}-${String(row.MONTH).padStart(2, '0')}`;
             if (!acc[key]) {
@@ -200,7 +207,7 @@ const getMonthlyLabNoCount = async (req, res) => {
                     year: row.YEAR,
                     month: row.MONTH,
                     month_year: row.MONTH_YEAR,
-                    province: row.PROVINCE,
+                    province: row.PROVINCE.trim(), // ✅ Added .trim()
                     category: 'Screened',
                     total_samples: 0,
                     total_labno: 0,
@@ -407,22 +414,30 @@ const getCumulativeAllProvince = async (req, res) => {
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );        
 
+        // ✅ Return empty data with 200 status instead of 404 error
         if (result.rows.length === 0) {
-            return res.status(404).json({ 
-                error: "No data found for the selected date range",
-                searchCriteria: {
-                    type: 'Screened',
+            return res.json({
+                parameters: {
+                    type: 'Screened', // or 'Screened' for the screened controller
                     spectypes: spectypeValues,
                     dateRange: { from, to }
+                },
+                cumulativeData: [], // ✅ Empty array instead of error
+                rawData: [],
+                summary: {
+                    totalRecords: 0,
+                    totalSamples: 0,
+                    totalLabNo: 0
                 }
             });
         }
 
+        // ✅ FIXED: Added .trim() to remove trailing spaces from province names
         const cumulativeData = result.rows.reduce((acc, row) => {
-            const key = row.PROVINCE;
+            const key = row.PROVINCE.trim(); // ✅ Added .trim()
             if (!acc[key]) {
                 acc[key] = {
-                    province: row.PROVINCE,
+                    province: row.PROVINCE.trim(), // ✅ Added .trim()
                     category: 'Screened',
                     total_samples: 0,
                     total_labno: 0,

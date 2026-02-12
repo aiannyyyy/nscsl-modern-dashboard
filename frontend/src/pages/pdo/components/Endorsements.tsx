@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Download, FileText, Edit, Trash2, X, Eye, Filter, Calendar } from 'lucide-react';
 import { DateRangeModal } from '../../laboratory/components/DateRangeModal';
 import { useAuth } from '../../../hooks/useAuth';
+import { usePermissions } from '../../../hooks/usePermission';
 import {
   useGetAllEndorsements,
   useDeleteEndorsement,
@@ -67,6 +68,8 @@ export const Endorsements: React.FC = () => {
   
   const { user } = useAuth();
 
+  const { canExport } = usePermissions(['program', 'administrator']);
+
   // Map API data to component format
   const records = useMemo(() => {
     if (!endorsementsData) return [];
@@ -117,6 +120,7 @@ export const Endorsements: React.FC = () => {
     const downloadOnlyTypes = ['doc', 'docx', 'xls', 'xlsx', 'xlsm', 'ppt', 'pptx', 'csv', 'zip', 'rar'];
     
     if (downloadOnlyTypes.includes(fileExtension)) {
+      if (!canExport) return;
       handleDownloadFile(filePath);
       return;
     }
@@ -419,13 +423,15 @@ export const Endorsements: React.FC = () => {
                               <Eye size={14} />
                               View
                             </button>
-                            <button
-                              onClick={() => handleDownloadFile(filePath.trim())}
-                              className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
-                            >
-                              <Download size={14} />
-                              Download
-                            </button>
+                            {canExport && (
+                              <button
+                                onClick={() => handleDownloadFile(filePath.trim())}
+                                className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
+                              >
+                                <Download size={14} />
+                                Download
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -455,16 +461,6 @@ export const Endorsements: React.FC = () => {
           </div>
 
           <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 flex justify-end gap-2">
-            <button
-              onClick={() => {
-                setShowDetailsModal(false);
-                handleEdit(selectedRecord);
-              }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
-            >
-              <Edit size={16} />
-              Edit
-            </button>
             <button
               onClick={() => setShowDetailsModal(false)}
               className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors text-sm font-medium"
@@ -512,13 +508,15 @@ export const Endorsements: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleDownloadFile(viewingFile.path)}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
-              >
-                <Download size={14} />
-                Download
-              </button>
+              {canExport && (
+                <button
+                  onClick={() => handleDownloadFile(viewingFile.path)}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs"
+                >
+                  <Download size={14} />
+                  Download
+                </button>
+              )}
               <button
                 onClick={() => setViewingFile(null)}
                 className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -552,13 +550,15 @@ export const Endorsements: React.FC = () => {
                 <p className="text-sm text-gray-500 dark:text-gray-500 mb-4">
                   {viewingFile.name}
                 </p>
-                <button
-                  onClick={() => handleDownloadFile(viewingFile.path)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
-                >
-                  <Download size={16} />
-                  Download File
-                </button>
+                {canExport && (
+                  <button
+                    onClick={() => handleDownloadFile(viewingFile.path)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <Download size={16} />
+                    Download File
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -643,13 +643,15 @@ export const Endorsements: React.FC = () => {
               {/* Action Buttons */}
               <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-1"></div>
 
-              <button
-                onClick={() => setShowDateRangeModal(true)}
-                className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 text-xs font-medium whitespace-nowrap"
-              >
-                <Download size={16} />
-                Export
-              </button>
+              {canExport && (
+                <button
+                  onClick={() => setShowDateRangeModal(true)}
+                  className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 text-xs font-medium whitespace-nowrap"
+                >
+                  <Download size={16} />
+                  Export
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -831,13 +833,15 @@ export const Endorsements: React.FC = () => {
                           <Eye size={14} />
                           View
                         </button>
-                        <button
-                          onClick={() => handleDownloadFile(filePath)}
-                          className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs flex-shrink-0"
-                        >
-                          <Download size={14} />
-                          Download
-                        </button>
+                        {canExport && (
+                          <button
+                            onClick={() => handleDownloadFile(filePath)}
+                            className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-1.5 text-xs flex-shrink-0"
+                          >
+                            <Download size={14} />
+                            Download
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
