@@ -115,10 +115,10 @@ export const SpeedMonitoringChart: React.FC<Props> = ({
     () =>
       chartData.map((d) => ({
         Encoder: d.encoder,
-        "Total Samples Encoded": d.samples,
+        [type === 'entry' ? 'Total Samples Encoded' : 'Total Samples Verified']: d.samples,
         "Seconds per Filter Card": d.seconds,
       })),
-    [chartData]
+    [chartData, type]
   );
 
   const handleExport = async (format: "png" | "svg" | "excel") => {
@@ -388,7 +388,7 @@ export const SpeedMonitoringChart: React.FC<Props> = ({
             <Bar 
               dataKey="samples" 
               fill="#7dd3fc" 
-              name="Total Samples Encoded"
+              name={type === 'entry' ? 'Total Samples Encoded' : 'Total Samples Verified'}  // ← here
               yAxisId="left"
             >
               <LabelList content={renderBarLabel} />

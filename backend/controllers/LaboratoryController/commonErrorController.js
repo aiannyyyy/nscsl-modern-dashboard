@@ -188,7 +188,7 @@ exports.getCommonErrors = async (req, res) => {
 
         // Get database connection from app.locals
         const oraclePool = req.app.locals.oracleDb;
-        
+
         if (!oraclePool) {
             return res.status(500).json({
                 success: false,
@@ -204,47 +204,72 @@ exports.getCommonErrors = async (req, res) => {
         const formattedMonth = monthNum < 10 ? `0${monthNum}` : `${monthNum}`;
 
         // Create start and end date strings
-        const startDate = `${year}-${formattedMonth}-01 00:00:00`;
+        const startDate = new Date(`${year}-${formattedMonth}-01T00:00:00`);
 
         // Get the last day of the month
         const lastDay = new Date(year, monthNum, 0).getDate();
-        const endDate = `${year}-${formattedMonth}-${lastDay} 23:59:59`;
+        const endDate = new Date(`${year}-${formattedMonth}-${lastDay}T23:59:59`);
 
         console.log(`[Common Error] Date range: ${startDate} to ${endDate}`);
 
         const query = `
             SELECT
-                AUDIT_SAMPLE."TABLECOLUMN",
-                TO_CHAR(SAMPLE_DEMOG_ARCHIVE."DTRECV", 'YYYY-MM') AS month,
-                COUNT(SAMPLE_DEMOG_ARCHIVE."LABNO") AS "TOTAL_COUNT",
-                COUNT(CASE WHEN USERS."USERNAME" = 'MRGOMEZ' THEN SAMPLE_DEMOG_ARCHIVE."LABNO" END) AS "MRGOMEZ_COUNT",
-                COUNT(CASE WHEN USERS."USERNAME" = 'JMAPELADO' THEN SAMPLE_DEMOG_ARCHIVE."LABNO" END) AS "JMAPELADO_COUNT",
-                COUNT(CASE WHEN USERS."USERNAME" = 'ABBRUTAS' THEN SAMPLE_DEMOG_ARCHIVE."LABNO" END) AS "ABBRUTAS_COUNT",
-                COUNT(CASE WHEN USERS."USERNAME" = 'AAMORFE' THEN SAMPLE_DEMOG_ARCHIVE."LABNO" END) AS "AAMORFE_COUNT",
-                ROUND(
-                    (COUNT(SAMPLE_DEMOG_ARCHIVE."LABNO") * 100.0) / 
-                    SUM(COUNT(SAMPLE_DEMOG_ARCHIVE."LABNO")) OVER (),
-                    2
-                ) AS "PERCENTAGE"
-            FROM
-                "PHMSDS"."SAMPLE_DEMOG_ARCHIVE"
-            JOIN
-                "PHMSDS"."USERS" USERS ON SAMPLE_DEMOG_ARCHIVE."INIT_TECH" = USERS."USER_ID"
-            JOIN
-                "PHMSDS"."AUDIT_SAMPLE" AUDIT_SAMPLE ON SAMPLE_DEMOG_ARCHIVE."LABNO" = AUDIT_SAMPLE."LABNO"
-            WHERE
-                AUDIT_SAMPLE."TABLECOLUMN" NOT IN (
-                    'AGECOLL', 'CMSFLAG', 'FLAG', 'LINK', 'MATCHFLAG', 'MLNAME', 'RFLAG', 'SPECTYPE', 'TWIN'
-                )
-                AND AUDIT_SAMPLE."OLDDATA" <> 'N'
-                AND USERS."USERNAME" IN ('MRGOMEZ', 'JMAPELADO', 'ABBRUTAS', 'AAMORFE')
-                AND SAMPLE_DEMOG_ARCHIVE."DTRECV" BETWEEN 
-                    TO_TIMESTAMP(:startDate, 'YYYY-MM-DD HH24:MI:SS') 
-                    AND TO_TIMESTAMP(:endDate, 'YYYY-MM-DD HH24:MI:SS')
+                USERNAME,
+                TABLECOLUMN,
+                SUM(TOTAL_COUNT) AS TOTAL_COUNT
+            FROM (
+                -- Archive table counts
+                SELECT
+                    USERS."USERNAME" AS USERNAME,
+                    AUDIT_SAMPLE."TABLECOLUMN" AS TABLECOLUMN,
+                    COUNT(*) AS TOTAL_COUNT
+                FROM
+                    "PHMSDS"."SAMPLE_DEMOG_ARCHIVE" SAMPLE_DEMOG_ARCHIVE,
+                    "PHMSDS"."USERS" USERS,
+                    "PHMSDS"."AUDIT_SAMPLE" AUDIT_SAMPLE
+                WHERE
+                    SAMPLE_DEMOG_ARCHIVE."INIT_TECH" = USERS."USER_ID"
+                    AND SAMPLE_DEMOG_ARCHIVE."LABNO" = AUDIT_SAMPLE."LABNO"
+                    AND AUDIT_SAMPLE."TABLECOLUMN" NOT IN (
+                        'TWIN','SPECTYPE','RFLAG','MATCHFLAG','LINK','FLAG','CMSFLAG','AGECOLL'
+                    )
+                    AND AUDIT_SAMPLE."OLDDATA" <> 'N'
+                    AND SAMPLE_DEMOG_ARCHIVE."DTRECV" >= :startDate
+                    AND SAMPLE_DEMOG_ARCHIVE."DTRECV" < :endDate
+                GROUP BY
+                    USERS."USERNAME",
+                    AUDIT_SAMPLE."TABLECOLUMN"
+
+                UNION ALL
+
+                -- Master table counts
+                SELECT
+                    USERS."USERNAME" AS USERNAME,
+                    AUDIT_SAMPLE."TABLECOLUMN" AS TABLECOLUMN,
+                    COUNT(*) AS TOTAL_COUNT
+                FROM
+                    "PHMSDS"."SAMPLE_DEMOG_MASTER" SAMPLE_DEMOG_MASTER,
+                    "PHMSDS"."USERS" USERS,
+                    "PHMSDS"."AUDIT_SAMPLE" AUDIT_SAMPLE
+                WHERE
+                    SAMPLE_DEMOG_MASTER."INIT_TECH" = USERS."USER_ID"
+                    AND SAMPLE_DEMOG_MASTER."LABNO" = AUDIT_SAMPLE."LABNO"
+                    AND AUDIT_SAMPLE."TABLECOLUMN" NOT IN (
+                        'TWIN','SPECTYPE','RFLAG','MATCHFLAG','LINK','FLAG','CMSFLAG','AGECOLL'
+                    )
+                    AND AUDIT_SAMPLE."OLDDATA" <> 'N'
+                    AND SAMPLE_DEMOG_MASTER."DTRECV" >= :startDate
+                    AND SAMPLE_DEMOG_MASTER."DTRECV" < :endDate
+                GROUP BY
+                    USERS."USERNAME",
+                    AUDIT_SAMPLE."TABLECOLUMN"
+            ) COMBINED
             GROUP BY
-                AUDIT_SAMPLE."TABLECOLUMN", TO_CHAR(SAMPLE_DEMOG_ARCHIVE."DTRECV", 'YYYY-MM')
+                USERNAME,
+                TABLECOLUMN
             ORDER BY
-                AUDIT_SAMPLE."TABLECOLUMN" ASC
+                TABLECOLUMN ASC,
+                USERNAME ASC
         `;
 
         console.log('[Common Error] Executing query...');
@@ -277,9 +302,9 @@ exports.getCommonErrors = async (req, res) => {
 
     } catch (error) {
         console.error('❌ Common Error Query Error:', error);
-        
+
         const executionTime = Date.now() - startTime;
-        
+
         res.status(500).json({
             success: false,
             error: 'An error occurred while fetching common error data',

@@ -34,6 +34,16 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+const USERNAME_MAP: Record<string, string> = {
+  AAMORFE: "Abigail Morfe",
+  JMAPELADO: "Jay Arr Apelado",
+  MRGOMEZ: "Mary Rose Gomez",
+  ABBRUTAS: "Angelica Brutas",
+};
+
+const getDisplayName = (username: string): string =>
+  USERNAME_MAP[username.toUpperCase()] ?? username;
+
 // ─────────────────────────────────────────────
 // Breakdown Modal Component
 // ─────────────────────────────────────────────
@@ -43,6 +53,9 @@ interface BreakdownModalProps {
   tableColumn: string;
   year: number;
   month: number;
+  // Pass pre-computed tech data from parent to avoid extra API call
+  techData: { name: string; count: number; percentage: string }[];
+  totalCount: number;
 }
 
 const BreakdownModal: React.FC<BreakdownModalProps> = ({
@@ -51,25 +64,9 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({
   tableColumn,
   year,
   month,
+  techData,
+  totalCount,
 }) => {
-  const { data, isLoading, isError } = useCommonErrorBreakdown(
-    { year, month, tableColumn },
-    { enabled: isOpen && !!tableColumn }
-  );
-
-  const techData = useMemo(() => {
-    if (!data?.data?.technicianSummary) return [];
-
-    return data.data.technicianSummary.map((tech) => ({
-      name: tech.tech_name,
-      count: tech.count,
-      percentage:
-        data.data.totalRecords > 0
-          ? ((tech.count / data.data.totalRecords) * 100).toFixed(1)
-          : "0",
-    }));
-  }, [data]);
-
   if (!isOpen) return null;
 
   return (
@@ -106,20 +103,7 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({
 
         {/* Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="text-center">
-                <Loader2 className="w-10 h-10 animate-spin mx-auto mb-3 text-blue-500" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Loading breakdown data...
-                </p>
-              </div>
-            </div>
-          ) : isError ? (
-            <div className="flex items-center justify-center py-16">
-              <p className="text-sm text-red-500">Failed to load breakdown data</p>
-            </div>
-          ) : techData.length === 0 ? (
+          {techData.length === 0 ? (
             <div className="flex items-center justify-center py-16">
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 No breakdown data available
@@ -138,7 +122,7 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({
                     Total Errors
                   </p>
                   <p className="text-2xl font-bold text-blue-900 dark:text-blue-100 mt-1">
-                    {data?.data.totalRecords || 0}
+                    {totalCount}
                   </p>
                 </div>
                 <div
@@ -149,7 +133,7 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({
                   <p className="text-sm font-medium text-purple-600 dark:text-purple-400">
                     Error Type
                   </p>
-                  <p className="text-2xl font-bold text-purple-900 dark:text-purple-100 mt-1">
+                  <p className="text-2xl font-bold text-purple-900 dark:text-purple-100 mt-1 truncate">
                     {tableColumn}
                   </p>
                 </div>
@@ -159,7 +143,7 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({
                   border-green-200 dark:border-green-800"
                 >
                   <p className="text-sm font-medium text-green-600 dark:text-green-400">
-                    Technicians
+                    Demog Encoders
                   </p>
                   <p className="text-2xl font-bold text-green-900 dark:text-green-100 mt-1">
                     {techData.length}
@@ -170,7 +154,7 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({
               {/* Bar Chart */}
               <div className="p-4 rounded-xl border bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
-                  Errors by Technician
+                  Errors by Demog Encoders
                 </h3>
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={techData}>
@@ -204,7 +188,7 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({
                 </ResponsiveContainer>
               </div>
 
-              {/* Technician Details Table */}
+              {/* Demog Encoder Details Table */}
               <div className="rounded-xl border overflow-hidden bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -214,7 +198,7 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({
                           Rank
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                          Technician
+                          Encoders
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                           Error Count
@@ -225,7 +209,7 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                      {techData
+                      {[...techData]
                         .sort((a, b) => b.count - a.count)
                         .map((tech, index) => (
                           <tr
@@ -299,16 +283,10 @@ const BreakdownModal: React.FC<BreakdownModalProps> = ({
 // ─────────────────────────────────────────────
 const renderActiveShape = (props: any) => {
   const {
-    cx,
-    cy,
-    innerRadius,
-    outerRadius,
-    startAngle,
-    endAngle,
-    fill,
-    payload,
-    percent,
-    value,
+    cx, cy,
+    innerRadius, outerRadius,
+    startAngle, endAngle,
+    fill, payload, percent, value,
   } = props;
 
   return (
@@ -333,41 +311,23 @@ const renderActiveShape = (props: any) => {
         fill={fill}
         opacity={0.3}
       />
-      <text
-        x={cx}
-        y={cy - 20}
-        textAnchor="middle"
-        fill={fill}
-        className="font-bold text-lg"
-      >
+      <text x={cx} y={cy - 20} textAnchor="middle" fill={fill} className="font-bold text-lg">
         {payload.error}
       </text>
-      <text
-        x={cx}
-        y={cy + 5}
-        textAnchor="middle"
-        fill="#666"
-        className="text-base"
-      >
+      <text x={cx} y={cy + 5} textAnchor="middle" fill="#666" className="text-base">
         {`Count: ${value}`}
       </text>
-      <text
-        x={cx}
-        y={cy + 25}
-        textAnchor="middle"
-        fill="#999"
-        className="text-sm"
-      >
+      <text x={cx} y={cy + 25} textAnchor="middle" fill="#999" className="text-sm">
         {`${(percent * 100).toFixed(1)}%`}
       </text>
     </g>
   );
 };
 
-export const DemogCommonErrorChart: React.FC<Props> = ({
-  expanded,
-  onExpand,
-}) => {
+// ─────────────────────────────────────────────
+// Main Chart Component
+// ─────────────────────────────────────────────
+export const DemogCommonErrorChart: React.FC<Props> = ({ expanded, onExpand }) => {
   const currentDate = new Date();
   const [year, setYear] = useState(currentDate.getFullYear());
   const [month, setMonth] = useState(currentDate.getMonth() + 1);
@@ -376,46 +336,82 @@ export const DemogCommonErrorChart: React.FC<Props> = ({
   const [showAll, setShowAll] = useState(false);
   const [selectedError, setSelectedError] = useState<string | null>(null);
 
-  // Fetch data using React Query
-  const { data: apiData, isLoading, isError, error } = useCommonErrors({
-    year,
-    month,
-  });
+  const { data: apiData, isLoading, isError, error } = useCommonErrors({ year, month });
 
-  // Transform API data to chart format
+  // ── Aggregate by TABLECOLUMN (summing across all usernames) ──
+  const aggregatedByColumn = useMemo(() => {
+    if (!apiData?.data || apiData.data.length === 0) return {} as Record<string, number>;
+
+    return apiData.data.reduce<Record<string, number>>((acc, row) => {
+      acc[row.TABLECOLUMN] = (acc[row.TABLECOLUMN] ?? 0) + row.TOTAL_COUNT;
+      return acc;
+    }, {});
+  }, [apiData]);
+
+  // ── Chart data (top 5 or all) ──
   const chartData: ErrorData[] = useMemo(() => {
-    if (!apiData?.data || apiData.data.length === 0) return [];
+    const sorted = Object.entries(aggregatedByColumn)
+      .sort(([, a], [, b]) => b - a);
 
-    const sorted = apiData.data.sort((a, b) => b.TOTAL_COUNT - a.TOTAL_COUNT);
-    const dataToShow = showAll ? sorted : sorted.slice(0, 5);
-
-    return dataToShow.map((item) => ({
-      error: item.TABLECOLUMN,
-      count: item.TOTAL_COUNT,
+    return (showAll ? sorted : sorted.slice(0, 5)).map(([column, count]) => ({
+      error: column,
+      count,
     }));
-  }, [apiData, showAll]);
+  }, [aggregatedByColumn, showAll]);
 
-  // Transform data for Excel export
+  // ── Tech breakdown for the selected error (used by modal) ──
+  const modalTechData = useMemo(() => {
+    if (!selectedError || !apiData?.data) return [];
+
+    const rows = apiData.data.filter(r => r.TABLECOLUMN === selectedError);
+    const total = rows.reduce((s, r) => s + r.TOTAL_COUNT, 0);
+
+    return rows
+      .map(r => ({
+        name: getDisplayName(r.USERNAME),
+        count: r.TOTAL_COUNT,
+        percentage: total > 0
+          ? ((r.TOTAL_COUNT / total) * 100).toFixed(1)
+          : "0",
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [selectedError, apiData]);
+
+  const modalTotalCount = useMemo(() => {
+    if (!selectedError) return 0;
+    return aggregatedByColumn[selectedError] ?? 0;
+  }, [selectedError, aggregatedByColumn]);
+
+  // ── Export data (pivoted by USERNAME) ──
   const exportData = useMemo(() => {
     if (!apiData?.data) return [];
 
-    return apiData.data
-      .sort((a, b) => b.TOTAL_COUNT - a.TOTAL_COUNT)
-      .map((item, index) => ({
-        Rank: index + 1,
-        "Error Type": item.TABLECOLUMN,
-        "Total Count": item.TOTAL_COUNT,
-        MRGOMEZ: item.MRGOMEZ_COUNT,
-        JMAPELADO: item.JMAPELADO_COUNT,
-        ABBRUTAS: item.ABBRUTAS_COUNT,
-        AAMORFE: item.AAMORFE_COUNT,
-        Percentage: `${item.PERCENTAGE.toFixed(2)}%`,
-      }));
+    const usernames = [...new Set(apiData.data.map(r => r.USERNAME))].sort();
+
+    const byColumn = apiData.data.reduce<Record<string, Record<string, number>>>((acc, row) => {
+      if (!acc[row.TABLECOLUMN]) acc[row.TABLECOLUMN] = {};
+      acc[row.TABLECOLUMN][row.USERNAME] = row.TOTAL_COUNT;
+      return acc;
+    }, {});
+
+    return Object.entries(byColumn)
+      .map(([column, techCounts]) => {
+        const total = Object.values(techCounts).reduce((s, v) => s + v, 0);
+        const row: Record<string, any> = {
+          "Error Type": column,
+          "Total Count": total,
+        };
+        for (const username of usernames) {
+          row[getDisplayName(username)] = techCounts[username] ?? 0;
+        }
+        return row;
+      })
+      .sort((a, b) => b["Total Count"] - a["Total Count"])
+      .map((row, index) => ({ Rank: index + 1, ...row }));
   }, [apiData]);
 
   const handleExport = async (format: "png" | "svg" | "excel") => {
     setExportOpen(false);
-
     await downloadChart({
       elementId: "demog-common-error-container",
       filename: `demog-common-errors-${year}-${MONTHS[month - 1].toLowerCase()}`,
@@ -429,25 +425,7 @@ export const DemogCommonErrorChart: React.FC<Props> = ({
     });
   };
 
-  const onPieEnter = (_: any, index: number) => {
-    setActiveIndex(index);
-  };
-
-  const onPieLeave = () => {
-    setActiveIndex(undefined);
-  };
-
-  const handlePieClick = (_: any, index: number) => {
-    const errorType = chartData[index]?.error;
-    if (errorType) {
-      setSelectedError(errorType);
-    }
-  };
-
-  const years = Array.from(
-    { length: 10 },
-    (_, i) => currentDate.getFullYear() - i
-  );
+  const years = Array.from({ length: 10 }, (_, i) => currentDate.getFullYear() - i);
 
   return (
     <>
@@ -496,9 +474,7 @@ export const DemogCommonErrorChart: React.FC<Props> = ({
                     focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {years.map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
+                    <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
 
@@ -512,9 +488,7 @@ export const DemogCommonErrorChart: React.FC<Props> = ({
                     focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {MONTHS.map((m, idx) => (
-                    <option key={m} value={idx + 1}>
-                      {m}
-                    </option>
+                    <option key={m} value={idx + 1}>{m}</option>
                   ))}
                 </select>
               </>
@@ -540,19 +514,16 @@ export const DemogCommonErrorChart: React.FC<Props> = ({
 
               {exportOpen && (
                 <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setExportOpen(false)}
-                  />
+                  <div className="fixed inset-0 z-10" onClick={() => setExportOpen(false)} />
                   <div
                     className="absolute right-0 mt-1 w-44 rounded-lg shadow-lg border z-20
                     bg-white dark:bg-gray-800
                     border-gray-200 dark:border-gray-700"
                   >
-                    {["png", "svg", "excel"].map((f) => (
+                    {(["png", "svg", "excel"] as const).map((f) => (
                       <button
                         key={f}
-                        onClick={() => handleExport(f as any)}
+                        onClick={() => handleExport(f)}
                         className="w-full px-4 py-2.5 text-left text-xs
                           hover:bg-gray-50 dark:hover:bg-gray-700
                           text-gray-700 dark:text-gray-300
@@ -583,9 +554,7 @@ export const DemogCommonErrorChart: React.FC<Props> = ({
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-blue-500" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Loading data...
-                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Loading data...</p>
               </div>
             </div>
           ) : isError ? (
@@ -613,9 +582,7 @@ export const DemogCommonErrorChart: React.FC<Props> = ({
               <PieChart>
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: document.documentElement.classList.contains(
-                      "dark"
-                    )
+                    backgroundColor: document.documentElement.classList.contains("dark")
                       ? "#1f2937"
                       : "#ffffff",
                     border: "1px solid #e5e7eb",
@@ -625,9 +592,7 @@ export const DemogCommonErrorChart: React.FC<Props> = ({
                 <Legend
                   verticalAlign="bottom"
                   height={36}
-                  wrapperStyle={{
-                    fontSize: "12px",
-                  }}
+                  wrapperStyle={{ fontSize: "12px" }}
                 />
                 <Pie
                   data={chartData}
@@ -638,9 +603,12 @@ export const DemogCommonErrorChart: React.FC<Props> = ({
                   paddingAngle={4}
                   activeIndex={activeIndex}
                   activeShape={renderActiveShape}
-                  onMouseEnter={onPieEnter}
-                  onMouseLeave={onPieLeave}
-                  onClick={handlePieClick}
+                  onMouseEnter={(_, index) => setActiveIndex(index)}
+                  onMouseLeave={() => setActiveIndex(undefined)}
+                  onClick={(_, index) => {
+                    const errorType = chartData[index]?.error;
+                    if (errorType) setSelectedError(errorType);
+                  }}
                   label={
                     activeIndex === undefined
                       ? ({ error, count, percent }) =>
@@ -656,9 +624,7 @@ export const DemogCommonErrorChart: React.FC<Props> = ({
                       style={{
                         transition: "all 0.3s ease",
                         opacity:
-                          activeIndex === undefined || activeIndex === index
-                            ? 1
-                            : 0.6,
+                          activeIndex === undefined || activeIndex === index ? 1 : 0.6,
                       }}
                     />
                   ))}
@@ -676,6 +642,8 @@ export const DemogCommonErrorChart: React.FC<Props> = ({
         tableColumn={selectedError || ""}
         year={year}
         month={month}
+        techData={modalTechData}
+        totalCount={modalTotalCount}
       />
     </>
   );

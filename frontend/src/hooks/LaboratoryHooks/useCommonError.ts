@@ -23,7 +23,7 @@ export const commonErrorKeys = {
     list: (params: CommonErrorParams) => [...commonErrorKeys.lists(), params] as const,
     current: () => [...commonErrorKeys.all, 'current'] as const,
     breakdowns: () => [...commonErrorKeys.all, 'breakdown'] as const,
-    breakdown: (params: CommonErrorBreakdownParams) => 
+    breakdown: (params: CommonErrorBreakdownParams) =>
         [...commonErrorKeys.breakdowns(), params] as const,
 };
 
@@ -31,12 +31,6 @@ export const commonErrorKeys = {
 // Main Hooks
 // ─────────────────────────────────────────────
 
-/**
- * Hook to fetch common error data by year and month
- * @param params - Year and month parameters
- * @param options - React Query options
- * @returns UseQueryResult with common error data
- */
 export const useCommonErrors = (
     params: CommonErrorParams,
     options?: Omit<UseQueryOptions<CommonErrorResponse, Error>, 'queryKey' | 'queryFn'>
@@ -45,19 +39,13 @@ export const useCommonErrors = (
         queryKey: commonErrorKeys.list(params),
         queryFn: () => fetchCommonErrors(params),
         enabled: !!params.year && !!params.month,
-        staleTime: 5 * 60 * 1000, // 5 minutes
-        gcTime: 10 * 60 * 1000, // 10 minutes
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
         retry: 2,
         ...options,
     });
 };
 
-/**
- * Hook to fetch detailed breakdown of errors for a specific table column
- * @param params - Year, month, and table column parameters
- * @param options - React Query options
- * @returns UseQueryResult with detailed error breakdown
- */
 export const useCommonErrorBreakdown = (
     params: CommonErrorBreakdownParams,
     options?: Omit<UseQueryOptions<CommonErrorBreakdownResponse, Error>, 'queryKey' | 'queryFn'>
@@ -73,11 +61,6 @@ export const useCommonErrorBreakdown = (
     });
 };
 
-/**
- * Hook to fetch common error data for current month
- * @param options - React Query options
- * @returns UseQueryResult with common error data
- */
 export const useCurrentMonthCommonErrors = (
     options?: Omit<UseQueryOptions<CommonErrorResponse, Error>, 'queryKey' | 'queryFn'>
 ): UseQueryResult<CommonErrorResponse, Error> => {
@@ -96,9 +79,8 @@ export const useCurrentMonthCommonErrors = (
 // ─────────────────────────────────────────────
 
 /**
- * Hook to get aggregated statistics from common error data
- * @param params - Year and month parameters
- * @returns Aggregated statistics
+ * Groups rows by TABLECOLUMN and aggregates per-technician counts.
+ * New query returns one row per (USERNAME, TABLECOLUMN) pair.
  */
 export const useCommonErrorStats = (params: CommonErrorParams) => {
     const { data, ...queryResult } = useCommonErrors(params);
@@ -107,59 +89,52 @@ export const useCommonErrorStats = (params: CommonErrorParams) => {
         if (!data?.data || data.data.length === 0) {
             return {
                 totalErrors: 0,
-                totalByTechnician: {
-                    MRGOMEZ: 0,
-                    JMAPELADO: 0,
-                    ABBRUTAS: 0,
-                    AAMORFE: 0,
-                },
+                totalByTechnician: {} as Record<string, number>,
                 topErrorTypes: [],
                 totalErrorTypes: 0,
                 averageErrorsPerType: 0,
             };
         }
 
-        const totalErrors = data.data.reduce((sum, item) => sum + item.TOTAL_COUNT, 0);
-        
-        const totalByTechnician = {
-            MRGOMEZ: data.data.reduce((sum, item) => sum + item.MRGOMEZ_COUNT, 0),
-            JMAPELADO: data.data.reduce((sum, item) => sum + item.JMAPELADO_COUNT, 0),
-            ABBRUTAS: data.data.reduce((sum, item) => sum + item.ABBRUTAS_COUNT, 0),
-            AAMORFE: data.data.reduce((sum, item) => sum + item.AAMORFE_COUNT, 0),
-        };
+        // Aggregate totals per TABLECOLUMN
+        const byColumn: Record<string, number> = {};
+        // Aggregate totals per USERNAME
+        const byTech: Record<string, number> = {};
 
-        const topErrorTypes = [...data.data]
-            .sort((a, b) => b.TOTAL_COUNT - a.TOTAL_COUNT)
+        for (const row of data.data) {
+            byColumn[row.TABLECOLUMN] = (byColumn[row.TABLECOLUMN] ?? 0) + row.TOTAL_COUNT;
+            byTech[row.USERNAME] = (byTech[row.USERNAME] ?? 0) + row.TOTAL_COUNT;
+        }
+
+        const totalErrors = Object.values(byColumn).reduce((sum, v) => sum + v, 0);
+
+        const topErrorTypes = Object.entries(byColumn)
+            .sort(([, a], [, b]) => b - a)
             .slice(0, 5)
-            .map(item => ({
-                type: item.TABLECOLUMN,
-                count: item.TOTAL_COUNT,
-                percentage: item.PERCENTAGE,
+            .map(([type, count]) => ({
+                type,
+                count,
+                percentage: totalErrors > 0
+                    ? parseFloat(((count / totalErrors) * 100).toFixed(2))
+                    : 0,
             }));
+
+        const totalErrorTypes = Object.keys(byColumn).length;
 
         return {
             totalErrors,
-            totalByTechnician,
+            totalByTechnician: byTech,
             topErrorTypes,
-            totalErrorTypes: data.data.length,
-            averageErrorsPerType: data.data.length > 0 
-                ? Math.round(totalErrors / data.data.length) 
+            totalErrorTypes,
+            averageErrorsPerType: totalErrorTypes > 0
+                ? Math.round(totalErrors / totalErrorTypes)
                 : 0,
         };
     }, [data]);
 
-    return {
-        ...queryResult,
-        data,
-        stats,
-    };
+    return { ...queryResult, data, stats };
 };
 
-/**
- * Hook to get breakdown statistics for a specific error type
- * @param params - Year, month, and table column parameters
- * @returns Breakdown statistics
- */
 export const useCommonErrorBreakdownStats = (params: CommonErrorBreakdownParams) => {
     const { data, ...queryResult } = useCommonErrorBreakdown(params);
 
@@ -178,8 +153,8 @@ export const useCommonErrorBreakdownStats = (params: CommonErrorBreakdownParams)
                 name: tech.tech_name,
                 id: tech.tech_id,
                 count: tech.count,
-                percentage: data.data.totalRecords > 0 
-                    ? Math.round((tech.count / data.data.totalRecords) * 100) 
+                percentage: data.data.totalRecords > 0
+                    ? Math.round((tech.count / data.data.totalRecords) * 100)
                     : 0,
             }))
             .sort((a, b) => b.count - a.count);
@@ -192,9 +167,5 @@ export const useCommonErrorBreakdownStats = (params: CommonErrorBreakdownParams)
         };
     }, [data]);
 
-    return {
-        ...queryResult,
-        data,
-        stats,
-    };
+    return { ...queryResult, data, stats };
 };

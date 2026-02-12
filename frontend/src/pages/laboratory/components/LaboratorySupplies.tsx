@@ -5,12 +5,14 @@ import {
   AlertTriangle,
   CheckCircle2,
   AlertCircle,
+  Download,
 } from 'lucide-react';
 
 import {
   getLabSupplies,
   type LabSupply,
 } from '../../../services/LaboratoryServices/labSuppliesService';
+import { downloadChart } from '../../../utils/chartDownloadUtils';
 
 // ─────────────────────────────────────────────
 // Status UI Config (presentation only)
@@ -46,7 +48,7 @@ const STATUS_CONFIG = {
     label: 'Critical',
     icon: AlertCircle,
   },
-  'out-of-stock': {  // 👈 ADD THIS for out-of-stock status
+  'out-of-stock': {
     border: 'border-gray-400',
     text: 'text-gray-600 dark:text-gray-400',
     badge: 'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300',
@@ -157,6 +159,95 @@ const FilterPill: React.FC<{
 };
 
 // ─────────────────────────────────────────────
+// Export Dropdown
+// ─────────────────────────────────────────────
+const ExportDropdown: React.FC<{
+  supplies: LabSupply[];
+  elementId: string;
+}> = ({ supplies, elementId }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleExport = async (format: 'png' | 'svg' | 'excel') => {
+    setIsOpen(false);
+    
+    try {
+      if (format === 'excel') {
+        const excelData = supplies.map(s => ({
+          'Item Code': s.itemCode,
+          'Description': s.description,
+          'Stock': s.stock,
+          'Unit': s.unit,
+          'Status': normalizeStatus(s.status).toUpperCase(),
+        }));
+        
+        await downloadChart({
+          elementId,
+          filename: `laboratory-supplies-${new Date().toISOString().split('T')[0]}`,
+          format: 'excel',
+          data: excelData,
+          sheetName: 'Lab Supplies',
+        });
+      } else {
+        await downloadChart({
+          elementId,
+          filename: `laboratory-supplies-${new Date().toISOString().split('T')[0]}`,
+          format,
+          backgroundColor: '#ffffff',
+          scale: 2,
+        });
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium
+          text-gray-600 dark:text-gray-300
+          hover:text-blue-600 dark:hover:text-blue-400
+          hover:bg-gray-100 dark:hover:bg-gray-700
+          rounded-lg transition-all"
+      >
+        <Download size={14} />
+        Export
+      </button>
+
+      {isOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-10"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute right-0 mt-1 w-36 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-20 overflow-hidden">
+            <button
+              onClick={() => handleExport('png')}
+              className="w-full px-3 py-2 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              Download PNG
+            </button>
+            <button
+              onClick={() => handleExport('svg')}
+              className="w-full px-3 py-2 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              Download SVG
+            </button>
+            <button
+              onClick={() => handleExport('excel')}
+              className="w-full px-3 py-2 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              Download Excel
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────
 export const LaboratorySupplies: React.FC = () => {
@@ -165,6 +256,8 @@ export const LaboratorySupplies: React.FC = () => {
   const [activeFilter, setActiveFilter] =
     useState<'normal' | 'warning' | 'critical' | 'out-of-stock' | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const CHART_ID = 'lab-supplies-chart';
 
   useEffect(() => {
     loadSupplies();
@@ -203,7 +296,7 @@ export const LaboratorySupplies: React.FC = () => {
     supplies.filter((s) => normalizeStatus(s.status) === status).length;
 
   return (
-    <div className="rounded-2xl shadow-lg bg-white dark:bg-gray-900 flex flex-col">
+    <div id={CHART_ID} className="rounded-2xl shadow-lg bg-white dark:bg-gray-900 flex flex-col">
       {/* Header */}
       <div className="flex justify-between px-5 py-3 border-b bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700">
         <h3 className="flex items-center gap-2 text-base font-semibold text-gray-800 dark:text-gray-100">
@@ -211,14 +304,17 @@ export const LaboratorySupplies: React.FC = () => {
           Laboratory Supplies
         </h3>
 
-        {activeFilter && (
-          <button
-            onClick={() => setActiveFilter(null)}
-            className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-          >
-            Clear filter
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {activeFilter && (
+            <button
+              onClick={() => setActiveFilter(null)}
+              className="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+            >
+              Clear filter
+            </button>
+          )}
+          <ExportDropdown supplies={filtered} elementId={CHART_ID} />
+        </div>
       </div>
 
       {/* Filters */}

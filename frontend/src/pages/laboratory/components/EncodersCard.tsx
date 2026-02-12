@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { RefreshCw, User } from 'lucide-react';
 import { useDemogCurrentMonth, useDemogTotals } from '../../../hooks/LaboratoryHooks/useDemogSummaryCards';
 
 export const EncodersCard: React.FC = () => {
   const { stats, loading, error, refetch } = useDemogCurrentMonth();
   const totals = useDemogTotals(stats);
-  const [showVerification, setShowVerification] = useState(false);
 
   const getCurrentMonthName = () => {
     const monthNames = [
@@ -55,31 +54,15 @@ export const EncodersCard: React.FC = () => {
   if (!stats) return null;
 
   const technicians = [
-    { 
-      entry: "Jay Arr Apelado", 
-      verification: "Apelado Jay Arr", 
-      color: "bg-blue-500"
-    },
-    { 
-      entry: "Angelica Brutas", 
-      verification: "Brutas Angelica", 
-      color: "bg-green-600"
-    },
-    { 
-      entry: "Mary Rose Gomez", 
-      verification: "Gomez Mary Rose", 
-      color: "bg-orange-500"
-    },
-    { 
-      entry: "Abigail Morfe", 
-      verification: "Morfe Abigail", 
-      color: "bg-red-600"
-    }
+    { name: "Jay Arr Apelado",  entryKey: "Jay Arr Apelado",  color: "bg-blue-500"   },
+    { name: "Angelica Brutas",  entryKey: "Angelica Brutas",  color: "bg-green-600"  },
+    { name: "Mary Rose Gomez",  entryKey: "Mary Rose Gomez",  color: "bg-orange-500" },
+    { name: "Abigail Morfe",    entryKey: "Abigail Morfe",    color: "bg-red-600"    },
   ];
 
   return (
     <div className="space-y-4">
-      {/* Header with Refresh and Toggle */}
+      {/* Header */}
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -89,57 +72,18 @@ export const EncodersCard: React.FC = () => {
             {getCurrentMonthName()}
           </p>
         </div>
-        
-        <div className="flex items-center gap-2">
-          {/* Toggle Switch */}
-          <div className="inline-flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-            <button
-              onClick={() => setShowVerification(false)}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
-                !showVerification
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              Entry
-            </button>
-            <button
-              onClick={() => setShowVerification(true)}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
-                showVerification
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              Verification
-            </button>
-          </div>
-          {/* Refresh Button 
-          <button
-            onClick={refetch}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors flex items-center gap-1.5"
-          >
-            <RefreshCw size={14} />
-            Refresh
-          </button>
-          */}
-        </div>
       </div>
 
       {/* Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {technicians.map((person, idx) => {
-          const entryCount = stats.entry[person.entry as keyof typeof stats.entry];
-          const verifCount = stats.verification[person.verification as keyof typeof stats.verification];
-          const total = entryCount + verifCount;
-          
-          const displayCount = showVerification ? verifCount : entryCount;
-          const displayPercent = showVerification
-            ? (totals.verification > 0 ? ((verifCount / totals.verification) * 100).toFixed(1) : '0.0')
-            : (totals.entry > 0 ? ((entryCount / totals.entry) * 100).toFixed(1) : '0.0');
-          
+          const entryCount = stats.entry[person.entryKey as keyof typeof stats.entry] ?? 0;
+          const entryPercent = totals.entry > 0
+            ? ((entryCount / totals.entry) * 100).toFixed(1)
+            : '0.0';
+
           return (
-            <div 
+            <div
               key={idx}
               className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-all"
             >
@@ -148,26 +92,26 @@ export const EncodersCard: React.FC = () => {
                 <div className={`${person.color} rounded-lg p-2.5 flex-shrink-0`}>
                   <User className="text-white" size={20} />
                 </div>
-                
+
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <h3 className="text-xs font-normal text-gray-600 dark:text-gray-400 mb-0.5 leading-tight">
-                    {person.entry}
+                    {person.name}
                   </h3>
-                  
+
                   {/* Main Count */}
                   <div className="flex items-baseline gap-1.5 mb-1">
                     <p className="text-2xl font-bold text-gray-900 dark:text-white leading-none">
-                      {displayCount.toLocaleString()}
+                      {entryCount.toLocaleString()}
                     </p>
                     <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                      ({displayPercent}%)
+                      ({entryPercent}%)
                     </span>
                   </div>
 
-                  {/* Total as secondary info */}
+                  {/* Footer */}
                   <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                    Total: {total.toLocaleString()} • at the moment
+                    at the moment
                   </p>
                 </div>
               </div>
