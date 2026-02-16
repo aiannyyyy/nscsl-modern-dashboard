@@ -96,6 +96,8 @@ const UnsatByPercentages: React.FC = () => {
     fetchData();
   }, [range.from, range.to, selectedProvince]);
 
+  const totalFacilities = data.length;
+
   /**
    * Handle export to Excel
    */
@@ -222,9 +224,18 @@ const UnsatByPercentages: React.FC = () => {
         </div>
 
         {/* ================= FOOTER ================= */}
-        <div className="text-center text-sm text-gray-400 mt-2">
-          Showing unsatisfactory rate as percentages
+        <div className="px-5 py-3 border-t text-sm">
+          <span>Showing unsatisfactory rate as percentages</span>
+          {!loading && (
+            <div className="flex justify-left text-gray-600 dark:text-gray-300">
+              <span>Total Facilities: </span>
+              <span className="font-semibold">{totalFacilities}</span>
+             
+            </div>
+            
+          )}
         </div>
+
       </div>
 
       {/* ================= DATE RANGE MODAL ================= */}

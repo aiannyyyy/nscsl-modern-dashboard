@@ -225,14 +225,19 @@ app.use("/api/common-errors", require("./routes/LaboratoryRoutes/commonErrorRout
 // Unsat Endorsement
 app.use("/api/endorsements", require("./routes/LaboratoryRoutes/unsatEndorsementRoutes"))
 
-// Unsatisfactory Analysis
-app.use("/api/unsat", require("./routes/PDORoutes/unsatRoutes"));
+// IT Job Order Routes
+app.use('/api/it-job-order', require('./routes/ITRoutes/itJobOrderRoutes'));
 
 // Notification Routes
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 
+// Unsatisfactory Analysis
+app.use("/api/unsat", require("./routes/PDORoutes/unsatRoutes"));
+
 // NSF Performance
 app.use("/api", require("./routes/PDORoutes/nsfPerformanceRoutes"));
+
+
 
 console.log("📋 API Routes loaded");
 

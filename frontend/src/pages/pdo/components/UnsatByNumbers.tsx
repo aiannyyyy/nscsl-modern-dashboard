@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { DateRangeModal } from "./DateRangeModal";
 import { FacilityPatientModal } from "./FacilityPatientModal";
 import { getTopUnsatisfactory } from "../../../services/PDOServices/unsatApi";
@@ -57,7 +57,7 @@ const getCurrentMonthRange = () => {
 
 /**
  * ================================
- * Component
+ * Component - OPTIMIZED
  * ================================
  */
 const UnsatByNumbers: React.FC = () => {
@@ -66,37 +66,89 @@ const UnsatByNumbers: React.FC = () => {
 
   const [data, setData] = useState<UnsatItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [selectedFacility, setSelectedFacility] = useState<string | null>(null);
   const [selectedProvince, setSelectedProvince] = useState("all");
   const [range, setRange] = useState(getCurrentMonthRange());
 
+  // Track the current request to cancel it when params change
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   /**
-   * Fetch data - Now includes province parameter
+   * Fetch data with request cancellation
    */
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller for this request
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       setLoading(true);
-      const res = await getTopUnsatisfactory(range.from, range.to, selectedProvince);
-      setData(res);
-    } catch (err) {
-      console.error("❌ Failed to load unsat by numbers", err);
-      setData([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+      setError(null);
 
-  // Refetch when province changes
+      const res = await getTopUnsatisfactory(
+        range.from,
+        range.to,
+        selectedProvince,
+        controller.signal
+      );
+
+      // Only update state if request wasn't cancelled
+      if (!controller.signal.aborted) {
+        setData(res);
+      }
+    } catch (err: any) {
+      // Don't show error for cancelled requests
+      if (err.name === 'CanceledError' || err.name === 'AbortError') {
+        console.log('Request cancelled');
+        return;
+      }
+
+      console.error("❌ Failed to load unsat by numbers", err);
+      
+      if (!controller.signal.aborted) {
+        setData([]);
+        setError(err.response?.data?.error || "Failed to load data. Please try again.");
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
+    }
+  }, [range.from, range.to, selectedProvince]);
+
+  /**
+   * Fetch when dependencies change
+   */
   useEffect(() => {
     fetchData();
-  }, [range.from, range.to, selectedProvince]);
+
+    // Cleanup: cancel request on unmount or when dependencies change
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [fetchData]);
 
   /**
    * Handle export to Excel
    */
   const handleExport = () => {
     exportUnsatCountToExcel(data, range.from, range.to, selectedProvince);
+  };
+
+  /**
+   * Handle retry
+   */
+  const handleRetry = () => {
+    fetchData();
   };
 
   return (
@@ -129,6 +181,7 @@ const UnsatByNumbers: React.FC = () => {
               className="flex-1 h-9 px-3 text-sm rounded-lg border border-gray-300 dark:border-gray-600 
                          bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100
                          focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={loading}
             >
               {PROVINCES.map((prov) => (
                 <option key={prov.value} value={prov.value}>
@@ -139,7 +192,7 @@ const UnsatByNumbers: React.FC = () => {
 
             <button
               onClick={handleExport}
-              disabled={data.length === 0}
+              disabled={data.length === 0 || loading}
               className="h-9 px-4 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700
                          disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
             >
@@ -165,18 +218,45 @@ const UnsatByNumbers: React.FC = () => {
         {/* ================= BODY ================= */}
         <div className="mx-5 mt-3 h-[280px] overflow-y-auto border rounded-lg">
           {loading && (
-            <div className="text-center text-sm text-gray-400 py-10">
-              Loading data...
+            <div className="flex flex-col items-center justify-center py-10 space-y-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <p className="text-sm text-gray-500">Loading data...</p>
             </div>
           )}
 
-          {!loading && data.length === 0 && (
-            <div className="text-center text-sm text-gray-400 py-10">
-              No data available
+          {error && !loading && (
+            <div className="flex flex-col items-center justify-center py-10 space-y-3">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-12 w-12 text-red-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <p className="text-sm text-red-600 text-center px-4">{error}</p>
+              <button
+                onClick={handleRetry}
+                className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Retry
+              </button>
             </div>
           )}
 
-          {!loading &&
+          {!loading && !error && data.length === 0 && (
+            <div className="text-center text-sm text-gray-400 py-10">
+              No data available for the selected criteria
+            </div>
+          )}
+
+          {!loading && !error &&
             data.map((item, index) => {
               const facility =
                 item.FACILITY_NAME || item.facility_name || "Unknown Facility";
@@ -194,7 +274,7 @@ const UnsatByNumbers: React.FC = () => {
                     setOpenFacilityModal(true);
                   }}
                   className="flex justify-between items-center px-4 py-2 border-b last:border-b-0
-                             cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                             cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
@@ -215,8 +295,14 @@ const UnsatByNumbers: React.FC = () => {
         </div>
 
         {/* ================= FOOTER ================= */}
-        <div className="text-center text-sm text-gray-400 mt-2">
-          Showing unsatisfactory count by numbers
+        <div className="px-5 py-3 border-t text-sm">
+          <span>Showing unsatisfactory rate as numbers</span>
+          {!loading && !error && (
+            <div className="flex justify-left text-gray-600 dark:text-gray-300">
+              <span>Total Facilities: </span>
+              <span className="font-semibold">{data.length}</span>
+            </div>
+          )}
         </div>
       </div>
 

@@ -434,7 +434,7 @@ exports.fullPatient = async (req, res) => {
 };
 
 // =====================================================
-// UNSATISFACTORY RATE (%) - FIXED VERSION
+// UNSATISFACTORY RATE (%)
 // =====================================================
 exports.unsatRate = async (req, res) => {
   let connection;
@@ -481,14 +481,13 @@ exports.unsatRate = async (req, res) => {
       sampleThreshold = 600;
     }
 
-    console.log(`📊 Date range: ${diffDays} days (~${diffMonths} months), threshold: ${sampleThreshold}`);
-
     // ================= BUILD PROVINCE FILTER =================
     let provinceFilter = '';
     const unsatParams = { date_from: from, date_to: to };
     const totalParams = { 
       date_from: fromDateOnly, 
-      date_to: toDateOnly
+      date_to: toDateOnly,
+      threshold: sampleThreshold
     };
 
     if (province && province !== 'all') {
@@ -556,7 +555,7 @@ exports.unsatRate = async (req, res) => {
       GROUP BY facility_name, province
     `;
 
-    /* ================= TOTAL SAMPLES (NO THRESHOLD IN SQL) ================= */
+    /* ================= TOTAL SAMPLES ================= */
     const totalSql = `
       WITH COMBINED AS (
         SELECT
@@ -603,6 +602,7 @@ exports.unsatRate = async (req, res) => {
         COUNT(DISTINCT LABNO) AS total_samples
       FROM COMBINED
       GROUP BY facility_name, province
+      HAVING COUNT(DISTINCT LABNO) > :threshold
     `;
 
     const unsatResult = await connection.execute(
@@ -636,13 +636,9 @@ exports.unsatRate = async (req, res) => {
       };
     });
 
-    /* ================= FILTER BY THRESHOLD AFTER MERGE ================= */
-    const filteredData = data.filter(d => d.total_samples >= sampleThreshold);
-    filteredData.sort((a, b) => b.unsat_rate - a.unsat_rate);
+    data.sort((a, b) => b.unsat_rate - a.unsat_rate);
 
-    console.log(`✅ Total facilities before filter: ${data.length}, after filter: ${filteredData.length} (threshold: ${sampleThreshold})`);
-
-    res.json(filteredData);
+    res.json(data);
 
   } catch (err) {
     console.error("❌ unsatRate error:", err);

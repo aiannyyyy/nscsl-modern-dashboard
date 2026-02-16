@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useDarkMode } from '../hooks';
 import { useAuth } from '../hooks/useAuth';
 import { Notifications } from '../components';
+import { DarkModeToggle } from '../components/DarkModeToggle';
 
 interface NavbarProps {
   isCollapsed: boolean;
@@ -93,6 +94,9 @@ export const Navbar: React.FC<NavbarProps> = ({ isCollapsed, setIsCollapsed }) =
 
         {/* Right: Actions */}
         <div className="flex items-center gap-3">
+          {/* Dark Mode Toggle */}
+          <DarkModeToggle />
+
           {/* Notifications Component */}
           <Notifications />
 

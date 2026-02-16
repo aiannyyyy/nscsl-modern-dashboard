@@ -49,7 +49,7 @@ module.exports = async (req, res, next) => {
 
     // Attach user to request
     req.user = {
-      id: user.user_id,
+      user_id: user.user_id,
       username: user.username,
       name: user.name,
       dept: user.dept,

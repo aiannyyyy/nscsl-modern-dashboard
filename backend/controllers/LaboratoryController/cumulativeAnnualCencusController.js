@@ -26,7 +26,7 @@ exports.getCumulativeAnnualCensus = async (req, res) => {
         connection = await oraclePool.getConnection();
         console.log('✅ [Cumulative Annual Census] Database connection successful');
         
-        /*
+        
         // Build query with UNION ALL to combine ARCHIVE and MASTER tables
         const query = `
             SELECT 
@@ -70,7 +70,9 @@ exports.getCumulativeAnnualCensus = async (req, res) => {
             GROUP BY year_month
             ORDER BY year_month ASC
         `;
-        */
+        
+
+        /*
         const query = `
             SELECT 
                 year_month,
@@ -111,6 +113,7 @@ exports.getCumulativeAnnualCensus = async (req, res) => {
             GROUP BY year_month
             ORDER BY year_month ASC
         `;
+        */
 
         console.log('[Cumulative Annual Census] Executing Query');
 

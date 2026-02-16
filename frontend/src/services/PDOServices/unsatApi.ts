@@ -9,7 +9,7 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json"
   },
-  timeout: 60000
+  timeout: 300000 // 5 minutes default
 });
 
 /**
@@ -72,26 +72,35 @@ export interface UnsatProvince {
  */
 
 /**
- * Top unsatisfactory facilities
- * @param province - Optional province filter ("all" or specific province name)
+ * Top unsatisfactory facilities (BY COUNT)
+ * @param from - Start date "YYYY-MM-DD HH:mm:ss"
+ * @param to - End date "YYYY-MM-DD HH:mm:ss"
+ * @param province - Optional: "all" or specific province name
  */
 export const getTopUnsatisfactory = async (
   from: string,
   to: string,
   province?: string
 ): Promise<TopUnsatFacility[]> => {
-  const params: any = { from, to };
-  
-  if (province) {
+  const params: Record<string, string> = { from, to };
+
+  if (province && province !== "all") {
     params.province = province;
   }
-  
-  const response = await api.get("/unsat/top-unsatisfactory", { params });
+
+  const response = await api.get("/unsat/top-unsatisfactory", {
+    params,
+    timeout: 300000
+  });
+
   return response.data;
 };
 
 /**
- * Unsatisfactory patient details (BY NUMBERS)
+ * Unsatisfactory patient details per facility (BY COUNT - modal)
+ * @param from - Start date "YYYY-MM-DD"
+ * @param to - End date "YYYY-MM-DD"
+ * @param facilityName - Exact facility name
  */
 export const getUnsatDetails = async (
   from: string,
@@ -103,13 +112,18 @@ export const getUnsatDetails = async (
       from,
       to,
       facility_name: facilityName
-    }
+    },
+    timeout: 300000
   });
+
   return response.data;
 };
 
 /**
  * Total samples per facility
+ * @param from - Start date "YYYY-MM-DD HH:mm:ss"
+ * @param to - End date "YYYY-MM-DD HH:mm:ss"
+ * @param facilityName - Exact facility name
  */
 export const getTotalSamples = async (
   from: string,
@@ -121,32 +135,49 @@ export const getTotalSamples = async (
       from,
       to,
       facility_name: facilityName
-    }
+    },
+    timeout: 300000
   });
+
   return response.data;
 };
 
 /**
- * Unsatisfactory rate (BY PERCENTAGE)
- * @param province - Optional province filter ("all" or specific province name)
+ * Unsatisfactory rate per facility (BY PERCENTAGE)
+ * @param from - Start date "YYYY-MM-DD HH:mm:ss"
+ * @param to - End date "YYYY-MM-DD HH:mm:ss"
+ * @param province - Optional: "all" or specific province name
+ * @param facilityName - Optional: specific facility name
  */
 export const getUnsatRate = async (
   from: string,
   to: string,
-  province?: string
+  province?: string,
+  facilityName?: string
 ): Promise<UnsatRate[]> => {
-  const params: any = { from, to };
-  
-  if (province) {
+  const params: Record<string, string> = { from, to };
+
+  if (province && province !== "all") {
     params.province = province;
   }
-  
-  const response = await api.get("/unsat/unsat-rate", { params });
+
+  if (facilityName) {
+    params.facility_name = facilityName;
+  }
+
+  const response = await api.get("/unsat/unsat-rate", {
+    params,
+    timeout: 300000
+  });
+
   return response.data;
 };
 
 /**
- * Full patient details (used in modal for percentage view)
+ * Full patient list per facility (BY PERCENTAGE - modal)
+ * @param from - Start date "YYYY-MM-DD"
+ * @param to - End date "YYYY-MM-DD"
+ * @param facilityName - Exact facility name
  */
 export const getFullPatient = async (
   from: string,
@@ -158,13 +189,19 @@ export const getFullPatient = async (
       from,
       to,
       facility_name: facilityName
-    }
+    },
+    timeout: 300000
   });
+
   return response.data;
 };
 
 /**
  * Unsatisfactory comparison by province (Period 1 vs Period 2)
+ * @param dateFrom1 - Period 1 start "YYYY-MM-DD HH:mm:ss"
+ * @param dateTo1   - Period 1 end   "YYYY-MM-DD HH:mm:ss"
+ * @param dateFrom2 - Period 2 start "YYYY-MM-DD HH:mm:ss"
+ * @param dateTo2   - Period 2 end   "YYYY-MM-DD HH:mm:ss"
  */
 export const getUnsatProvince = async (
   dateFrom1: string,
@@ -173,16 +210,21 @@ export const getUnsatProvince = async (
   dateTo2: string
 ): Promise<{
   success: boolean;
-  rows: any[];
+  rows: UnsatProvince[];
   rowCount: number;
 }> => {
   const response = await api.get("/unsat/unsat-province", {
-    params: { dateFrom1, dateTo1, dateFrom2, dateTo2 }
+    params: {
+      dateFrom1,
+      dateTo1,
+      dateFrom2,
+      dateTo2
+    },
+    timeout: 300000
   });
 
   return response.data;
 };
-
 
 /**
  * ================================

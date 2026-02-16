@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
-import { DarkModeToggle } from '../components/DarkModeToggle';
+import { GlobalJobOrderManager } from '../components/GlobalJobOrderManager';
 
 export const DashboardLayout: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-300 relative">
       <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
       <Navbar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
       
@@ -18,13 +18,14 @@ export const DashboardLayout: React.FC = () => {
           isCollapsed ? 'ml-20' : 'ml-64'
         }`}
       >
-        {/* Dark Mode Toggle - Fixed Position */}
-        <div className="fixed bottom-6 right-6 z-50">
-          <DarkModeToggle />
-        </div>
-        
         <Outlet />
       </main>
+
+      {/* Global Job Order Floating Tracker & FAB - Shows on ALL pages */}
+      {/* 🔧 FIXED: Wrapped in a portal-like container with high z-index */}
+      <div className="relative z-[9999]">
+        <GlobalJobOrderManager />
+      </div>
     </div>
   );
 };

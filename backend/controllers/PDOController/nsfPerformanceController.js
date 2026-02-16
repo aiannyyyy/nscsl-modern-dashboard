@@ -434,7 +434,6 @@ exports.getNsfPerformanceLabDetails = async (req, res) => {
         WHEN MNEMONIC = 'E108' THEN 'INSUFFICIENT'
         WHEN MNEMONIC = 'E109' THEN 'CONTAMINATED'
         WHEN MNEMONIC = 'DE' THEN 'DATA_ERASURES'
-        WHEN MNEMONIC = 'PRT' THEN 'PRETERM'
         ELSE NULL
         END)
         END AS ISSUE_DESCRIPTION
