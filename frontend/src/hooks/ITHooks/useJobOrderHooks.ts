@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import type { UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { itJobOrderService } from '../../services/ITServices/itJobOrderService';
@@ -83,6 +83,7 @@ export const useJobOrderStats = (
     return useQuery<ApiResponse<JobOrderStats>>({
         queryKey: jobOrderKeys.stats(),
         queryFn: () => itJobOrderService.getStatistics(),
+        placeholderData: keepPreviousData,  // ← ADD THIS
         ...options,
     });
 };
@@ -241,6 +242,7 @@ export const useRejectJobOrder = (
             toast.success('Job order rejected.');
             queryClient.invalidateQueries({ queryKey: jobOrderKeys.detail(variables.id) });
             queryClient.invalidateQueries({ queryKey: jobOrderKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: jobOrderKeys.myActive() });
             queryClient.invalidateQueries({ queryKey: jobOrderKeys.stats() });
         },
         onError: (error) => {

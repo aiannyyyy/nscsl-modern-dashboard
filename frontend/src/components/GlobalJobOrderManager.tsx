@@ -40,6 +40,7 @@ export function GlobalJobOrderManager() {
   const approveMutation = useApproveJobOrder();
   const rejectMutation  = useRejectJobOrder();
 
+
   const activeTickets: Ticket[] = React.useMemo(() => {
     if (!activeJobOrdersData?.data) return [];
     return activeJobOrdersData.data.map(mapJobOrderToTicket);
@@ -56,7 +57,6 @@ export function GlobalJobOrderManager() {
 
   return (
     <>
-      {/* Requester: floating ticket tracker */}
       {perms.isRequester && (
         <FloatingJobOrderTracker
           activeTickets={activeTickets}
@@ -65,24 +65,15 @@ export function GlobalJobOrderManager() {
         />
       )}
 
-      {/* Approver: floating approval tracker */}
       {perms.isApprover && (
         <FloatingApprovalTracker
           pendingApprovals={pendingApprovals}
           onViewAll={() => navigate('/dashboard/it-job-order')}
           onApprove={(id) => approveMutation.mutate(id)}
-          // ✅ FIX: onReject receives (id, workOrderNo) from the tracker,
-          //         but rejectMutation needs (id, reason).
-          //         The tracker collects the reason internally — we get it
-          //         from the reject modal inside FloatingApprovalTracker,
-          //         which calls onReject(numericId, workOrderNo).
-          //         So we need FloatingApprovalTracker to pass reason, not workOrderNo.
           onReject={(id, reason) => rejectMutation.mutate({ id, reason })}
           isApproving={approveMutation.isPending || rejectMutation.isPending}
         />
       )}
-
-      {/* Troubleshooter: no floating tracker */}
 
       <CreateTicketModal
         isOpen={isCreateModalOpen}

@@ -158,19 +158,69 @@ exports.getMyActiveJobOrders = async (req, res) => {
 exports.getJobOrderById = async (req, res) => {
     try {
         const { id } = req.params;
+
         const [rows] = await mysqlPool.query(
-            `SELECT jo.*, req.name as requester_name, req.dept as requester_dept, tech.name as tech_name, tech.username as tech_username, approved.name as approved_by_name
-             FROM it_job_order jo LEFT JOIN user req ON jo.requester_id = req.user_id LEFT JOIN user tech ON jo.tech_id = tech.user_id LEFT JOIN user approved ON jo.approved_by_id = approved.user_id
-             WHERE jo.id = ?`, [id]
+            `SELECT jo.*, 
+                    req.name as requester_name, req.dept as requester_dept, 
+                    tech.name as tech_name, tech.username as tech_username, 
+                    approved.name as approved_by_name
+             FROM it_job_order jo 
+             LEFT JOIN user req      ON jo.requester_id   = req.user_id 
+             LEFT JOIN user tech     ON jo.tech_id         = tech.user_id 
+             LEFT JOIN user approved ON jo.approved_by_id  = approved.user_id
+             WHERE jo.id = ?`,
+            [id]
         );
-        if (rows.length === 0) return res.status(404).json({ success: false, message: 'Job order not found' });
-        const [attachments] = await mysqlPool.query(`SELECT a.*, u.name as uploaded_by_name FROM job_order_attachments a LEFT JOIN user u ON a.uploaded_by = u.user_id WHERE a.job_order_id = ?`, [id]);
-        const [comments]    = await mysqlPool.query(`SELECT c.*, u.name as author_name FROM job_order_comments c LEFT JOIN user u ON c.user_id = u.user_id WHERE c.job_order_id = ? ORDER BY c.created_at DESC`, [id]);
-        const [history]     = await mysqlPool.query(`SELECT h.*, u.name as user_name FROM job_order_history h LEFT JOIN user u ON h.user_id = u.user_id WHERE h.job_order_id = ? ORDER BY h.created_at DESC`, [id]);
-        res.json({ success: true, data: { ...rows[0], attachments, comments, history } });
+
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Job order not found' });
+        }
+
+        const [attachmentsRaw] = await mysqlPool.query(
+            `SELECT a.*, u.name as uploaded_by_name 
+             FROM job_order_attachments a 
+             LEFT JOIN user u ON a.uploaded_by = u.user_id 
+             WHERE a.job_order_id = ?`,
+            [id]
+        );
+
+        const [comments] = await mysqlPool.query(
+            `SELECT c.*, u.name as author_name 
+             FROM job_order_comments c 
+             LEFT JOIN user u ON c.user_id = u.user_id 
+             WHERE c.job_order_id = ? 
+             ORDER BY c.created_at DESC`,
+            [id]
+        );
+
+        const [history] = await mysqlPool.query(
+            `SELECT h.*, u.name as user_name 
+             FROM job_order_history h 
+             LEFT JOIN user u ON h.user_id = u.user_id 
+             WHERE h.job_order_id = ? 
+             ORDER BY h.created_at DESC`,
+            [id]
+        );
+
+        // ✅ Build full URL for each attachment so the frontend can display/download them
+        const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
+        const attachments = attachmentsRaw.map((a) => ({
+            ...a,
+            file_url: `${BASE_URL}/uploads/${a.file_path}`,
+        }));
+
+        res.json({
+            success: true,
+            data: { ...rows[0], attachments, comments, history },
+        });
+
     } catch (error) {
         console.error('Error fetching job order:', error);
-        res.status(500).json({ success: false, message: 'Failed to fetch job order', error: error.message });
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch job order',
+            error: error.message,
+        });
     }
 };
 
@@ -349,9 +399,18 @@ exports.resolveJobOrder = async (req, res) => {
     try {
         await connection.beginTransaction();
         const { id } = req.params;
-        const { action_taken, resolution_notes, actual_hours } = req.body;
+        const { action_taken, resolution_notes } = req.body;
         const techId = req.user?.user_id;
         if (!action_taken) return res.status(400).json({ success: false, message: 'action_taken is required' });
+
+        // ✅ Auto-calculate actual_hours from started_at → NOW()
+        const [startRows] = await connection.query('SELECT started_at FROM it_job_order WHERE id = ?', [id]);
+        let actual_hours = null;
+        if (startRows[0]?.started_at) {
+            const startedAt = new Date(startRows[0].started_at);
+            actual_hours = parseFloat(((Date.now() - startedAt.getTime()) / (1000 * 60 * 60)).toFixed(2));
+        }
+
         await connection.query(
             `UPDATE it_job_order SET status = 'resolved', resolved_at = NOW(), action_taken = ?, resolution_notes = ?, actual_hours = ? WHERE id = ? AND tech_id = ?`,
             [action_taken, resolution_notes, actual_hours, id, techId]

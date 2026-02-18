@@ -7,7 +7,7 @@
 export const POSITIONS = {
   // IT troubleshooters — see all tickets, can assign/start/resolve
   COMPUTER_PROGRAMMER: 'Computer Programmer',
-  MIS_OFFICER:         'MIS Officer',
+  MIS_OFFICER:         'Mis Officer',
 
   // Dept approvers — see only their dept's pending tickets, can approve/reject
   PROGRAM_MANAGER:   'Program Manager',    // PDO department
@@ -22,7 +22,7 @@ export const APPROVER_DEPT_MAP: Record<string, string> = {
   [POSITIONS.LAB_MANAGER]:     'Laboratory',
 };
 
-// ─── Role helpers ─────────────────────────────────────────────────────────────
+// ─── Role helpers ───────────────────────────────────────────────────a──────────
 
 export type UserRole = 'troubleshooter' | 'approver' | 'requester';
 
