@@ -30,12 +30,11 @@ export const useGetNotifications = (limit = 50, offset = 0) => {
     return useQuery<Notification[], Error>({
         queryKey: notificationKeys.list(limit, offset),
         queryFn: () => getNotifications(limit, offset),
-        staleTime: 1000 * 60 * 2, // 2 minutes - data stays fresh longer
-        gcTime: 1000 * 60 * 5, // 5 minutes - cache cleanup time
-        refetchInterval: false, // ✅ Disable auto-refetch to prevent glitches
-        refetchOnWindowFocus: true, // ✅ Only refetch when user focuses window
-        refetchOnMount: true, // ✅ Refetch when component mounts
-        retry: 1, // Only retry once on failure
+        staleTime: 1000 * 30,
+        refetchInterval: 1000 * 30,
+        refetchOnWindowFocus: true,
+        refetchOnMount: true,
+        retry: 1,
     });
 };
 
@@ -46,9 +45,8 @@ export const useGetUnreadCount = () => {
     return useQuery<UnreadCountResponse, Error>({
         queryKey: notificationKeys.unreadCount(),
         queryFn: getUnreadCount,
-        staleTime: 1000 * 60 * 2, // 2 minutes
-        gcTime: 1000 * 60 * 5, // 5 minutes
-        refetchInterval: false, // ✅ Disable auto-refetch
+        staleTime: 1000 * 30,
+        refetchInterval: 1000 * 30,
         refetchOnWindowFocus: true,
         refetchOnMount: true,
         retry: 1,

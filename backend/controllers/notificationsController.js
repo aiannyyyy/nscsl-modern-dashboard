@@ -4,7 +4,7 @@ const { database } = require('../config');
 const getNotifications = async (req, res) => {
     try {
         const userDept = req.user?.dept;
-        const userId = req.user?.id;
+        const userId = req.user?.user_id ?? null; 
         const { limit = 50, offset = 0 } = req.query;
 
         console.log('==========================================');
@@ -69,7 +69,7 @@ const getNotifications = async (req, res) => {
 const getUnreadCount = async (req, res) => {
     try {
         const userDept = req.user?.dept;
-        const userId = req.user?.id;
+        const userId = req.user?.user_id ?? null; 
 
         if (!userDept) {
             return res.status(400).json({ 
@@ -209,7 +209,7 @@ const markAsRead = async (req, res) => {
 const markAllAsRead = async (req, res) => {
     try {
         const userDept = req.user?.dept;
-        const userId = req.user?.id;
+        const userId = req.user?.user_id ?? null; 
         const now = new Date();
 
         if (!userDept) {
@@ -282,7 +282,7 @@ const deleteNotification = async (req, res) => {
 const deleteAllNotifications = async (req, res) => {
     try {
         const userDept = req.user?.dept;
-        const userId = req.user?.id;
+        const userId = req.user?.user_id ?? null; 
         const now = new Date();
 
         if (!userDept) {

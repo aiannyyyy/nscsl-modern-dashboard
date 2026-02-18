@@ -55,7 +55,9 @@ export const useGetAllEndorsements = () => {
     return useQuery<EndorsementData[], Error>({
         queryKey: endorsementKeys.lists(),
         queryFn: getAllEndorsements,
-        staleTime: 30 * 1000, // 30 seconds
+        staleTime: 1000 * 30,
+        refetchInterval: 1000 * 30,
+        refetchOnWindowFocus: true,
     });
 };
 
