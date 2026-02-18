@@ -377,11 +377,37 @@ exports.startJobOrder = async (req, res) => {
         await connection.beginTransaction();
         const { id } = req.params;
         const techId = req.user?.user_id;
-        const [activeRows] = await connection.query(`SELECT * FROM it_job_order WHERE tech_id = ? AND status = 'in_progress'`, [techId]);
-        if (activeRows.length > 0) {
-            return res.status(400).json({ success: false, message: 'You already have an active work order. Please complete it first.', active_order: activeRows[0].work_order_no });
+
+        // Check if this job order exists and is in 'assigned' status
+        const [rows] = await connection.query(
+            `SELECT * FROM it_job_order WHERE id = ? AND status = 'assigned'`, 
+            [id]
+        );
+        if (rows.length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Job order not found or not in assigned status' 
+            });
         }
-        await connection.query(`UPDATE it_job_order SET status = 'in_progress', started_at = NOW() WHERE id = ? AND tech_id = ?`, [id, techId]);
+
+        // Check if this tech already has an active order
+        const [activeRows] = await connection.query(
+            `SELECT * FROM it_job_order WHERE tech_id = ? AND status = 'in_progress'`, 
+            [techId]
+        );
+        if (activeRows.length > 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'You already have an active work order. Please complete it first.',
+                active_order: activeRows[0].work_order_no 
+            });
+        }
+
+        // ✅ Remove AND tech_id = ? so any troubleshooter can start it
+        await connection.query(
+            `UPDATE it_job_order SET status = 'in_progress', started_at = NOW() WHERE id = ?`, 
+            [id]
+        );
         await logHistory(connection, id, techId, 'started', 'status', 'assigned', 'in_progress');
         await connection.commit();
         res.json({ success: true, message: 'Started working on job order' });
@@ -401,24 +427,36 @@ exports.resolveJobOrder = async (req, res) => {
         const { id } = req.params;
         const { action_taken, resolution_notes } = req.body;
         const techId = req.user?.user_id;
+
         if (!action_taken) return res.status(400).json({ success: false, message: 'action_taken is required' });
 
-        // ✅ Auto-calculate actual_hours from started_at → NOW()
-        const [startRows] = await connection.query('SELECT started_at FROM it_job_order WHERE id = ?', [id]);
+        // ✅ Check job order exists and is in_progress
+        const [rows] = await connection.query(
+            `SELECT * FROM it_job_order WHERE id = ? AND status = 'in_progress'`, 
+            [id]
+        );
+        if (rows.length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Job order not found or not in progress' 
+            });
+        }
+
+        // Auto-calculate actual_hours
         let actual_hours = null;
-        if (startRows[0]?.started_at) {
-            const startedAt = new Date(startRows[0].started_at);
+        if (rows[0]?.started_at) {
+            const startedAt = new Date(rows[0].started_at);
             actual_hours = parseFloat(((Date.now() - startedAt.getTime()) / (1000 * 60 * 60)).toFixed(2));
         }
 
+        // ✅ Removed AND tech_id = ?
         await connection.query(
-            `UPDATE it_job_order SET status = 'resolved', resolved_at = NOW(), action_taken = ?, resolution_notes = ?, actual_hours = ? WHERE id = ? AND tech_id = ?`,
-            [action_taken, resolution_notes, actual_hours, id, techId]
+            `UPDATE it_job_order SET status = 'resolved', resolved_at = NOW(), action_taken = ?, resolution_notes = ?, actual_hours = ? WHERE id = ?`,
+            [action_taken, resolution_notes, actual_hours, id]
         );
+
         await logHistory(connection, id, techId, 'resolved', 'status', 'in_progress', 'resolved');
-        const [jobOrder] = await connection.query('SELECT * FROM it_job_order WHERE id = ?', [id]);
-        // ✅ FIX: pass connection
-        await createNotification(connection, jobOrder[0].requester_id, id, 'resolved', 'Work Order Resolved', `Your work order ${jobOrder[0].work_order_no} has been resolved`);
+        await createNotification(connection, rows[0].requester_id, id, 'resolved', 'Work Order Resolved', `Your work order ${rows[0].work_order_no} has been resolved`);
         await connection.commit();
         res.json({ success: true, message: 'Job order marked as resolved' });
     } catch (error) {

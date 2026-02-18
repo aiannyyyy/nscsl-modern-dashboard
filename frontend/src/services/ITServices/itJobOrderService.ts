@@ -15,7 +15,7 @@ export interface JobOrder {
     status: 'pending_approval' | 'approved' | 'queued' | 'assigned' | 'in_progress' | 'on_hold' | 'resolved' | 'closed' | 'cancelled' | 'rejected';
     requester_id: number;
     requester_name?: string;
-    requester_email?: string; // Keep optional, won't be populated from DB
+    requester_email?: string;
     requester_dept?: string;
     department: string;
     location?: string;
@@ -93,7 +93,7 @@ export interface CreateJobOrderPayload {
     asset_id?: string;
     estimated_hours?: number;
     tags?: string;
-    requester_id?: number; // Optional if using auth middleware
+    requester_id?: number;
 }
 
 export interface UpdateJobOrderPayload {

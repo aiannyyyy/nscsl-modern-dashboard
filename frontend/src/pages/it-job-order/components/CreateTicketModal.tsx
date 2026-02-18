@@ -230,45 +230,76 @@ export function CreateTicketModal({ isOpen, onClose }: CreateTicketModalProps) {
             </div>
 
             {/* Priority & Category */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-4">
+              {/* Priority */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Priority <span className="text-red-500">*</span>
                 </label>
-                <select
-                  required
-                  value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value as TicketPriority })}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  disabled={isSubmitting}
-                >
-                  <option value="low">🟢 Low</option>
-                  <option value="medium">🟡 Medium</option>
-                  <option value="high">🟠 High</option>
-                  <option value="critical">🔴 Critical</option>
-                </select>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { value: 'low',      icon: '🟢', label: 'Low',      active: 'border-green-500 bg-green-50 text-green-700 ring-2 ring-green-300 ring-offset-1'  },
+                    { value: 'medium',   icon: '🟡', label: 'Medium',   active: 'border-yellow-500 bg-yellow-50 text-yellow-700 ring-2 ring-yellow-300 ring-offset-1' },
+                    { value: 'high',     icon: '🟠', label: 'High',     active: 'border-orange-500 bg-orange-50 text-orange-700 ring-2 ring-orange-300 ring-offset-1' },
+                    { value: 'critical', icon: '🔴', label: 'Critical', active: 'border-red-500 bg-red-50 text-red-700 ring-2 ring-red-300 ring-offset-1'            },
+                  ].map(({ value, icon, label, active }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => setFormData({ ...formData, priority: value as TicketPriority })}
+                      className={`
+                        flex flex-col items-center gap-1 px-2 py-2.5 rounded-lg border text-xs font-semibold transition-all
+                        ${formData.priority === value
+                          ? active
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                        }
+                        disabled:opacity-50 disabled:cursor-not-allowed
+                      `}
+                    >
+                      <span className="text-lg leading-none">{icon}</span>
+                      <span className="leading-none">{label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Category */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Category <span className="text-red-500">*</span>
                 </label>
-                <select
-                  required
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value, type: e.target.value.toLowerCase() })}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  disabled={isSubmitting}
-                >
-                  <option value="">Select...</option>
-                  <option value="Hardware">🖥️ Hardware</option>
-                  <option value="Software">💿 Software</option>
-                  <option value="Network">🌐 Network</option>
-                  <option value="Access">🔐 Access</option>
-                  <option value="Email">📧 Email</option>
-                  <option value="Printer">🖨️ Printer</option>
-                  <option value="Phone">📱 Phone</option>
-                  <option value="Other">📋 Other</option>
-                </select>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { value: 'Printer',           icon: '🖨️', label: 'Printer'        },
+                    { value: 'Report Generation', icon: '📊', label: 'Report Gen'     },
+                    { value: 'Database',          icon: '🗄️', label: 'Database'       },
+                    { value: 'Access & Security', icon: '🔐', label: 'Access & Sec'   },
+                    { value: 'Lan and Networks',  icon: '🌐', label: 'LAN & Networks' },
+                    { value: 'Hardware',          icon: '🖥️', label: 'Hardware'       },
+                    { value: 'Software',          icon: '💿', label: 'Software'       },
+                    { value: 'Others',            icon: '📋', label: 'Others'         },
+                  ].map(({ value, icon, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => setFormData({ ...formData, category: value, type: value.toLowerCase() })}
+                      className={`
+                        flex flex-col items-center gap-1 px-2 py-2.5 rounded-lg border text-xs font-semibold transition-all
+                        ${formData.category === value
+                          ? 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-300 ring-offset-1'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50'
+                        }
+                        disabled:opacity-50 disabled:cursor-not-allowed
+                      `}
+                    >
+                      <span className="text-lg leading-none">{icon}</span>
+                      <span className="leading-none">{label}</span>
+                    </button>
+                  ))}
+                </div>
+                <input type="text" required value={formData.category} onChange={() => {}} className="sr-only" tabIndex={-1} />
               </div>
             </div>
 

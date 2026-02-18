@@ -41,6 +41,7 @@ export const useJobOrders = (
     return useQuery<PaginatedResponse<JobOrder>>({
         queryKey: jobOrderKeys.list(filters),
         queryFn: () => itJobOrderService.getAllJobOrders(filters),
+        refetchInterval: 10000, // 👈 just add this line
         ...options,
     });
 };
