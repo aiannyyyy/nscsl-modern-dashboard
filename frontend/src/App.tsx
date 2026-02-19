@@ -16,6 +16,7 @@ import ListCar from './pages/pdo/ListCar';
 import NSFPerformance from './pages/pdo/NSFPerformance';
 import DemoAndUnsat from './pages/laboratory/DemoAndUnsat';
 import AccountingOverview from './pages/admin/AccountingOverview';
+import { ITJobOrderSummary } from './pages/it-job-order/ITJobOrderSummary';
 
 // Create a QueryClient instance
 const queryClient = new QueryClient({
@@ -68,6 +69,7 @@ function App() {
 
               {/* IT Job Order Routes */}
               <Route path="it-job-order" element={<ITJobOrderOverview />} />
+              <Route path="it-job-order/summary" element={ <ITJobOrderSummary />} />
             </Route>
 
             {/* Catch all - redirect to login */}

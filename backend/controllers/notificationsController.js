@@ -127,7 +127,7 @@ const createNotification = async (req, res) => {
             });
         }
 
-        const validDepartments = ['admin', 'program', 'laboratory', 'followup'];
+        const validDepartments = ['admin', 'administrator', 'program', 'laboratory', 'followup'];
         if (!validDepartments.includes(department.toLowerCase())) {
             return res.status(400).json({ 
                 error: "Invalid department",

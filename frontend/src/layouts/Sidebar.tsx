@@ -70,6 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed })
       icon: <Briefcase size={20} />,
       subItems: [
         { title: 'Overview', path: '/dashboard/it-job-order' },
+        { title: "Summary", path: '/dashboard/it-job-order/summary'}
       ],
     },
   ];

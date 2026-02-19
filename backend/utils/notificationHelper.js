@@ -43,7 +43,7 @@ async function sendNotification(options) {
         }
 
         // Validate department
-        const validDepartments = ['admin', 'program', 'laboratory', 'followup'];
+        const validDepartments = ['admin', 'administrator', 'program', 'laboratory', 'followup'];
         if (!validDepartments.includes(department.toLowerCase())) {
             console.error('❌ Invalid department:', department);
             throw new Error(`Invalid department. Valid options: ${validDepartments.join(', ')}`);
