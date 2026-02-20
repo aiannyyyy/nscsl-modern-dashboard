@@ -19,12 +19,10 @@ const Login: React.FC = () => {
   const validateForm = (): boolean => {
     const errors: { username?: string; password?: string } = {};
 
-    // Username validation
     if (!username) {
       errors.username = 'Username is required';
     }
 
-    // Password validation
     if (!password) {
       errors.password = 'Password is required';
     } else if (password.length < 6) {
@@ -50,68 +48,62 @@ const Login: React.FC = () => {
 
     try {
       console.log('🔵 [LOGIN] Calling login function...');
-      
-      // Get user directly from login
       const user = await login(username, password);
-      
       console.log('✅ [LOGIN] Login successful!');
-      console.log('🔵 [LOGIN] User:', user);
-      console.log('🔵 [LOGIN] User department:', user.department);
-      
-      // Redirect immediately with the user data we just got
+      console.log('🔵 [LOGIN] User department (raw):', JSON.stringify(user.department));
       redirectToDepartment(user.department);
     } catch (err) {
       console.error('🔴 [LOGIN] Login failed:', err);
     }
   };
 
-  // Function to redirect based on department
+  // Normalize + route based on department
   const redirectToDepartment = (department: string) => {
-    // Map actual database department names to routes
-    const departmentRoutes: { [key: string]: string } = {
-      // PDO mappings
-      'pdo': '/dashboard/pdo',
-      'PDO': '/dashboard/pdo',
-      'program': '/dashboard/pdo',
-      'Program': '/dashboard/pdo',
-      'PROGRAM': '/dashboard/pdo',
-      
-      // Admin mappings
-      'admin': '/dashboard/admin',
-      'Admin': '/dashboard/admin',
-      'ADMIN': '/dashboard/admin',
-      'administration': '/dashboard/admin',
-      'Administration': '/dashboard/admin',
-      
-      // Laboratory mappings
-      'laboratory': '/dashboard/laboratory',
-      'Laboratory': '/dashboard/laboratory',
-      'LABORATORY': '/dashboard/laboratory',
-      'lab': '/dashboard/laboratory',
-      'Lab': '/dashboard/laboratory',
-      
-      // Followup mappings
-      'followup': '/dashboard/followup',
-      'Followup': '/dashboard/followup',
-      'Follow-up': '/dashboard/followup',
-      'follow-up': '/dashboard/followup',
-      'FOLLOWUP': '/dashboard/followup',
-      
-      // IT mappings
-      'it-job-order': '/dashboard/it-job-order',
-      'it': '/dashboard/it-job-order',
-      'IT': '/dashboard/it-job-order',
-      'Information Technology': '/dashboard/it-job-order',
-      
-      // Admin/Super User with 'all' department
-      'all': '/dashboard/pdo',
-      'All': '/dashboard/pdo',
-      'ALL': '/dashboard/pdo',
+    // Normalize: trim whitespace, lowercase, remove hyphens and extra spaces
+    const normalized = department
+      .trim()
+      .toLowerCase()
+      .replace(/[-_]/g, ' ')       // follow-up → follow up
+      .replace(/\s+/g, ' ');       // collapse multiple spaces
+
+    console.log('🔵 [LOGIN] Normalized department:', JSON.stringify(normalized));
+
+    const departmentRoutes: Record<string, string> = {
+      // PDO
+      'pdo':              '/dashboard/pdo',
+      'program':          '/dashboard/pdo',
+
+      // Admin
+      'admin':            '/dashboard/admin',
+      'administration':   '/dashboard/admin',
+      'administrator':    '/dashboard/admin',
+
+      // Laboratory
+      'laboratory':       '/dashboard/laboratory',
+      'lab':              '/dashboard/laboratory',
+
+      // Follow Up — all variants normalize to 'follow up'
+      'follow up':        '/dashboard/followup',
+      'followup':         '/dashboard/followup',
+
+      // IT
+      'it':               '/dashboard/it-job-order',
+      'it job order':     '/dashboard/it-job-order',
+      'information technology': '/dashboard/it-job-order',
+
+      // Super user / all
+      'all':              '/dashboard/pdo',
     };
 
-    // Get route or default to PDO
-    const route = departmentRoutes[department] || '/dashboard/pdo';
-    navigate(route);
+    const route = departmentRoutes[normalized];
+
+    if (!route) {
+      console.warn(`⚠️ [LOGIN] No route found for department: "${normalized}" — defaulting to /dashboard/pdo`);
+    } else {
+      console.log('✅ [LOGIN] Redirecting to:', route);
+    }
+
+    navigate(route ?? '/dashboard/pdo');
   };
 
   return (

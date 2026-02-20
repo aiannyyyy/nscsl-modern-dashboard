@@ -120,14 +120,14 @@ async function notifyITOfficersOnQueue({ jobOrderId, workOrderNo, department, cr
  */
 async function notifyApproversOnCreate({ jobOrderId, workOrderNo, requesterName, createdBy, department }) {
     try {
-        // Map the job order's department to the correct approver position
+        // Case-insensitive mapping
         const deptToPosition = {
-            'Program':    'Program Manager',
-            'Follow Up':  'Follow Up Head',
-            'Laboratory': 'Laboratory Manager',
+            'program':    'Program Manager',
+            'follow up':  'Follow Up Head',
+            'laboratory': 'Laboratory Manager',
         };
 
-        const targetPosition = deptToPosition[department];
+        const targetPosition = deptToPosition[department?.toLowerCase()?.trim()];
 
         let approvers;
 

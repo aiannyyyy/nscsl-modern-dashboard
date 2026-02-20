@@ -1,10 +1,10 @@
 const { database } = require('../config');
 
-// Get all notifications for a user's department
+// Get all notifications for a user
 const getNotifications = async (req, res) => {
     try {
         const userDept = req.user?.dept;
-        const userId = req.user?.user_id ?? null; 
+        const userId = req.user?.user_id ?? null;
         const { limit = 50, offset = 0 } = req.query;
 
         console.log('==========================================');
@@ -15,12 +15,17 @@ const getNotifications = async (req, res) => {
         console.log('==========================================');
 
         if (!userDept) {
-            return res.status(400).json({ 
-                error: "User department not found" 
-            });
+            return res.status(400).json({ error: "User department not found" });
         }
 
-        // Use LOWER() for case-insensitive comparison
+        // ✅ FIXED LOGIC:
+        // Show notification if:
+        //   A) It is specifically for this user (user_id = me), regardless of department
+        //   OR
+        //   B) It is a department-wide broadcast (user_id IS NULL) for my department
+        //
+        // This prevents Follow Up Head from seeing Program Manager's user-specific notifications
+        // while still allowing department-wide endorsement notifications to work as before.
         const sql = `
             SELECT 
                 id,
@@ -37,19 +42,21 @@ const getNotifications = async (req, res) => {
                 created_at,
                 read_at
             FROM test_nscslcom_nscsl_dashboard.notifications
-            WHERE LOWER(department) = LOWER(?)
-                AND is_deleted = FALSE
-                AND (user_id IS NULL OR user_id = ?)
+            WHERE is_deleted = FALSE
+                AND (
+                    user_id = ?
+                    OR (user_id IS NULL AND LOWER(department) = LOWER(?))
+                )
             ORDER BY created_at DESC
             LIMIT ? OFFSET ?
         `;
 
-        console.log('📝 Query params:', [userDept, userId, parseInt(limit), parseInt(offset)]);
+        console.log('📝 Query params:', [userId, userDept, parseInt(limit), parseInt(offset)]);
 
         const [results] = await database.mysqlPool.query(sql, [
+            userId,
             userDept,
-            userId, 
-            parseInt(limit), 
+            parseInt(limit),
             parseInt(offset)
         ]);
 
@@ -58,9 +65,9 @@ const getNotifications = async (req, res) => {
         res.json(results);
     } catch (err) {
         console.error("❌ Get notifications error:", err);
-        res.status(500).json({ 
+        res.status(500).json({
             error: "Failed to retrieve notifications",
-            message: err.message 
+            message: err.message
         });
     }
 };
@@ -69,36 +76,32 @@ const getNotifications = async (req, res) => {
 const getUnreadCount = async (req, res) => {
     try {
         const userDept = req.user?.dept;
-        const userId = req.user?.user_id ?? null; 
+        const userId = req.user?.user_id ?? null;
 
         if (!userDept) {
-            return res.status(400).json({ 
-                error: "User department not found" 
-            });
+            return res.status(400).json({ error: "User department not found" });
         }
 
+        // ✅ Same fixed logic as getNotifications
         const sql = `
             SELECT COUNT(*) as count
             FROM test_nscslcom_nscsl_dashboard.notifications
-            WHERE LOWER(department) = LOWER(?)
-                AND is_deleted = FALSE
+            WHERE is_deleted = FALSE
                 AND is_read = FALSE
-                AND (user_id IS NULL OR user_id = ?)
+                AND (
+                    user_id = ?
+                    OR (user_id IS NULL AND LOWER(department) = LOWER(?))
+                )
         `;
 
-        const [results] = await database.mysqlPool.query(sql, [
-            userDept,
-            userId
-        ]);
+        const [results] = await database.mysqlPool.query(sql, [userId, userDept]);
 
-        res.json({ 
-            count: Number(results[0].count) 
-        });
+        res.json({ count: Number(results[0].count) });
     } catch (err) {
         console.error("Get unread count error:", err);
-        res.status(500).json({ 
+        res.status(500).json({
             error: "Failed to get unread count",
-            message: err.message 
+            message: err.message
         });
     }
 };
@@ -121,7 +124,7 @@ const createNotification = async (req, res) => {
         const now = new Date();
 
         if (!department || !type || !title || !message) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 error: "Missing required fields",
                 required: ['department', 'type', 'title', 'message']
             });
@@ -129,13 +132,12 @@ const createNotification = async (req, res) => {
 
         const validDepartments = ['admin', 'administrator', 'program', 'laboratory', 'followup'];
         if (!validDepartments.includes(department.toLowerCase())) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 error: "Invalid department",
                 valid: validDepartments
             });
         }
 
-        // Capitalize first letter
         const capitalizeFirstLetter = (str) => {
             if (!str) return str;
             return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
@@ -160,15 +162,15 @@ const createNotification = async (req, res) => {
             now
         ]);
 
-        res.json({ 
-            message: "Notification created successfully", 
-            id: result.insertId 
+        res.json({
+            message: "Notification created successfully",
+            id: result.insertId
         });
     } catch (err) {
         console.error("Create notification error:", err);
-        res.status(500).json({ 
+        res.status(500).json({
             error: "Failed to create notification",
-            message: err.message 
+            message: err.message
         });
     }
 };
@@ -188,60 +190,53 @@ const markAsRead = async (req, res) => {
         const [result] = await database.mysqlPool.query(sql, [now, id]);
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ 
-                error: "Notification not found" 
-            });
+            return res.status(404).json({ error: "Notification not found" });
         }
 
-        res.json({ 
-            message: "Notification marked as read" 
-        });
+        res.json({ message: "Notification marked as read" });
     } catch (err) {
         console.error("Mark as read error:", err);
-        res.status(500).json({ 
+        res.status(500).json({
             error: "Failed to mark notification as read",
-            message: err.message 
+            message: err.message
         });
     }
 };
 
-// Mark all notifications as read for user's department
+// Mark all notifications as read for this user
 const markAllAsRead = async (req, res) => {
     try {
         const userDept = req.user?.dept;
-        const userId = req.user?.user_id ?? null; 
+        const userId = req.user?.user_id ?? null;
         const now = new Date();
 
         if (!userDept) {
-            return res.status(400).json({ 
-                error: "User department not found" 
-            });
+            return res.status(400).json({ error: "User department not found" });
         }
 
+        // ✅ Same fixed logic
         const sql = `
             UPDATE test_nscslcom_nscsl_dashboard.notifications 
             SET is_read = TRUE, read_at = ?
-            WHERE LOWER(department) = LOWER(?)
-                AND is_deleted = FALSE
+            WHERE is_deleted = FALSE
                 AND is_read = FALSE
-                AND (user_id IS NULL OR user_id = ?)
+                AND (
+                    user_id = ?
+                    OR (user_id IS NULL AND LOWER(department) = LOWER(?))
+                )
         `;
 
-        const [result] = await database.mysqlPool.query(sql, [
-            now, 
-            userDept,
-            userId
-        ]);
+        const [result] = await database.mysqlPool.query(sql, [now, userId, userDept]);
 
-        res.json({ 
+        res.json({
             message: "All notifications marked as read",
             updated: result.affectedRows
         });
     } catch (err) {
         console.error("Mark all as read error:", err);
-        res.status(500).json({ 
+        res.status(500).json({
             error: "Failed to mark all notifications as read",
-            message: err.message 
+            message: err.message
         });
     }
 };
@@ -261,59 +256,52 @@ const deleteNotification = async (req, res) => {
         const [result] = await database.mysqlPool.query(sql, [now, id]);
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ 
-                error: "Notification not found" 
-            });
+            return res.status(404).json({ error: "Notification not found" });
         }
 
-        res.json({ 
-            message: "Notification deleted successfully" 
-        });
+        res.json({ message: "Notification deleted successfully" });
     } catch (err) {
         console.error("Delete notification error:", err);
-        res.status(500).json({ 
+        res.status(500).json({
             error: "Failed to delete notification",
-            message: err.message 
+            message: err.message
         });
     }
 };
 
-// Delete all notifications for user's department
+// Delete all notifications for this user
 const deleteAllNotifications = async (req, res) => {
     try {
         const userDept = req.user?.dept;
-        const userId = req.user?.user_id ?? null; 
+        const userId = req.user?.user_id ?? null;
         const now = new Date();
 
         if (!userDept) {
-            return res.status(400).json({ 
-                error: "User department not found" 
-            });
+            return res.status(400).json({ error: "User department not found" });
         }
 
+        // ✅ Same fixed logic
         const sql = `
             UPDATE test_nscslcom_nscsl_dashboard.notifications 
             SET is_deleted = TRUE, deleted_at = ?
-            WHERE LOWER(department) = LOWER(?)
-                AND is_deleted = FALSE
-                AND (user_id IS NULL OR user_id = ?)
+            WHERE is_deleted = FALSE
+                AND (
+                    user_id = ?
+                    OR (user_id IS NULL AND LOWER(department) = LOWER(?))
+                )
         `;
 
-        const [result] = await database.mysqlPool.query(sql, [
-            now, 
-            userDept,
-            userId
-        ]);
+        const [result] = await database.mysqlPool.query(sql, [now, userId, userDept]);
 
-        res.json({ 
+        res.json({
             message: "All notifications deleted successfully",
             deleted: result.affectedRows
         });
     } catch (err) {
         console.error("Delete all notifications error:", err);
-        res.status(500).json({ 
+        res.status(500).json({
             error: "Failed to delete all notifications",
-            message: err.message 
+            message: err.message
         });
     }
 };

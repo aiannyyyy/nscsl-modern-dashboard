@@ -44,7 +44,6 @@ const fmtTm = (tm?: string | null): string => {
 const DateCell: React.FC<{ val?: string | null; tm?: string | null }> = ({ val, tm }) => {
     const f = fmtDisplay(val);
     if (!f) return <span className="text-slate-400">—</span>;
-    // Use Oracle time field if available, otherwise fall back to JS-parsed time (suppressed if midnight)
     const timeStr = tm ? fmtTm(tm) : (f.time !== '12:00 AM' ? f.time : '');
     return (
         <div>
@@ -86,11 +85,13 @@ const Badge: React.FC<{ label?: string | null; color?: BadgeColor }> = ({ label,
     </span>
 );
 
-// ─── Sort Icon ────────────────────────────────────────────────────────────────
-
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 
-const DetailModal: React.FC<{ patient: PatientDetail | null; onClose: () => void }> = ({ patient, onClose }) => {
+const DetailModal: React.FC<{
+    patient: PatientDetail | null;
+    matched: boolean;
+    onClose: () => void;
+}> = ({ patient, matched, onClose }) => {
     useEffect(() => {
         if (!patient) return;
         const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -103,7 +104,7 @@ const DetailModal: React.FC<{ patient: PatientDetail | null; onClose: () => void
     const Section: React.FC<{ icon: React.ReactNode; title: string; children: React.ReactNode }> = ({ icon, title, children }) => (
         <div>
             <div className="flex items-center gap-2 mb-3">
-                <span className="text-violet-500">{icon}</span>
+                <span className="text-blue-500">{icon}</span>
                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{title}</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
@@ -134,7 +135,7 @@ const DetailModal: React.FC<{ patient: PatientDetail | null; onClose: () => void
                 {/* Header */}
                 <div className="shrink-0 flex items-start justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 rounded-t-2xl">
                     <div>
-                        <p className="text-[10px] font-bold text-violet-500 uppercase tracking-widest">Patient Record</p>
+                        <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Patient Record</p>
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
                             {patient.LNAME}, {patient.FNAME}
                         </h3>
@@ -153,13 +154,17 @@ const DetailModal: React.FC<{ patient: PatientDetail | null; onClose: () => void
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
                     <Section icon={<User size={13} />} title="Patient Information">
-                        <Field label="Lab No."         value={<Badge label={patient.LABNO} color="violet" />} />
-                        <Field label="Link"            value={patient.LINK} />
-                        <Field label="Sex"             value={fmtSex(patient.SEX)} />
+                        {/* Lab No — green if LABNO===LINK, red otherwise (same as table) */}
+                        <Field label="Lab No."         value={<Badge label={patient.LABNO} color={matched ? 'emerald' : 'rose'} />} />
+                        {/* Link — always green if present */}
+                        <Field label="Link"            value={<Badge label={patient.LINK ?? '—'} color={patient.LINK ? 'emerald' : 'slate'} />} />
+                        {/* Sex — violet/rose/amber badge matching table */}
+                        <Field label="Sex"             value={<Badge label={fmtSex(patient.SEX)} color={sexBadgeColor(patient.SEX)} />} />
                         <Field label="Birth Date"      value={<DateCell val={patient.BIRTHDT} tm={patient.BIRTHTM} />} />
                         <Field label="Birth Weight"    value={patient.BIRTHWT} />
                         <Field label="Gestational Age" value={patient.GESTAGE} />
-                        <Field label="Clinical Status" value={<Badge label={patient.CLINSTAT} color="emerald" />} />
+                        {/* Clinical Status — emerald badge matching table */}
+                        <Field label="Clinical Status" value={<Badge label={patient.CLINSTAT} color={patient.CLINSTAT ? 'emerald' : 'slate'} />} />
                     </Section>
 
                     <hr className="border-slate-100 dark:border-slate-800" />
@@ -244,7 +249,7 @@ const ExportMenu: React.FC<{
                         onClick={() => { onExportPng(); setOpen(false); }}
                         className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors"
                     >
-                        <ImgIcon size={14} className="text-violet-500" />
+                        <ImgIcon size={14} className="text-blue-500" />
                         Export as PNG
                     </button>
                 </div>
@@ -319,8 +324,8 @@ export const PatientDetails: React.FC = () => {
     });
     const handleGenerate = () => setCommitted({ dateFrom, dateTo, testCode });
 
-    // ── Modal state
-    const [selected, setSelected] = useState<PatientDetail | null>(null);
+    // ── Modal state — store both patient and whether it's matched
+    const [selected, setSelected] = useState<{ patient: PatientDetail; matched: boolean } | null>(null);
 
     // ── Data fetching — auto-loads on mount with current month, refreshes on Generate
     const { data, isLoading, isError, error, isFetching } = usePatientDetails(committed);
@@ -392,7 +397,11 @@ export const PatientDetails: React.FC = () => {
 
     return (
         <>
-            <DetailModal patient={selected} onClose={() => setSelected(null)} />
+            <DetailModal
+                patient={selected?.patient ?? null}
+                matched={selected?.matched ?? false}
+                onClose={() => setSelected(null)}
+            />
 
             <div
                 id="patient-details-card"
@@ -405,13 +414,12 @@ export const PatientDetails: React.FC = () => {
                     {/* Title + action */}
                     <div className="flex items-center justify-between gap-3">
                         <div>
-                            <p className="text-[10px] font-bold text-violet-500 uppercase tracking-widest">Follow-up</p>
                             <h2 className="text-base font-bold text-slate-900 dark:text-white">Patient Details</h2>
                         </div>
 
                         <div className="flex items-center gap-2">
                             {isFetching && !isLoading && (
-                                <Loader2 size={13} className="animate-spin text-violet-400" />
+                                <Loader2 size={13} className="animate-spin text-blue-400" />
                             )}
                             <ExportMenu
                                 disabled={isLoading || filtered.length === 0}
@@ -453,18 +461,18 @@ export const PatientDetails: React.FC = () => {
                         <select
                             value={testCode}
                             onChange={e => setTestCode(e.target.value)}
-                            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer"
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
                         >
                             {TEST_CODES.map(tc => (
                                 <option key={tc} value={tc}>{tc}</option>
                             ))}
                         </select>
 
-                        {/* Generate Button */}
+                        {/* Generate Button — now blue */}
                         <button
                             onClick={handleGenerate}
                             disabled={isLoading}
-                            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors shadow-sm shadow-violet-200 dark:shadow-none"
+                            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors shadow-sm shadow-blue-200 dark:shadow-none"
                         >
                             {isLoading ? (
                                 <Loader2 size={12} className="animate-spin" />
@@ -497,7 +505,7 @@ export const PatientDetails: React.FC = () => {
                 <div id="patient-details-table" className="flex-1 overflow-auto">
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">
-                            <Loader2 size={26} className="animate-spin text-violet-400" />
+                            <Loader2 size={26} className="animate-spin text-blue-400" />
                             <p className="text-sm">Loading patient data…</p>
                         </div>
                     ) : isError ? (
@@ -531,7 +539,7 @@ export const PatientDetails: React.FC = () => {
                                 {filtered.map((row, i) => (
                                     <tr
                                         key={`${row.LABNO}-${row.LINK ?? i}`}
-                                        className="border-b border-slate-50 dark:border-slate-800/80 hover:bg-violet-50/50 dark:hover:bg-violet-900/10 transition-colors group"
+                                        className="border-b border-slate-50 dark:border-slate-800/80 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors group"
                                     >
                                         {/* Lab No. — green if LABNO===LINK, red otherwise */}
                                         <td className="px-4 py-2.5 whitespace-nowrap">
@@ -606,11 +614,11 @@ export const PatientDetails: React.FC = () => {
                                         <td className="px-4 py-2.5 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
                                             {row.COUNTY ?? '—'}
                                         </td>
-                                        {/* Action */}
-                                        <td className="px-4 py-2.5 whitespace-nowrap sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-violet-50/50 dark:group-hover:bg-violet-900/10 transition-colors">
+                                        {/* Action — View button now blue */}
+                                        <td className="px-4 py-2.5 whitespace-nowrap sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/10 transition-colors">
                                             <button
-                                                onClick={() => setSelected(row)}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800 hover:bg-violet-100 dark:hover:bg-violet-900/50 transition-colors"
+                                                onClick={() => setSelected({ patient: row, matched: isMatched(row) })}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
                                             >
                                                 <Eye size={11} />
                                                 View
