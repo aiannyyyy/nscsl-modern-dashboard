@@ -1,8 +1,10 @@
 import React from 'react';
 import { NurseCards } from './component/NurseCards';
 import { FollowupStats } from './component/FollowupStats';
-import { FollowupQueue } from './component/FollowupQueue';
-import { ActivityFeed } from './component/ActivityFeed';
+
+//import { FollowupQueue } from './component/FollowupQueue';
+//import { ActivityFeed } from './component/ActivityFeed';
+import { PatientDetails } from './component/PatientDetails';
 
 export const FollowupOverview: React.FC = () => {
   return (
@@ -37,7 +39,7 @@ export const FollowupOverview: React.FC = () => {
         <NurseCards />
       </div>
 
-      {/* Queue + Feed */}
+      {/* Queue + Feed 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2">
           <FollowupQueue />
@@ -46,6 +48,8 @@ export const FollowupOverview: React.FC = () => {
           <ActivityFeed />
         </div>
       </div>
+      */}
+      <PatientDetails />
     </div>
   );
 };

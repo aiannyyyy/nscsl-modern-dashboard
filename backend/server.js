@@ -231,6 +231,9 @@ app.use('/api/it-job-order', require('./routes/ITRoutes/itJobOrderRoutes'));
 // Notification Routes
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 
+// Patient Details Routes
+app.use('/api/followup', require('./routes/FollowupRoutes/patientDetailsRoutes'));
+
 // Unsatisfactory Analysis
 app.use("/api/unsat", require("./routes/PDORoutes/unsatRoutes"));
 
