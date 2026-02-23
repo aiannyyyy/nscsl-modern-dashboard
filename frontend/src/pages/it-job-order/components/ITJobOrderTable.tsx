@@ -4,8 +4,6 @@ import { useJobOrders, useDeleteJobOrder } from "../../../hooks/ITHooks/useJobOr
 import type { JobOrder, JobOrderFilters } from "../../../services/ITServices/itJobOrderService";
 
 // ─── Debounce Hook ────────────────────────────────────────────────────────────
-// Keeps the text input value local — only sends to the API after the user
-// stops typing for 400 ms, so the input never gets wiped on refetch.
 
 function useDebounce<T>(value: T, delay = 400): T {
   const [debounced, setDebounced] = useState(value);
@@ -164,16 +162,17 @@ interface ITJobOrderTableProps {
 }
 
 export const ITJobOrderTable: React.FC<ITJobOrderTableProps> = ({ onView, onEdit }) => {
-  // ── Local UI state (never tied directly to API params) ──
+  // ── Local UI state ──
   const [searchInput, setSearchInput] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("all"); // ← NEW
   const [showDateRangeModal, setShowDateRangeModal] = useState(false);
 
-  // ── Debounced search — only sent to API 400ms after user stops typing ──
+  // ── Debounced search ──
   const debouncedSearch = useDebounce(searchInput, 400);
 
-  // ── API filters — status & search go server-side, category stays client-side ──
+  // ── API filters ──
   const filters: JobOrderFilters = {
     limit: 500,
     sort_by: "created_at",
@@ -187,22 +186,38 @@ export const ITJobOrderTable: React.FC<ITJobOrderTableProps> = ({ onView, onEdit
 
   const allRecords = data?.data ?? [];
 
-  // Category filter is client-side only (derived from whatever the API returns)
+  // ── Client-side derived filter options ──
   const uniqueCategories = useMemo(() => {
     const cats = new Set(allRecords.map((r) => r.category).filter(Boolean));
     return Array.from(cats).sort();
   }, [allRecords]);
 
-  const filteredRecords = useMemo(() => {
-    return allRecords.filter((r) => selectedCategory === "all" || r.category === selectedCategory);
-  }, [allRecords, selectedCategory]);
+  // NEW: derive unique departments from the full record set
+  const uniqueDepartments = useMemo(() => {
+    const depts = new Set(allRecords.map((r) => r.department).filter(Boolean));
+    return Array.from(depts).sort();
+  }, [allRecords]);
 
-  const hasActiveFilters = searchInput !== "" || selectedStatus !== "all" || selectedCategory !== "all";
+  // ── Client-side filtering (category + department) ──
+  const filteredRecords = useMemo(() => {
+    return allRecords.filter((r) => {
+      const categoryMatch = selectedCategory === "all" || r.category === selectedCategory;
+      const departmentMatch = selectedDepartment === "all" || r.department === selectedDepartment; // ← NEW
+      return categoryMatch && departmentMatch;
+    });
+  }, [allRecords, selectedCategory, selectedDepartment]);
+
+  const hasActiveFilters =
+    searchInput !== "" ||
+    selectedStatus !== "all" ||
+    selectedCategory !== "all" ||
+    selectedDepartment !== "all"; // ← NEW
 
   const handleClearFilters = () => {
     setSearchInput("");
     setSelectedStatus("all");
     setSelectedCategory("all");
+    setSelectedDepartment("all"); // ← NEW
   };
 
   const handleDelete = async (id: number) => {
@@ -281,7 +296,6 @@ export const ITJobOrderTable: React.FC<ITJobOrderTableProps> = ({ onView, onEdit
                   ({filteredRecords.length} of {allRecords.length})
                 </span>
               )}
-              {/* Subtle loading indicator on background refetch */}
               {isLoading && allRecords.length > 0 && (
                 <Loader2 size={12} className="animate-spin text-blue-400 ml-1" />
               )}
@@ -294,7 +308,7 @@ export const ITJobOrderTable: React.FC<ITJobOrderTableProps> = ({ onView, onEdit
               <span className="font-medium">Filters:</span>
             </div>
 
-            {/* Search — controlled by searchInput, NOT debouncedSearch */}
+            {/* Search */}
             <input
               type="text"
               value={searchInput}
@@ -303,6 +317,7 @@ export const ITJobOrderTable: React.FC<ITJobOrderTableProps> = ({ onView, onEdit
               className="h-8 px-3 text-xs rounded-lg border w-44 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
 
+            {/* Status */}
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
@@ -312,6 +327,7 @@ export const ITJobOrderTable: React.FC<ITJobOrderTableProps> = ({ onView, onEdit
               {ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
             </select>
 
+            {/* Category */}
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
@@ -319,6 +335,16 @@ export const ITJobOrderTable: React.FC<ITJobOrderTableProps> = ({ onView, onEdit
             >
               <option value="all">All Categories</option>
               {uniqueCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+
+            {/* Department — NEW */}
+            <select
+              value={selectedDepartment}
+              onChange={(e) => setSelectedDepartment(e.target.value)}
+              className="h-8 px-2 text-xs rounded-lg border bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Departments</option>
+              {uniqueDepartments.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
 
             {hasActiveFilters && (
@@ -407,18 +433,12 @@ export const ITJobOrderTable: React.FC<ITJobOrderTableProps> = ({ onView, onEdit
                             {STATUS_LABELS[record.status] ?? record.status}
                           </span>
                         </td>
-
-                        {/* Requested By — requester name + created_at */}
                         <td className="px-3 py-2.5">
                           <StackedCell name={record.requester_name} dateString={record.created_at} />
                         </td>
-
-                        {/* Approved By — approver name + approved_at */}
                         <td className="px-3 py-2.5">
                           <StackedCell name={record.approved_by_name} dateString={record.approved_at} />
                         </td>
-
-                        {/* Assigned To — tech name + assigned_at */}
                         <td className="px-3 py-2.5">
                           <StackedCell
                             name={record.tech_name ?? (record.assigned_at ? undefined : null)}
@@ -426,8 +446,6 @@ export const ITJobOrderTable: React.FC<ITJobOrderTableProps> = ({ onView, onEdit
                             emptyLabel="Unassigned"
                           />
                         </td>
-
-                        {/* Resolved By — tech (troubleshooter) + resolved_at */}
                         <td className="px-3 py-2.5">
                           <StackedCell
                             name={record.resolved_at ? record.tech_name : null}

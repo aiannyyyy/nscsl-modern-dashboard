@@ -16,8 +16,8 @@ interface FloatingApproverTrackerProps {
 type TabType = 'my_orders' | 'approvals';
 
 export function FloatingApproverTracker({
-  activeTickets,
-  pendingApprovals,
+  activeTickets = [],
+  pendingApprovals = [],
   onViewAll,
   onApprove,
   onReject,
