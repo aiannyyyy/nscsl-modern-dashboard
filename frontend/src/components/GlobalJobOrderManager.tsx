@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FloatingJobOrderTracker } from '../pages/it-job-order/components/FloatingJobOrderTracker';
-import { FloatingApprovalTracker } from '../pages/it-job-order/components/FloatingApprovalTracker';
+import { FloatingApproverTracker } from '../pages/it-job-order/components/FloatingApprovalTracker';
 import { CreateTicketModal } from '../pages/it-job-order/components/CreateTicketModal';
 import type { Ticket } from '../pages/it-job-order/components/types';
 import { useNavigate } from 'react-router-dom';
@@ -22,7 +22,7 @@ export function GlobalJobOrderManager() {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // ── Requesters: their active tickets ──
+  // ── Requesters AND approvers: their own submitted active tickets ──
   const { data: activeJobOrdersData, isLoading: isLoadingActive } = useMyActiveJobOrders();
 
   // ── Approvers: pending approvals for their dept ──
@@ -40,7 +40,6 @@ export function GlobalJobOrderManager() {
   const approveMutation = useApproveJobOrder();
   const rejectMutation  = useRejectJobOrder();
 
-
   const activeTickets: Ticket[] = React.useMemo(() => {
     if (!activeJobOrdersData?.data) return [];
     return activeJobOrdersData.data.map(mapJobOrderToTicket);
@@ -52,11 +51,12 @@ export function GlobalJobOrderManager() {
   }, [approvalData]);
 
   // ── Only block render for the data that role actually needs ──
-  if (perms.isRequester && isLoadingActive) return null;
+  if ((perms.isRequester || perms.isApprover) && isLoadingActive) return null;
   if (perms.isApprover && isLoadingApprovals) return null;
 
   return (
     <>
+      {/* Requesters: job order tracker only */}
       {perms.isRequester && (
         <FloatingJobOrderTracker
           activeTickets={activeTickets}
@@ -65,8 +65,10 @@ export function GlobalJobOrderManager() {
         />
       )}
 
+      {/* Approvers: single combined tracker (my orders + pending approvals) */}
       {perms.isApprover && (
-        <FloatingApprovalTracker
+        <FloatingApproverTracker
+          activeTickets={activeTickets}
           pendingApprovals={pendingApprovals}
           onViewAll={() => navigate('/dashboard/it-job-order')}
           onApprove={(id) => approveMutation.mutate(id)}

@@ -14,6 +14,7 @@ import { mapJobOrderToTicket } from '../../utils/jobOrderMappers';
 import type { JobOrderFilters } from '../../services/ITServices/itJobOrderService';
 import { CreateTicketModal } from './components/CreateTicketModal';
 import { FloatingJobOrderTracker } from './components/FloatingJobOrderTracker';
+import { FloatingApprovalTracker } from './components/FloatingApprovalTracker';
 import { TicketDetailModal } from './components/TicketDetailModal';
 import { useAuth } from '../../context/AuthContext';
 import { getPermissions } from './components/permissions';
@@ -85,7 +86,7 @@ function RelativeTime({ date }: { date: Date }) {
 
 function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border uppercase tracking-wide ${STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700/50 dark:text-slate-400 dark:border-slate-600'}`}>
+    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border uppercase tracking-wide ${STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
       {status.replace(/_/g, ' ')}
     </span>
   );
@@ -94,13 +95,11 @@ function StatusBadge({ status }: { status: string }) {
 function PriorityBadge({ priority }: { priority: string }) {
   const icons: Record<string, string> = { critical: '🔴', high: '🟠', medium: '🟡', low: '🟢' };
   return (
-    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${PRIORITY_COLORS[priority] ?? 'bg-slate-100 text-slate-600 dark:bg-slate-700/50 dark:text-slate-400'}`}>
+    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${PRIORITY_COLORS[priority] ?? 'bg-slate-100 text-slate-600'}`}>
       {icons[priority]} {priority}
     </span>
   );
 }
-
-// ─── Shared modal animation ───────────────────────────────────────────────────
 
 const MODAL_KEYFRAME = `@keyframes modalFadeIn{from{opacity:0;transform:scale(0.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}`;
 const MODAL_STYLE = { animation: 'modalFadeIn 0.2s ease-out' };
@@ -108,10 +107,7 @@ const MODAL_STYLE = { animation: 'modalFadeIn 0.2s ease-out' };
 // ─── Modals ───────────────────────────────────────────────────────────────────
 
 function RejectModal({ workOrderNo, onConfirm, onCancel, isLoading }: {
-  workOrderNo: string;
-  onConfirm: (reason: string) => void;
-  onCancel: () => void;
-  isLoading: boolean;
+  workOrderNo: string; onConfirm: (reason: string) => void; onCancel: () => void; isLoading: boolean;
 }) {
   const [reason, setReason] = useState('');
   return (
@@ -122,19 +118,17 @@ function RejectModal({ workOrderNo, onConfirm, onCancel, isLoading }: {
         <p className="text-sm text-slate-500 dark:text-gray-400 mb-4">
           Rejecting <span className="font-mono font-bold text-slate-700 dark:text-gray-200">{workOrderNo}</span>. Please provide a reason.
         </p>
-        <textarea
-          autoFocus value={reason} onChange={(e) => setReason(e.target.value)}
+        <textarea autoFocus value={reason} onChange={(e) => setReason(e.target.value)}
           placeholder="Enter rejection reason..." rows={3}
-          className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 resize-none mb-4 bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-100 placeholder-slate-400 dark:placeholder-gray-500"
+          className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 resize-none mb-4 bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-100"
         />
         <div className="flex gap-2">
           <button onClick={onCancel} disabled={isLoading}
-            className="flex-1 px-4 py-2 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-300 rounded-lg text-sm font-semibold hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50">
+            className="flex-1 px-4 py-2 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-300 rounded-lg text-sm font-semibold hover:bg-slate-200 dark:hover:bg-gray-600 disabled:opacity-50">
             Cancel
           </button>
-          <button onClick={() => reason.trim() && onConfirm(reason.trim())}
-            disabled={isLoading || !reason.trim()}
-            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={() => reason.trim() && onConfirm(reason.trim())} disabled={isLoading || !reason.trim()}
+            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">
             {isLoading ? 'Rejecting...' : 'Confirm Reject'}
           </button>
         </div>
@@ -144,10 +138,7 @@ function RejectModal({ workOrderNo, onConfirm, onCancel, isLoading }: {
 }
 
 function AssignTechModal({ workOrderNo, onConfirm, onCancel, isLoading }: {
-  workOrderNo: string;
-  onConfirm: (techId: number) => void;
-  onCancel: () => void;
-  isLoading: boolean;
+  workOrderNo: string; onConfirm: (techId: number) => void; onCancel: () => void; isLoading: boolean;
 }) {
   const [selectedTech, setSelectedTech] = useState<number>(IT_OFFICERS[0].id);
   return (
@@ -166,12 +157,11 @@ function AssignTechModal({ workOrderNo, onConfirm, onCancel, isLoading }: {
         </select>
         <div className="flex gap-2">
           <button onClick={onCancel} disabled={isLoading}
-            className="flex-1 px-4 py-2 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-300 rounded-lg text-sm font-semibold hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50">
+            className="flex-1 px-4 py-2 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-300 rounded-lg text-sm font-semibold hover:bg-slate-200 dark:hover:bg-gray-600 disabled:opacity-50">
             Cancel
           </button>
-          <button onClick={() => selectedTech && onConfirm(selectedTech)}
-            disabled={isLoading || !selectedTech}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={() => selectedTech && onConfirm(selectedTech)} disabled={isLoading || !selectedTech}
+            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
             {isLoading ? 'Assigning...' : 'Assign'}
           </button>
         </div>
@@ -198,33 +188,31 @@ function ResolveModal({ workOrderNo, onConfirm, onCancel, isLoading }: {
         </p>
         <div className="space-y-3 mb-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1.5">
-              Action Taken <span className="text-red-500">*</span>
-            </label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1.5">Action Taken <span className="text-red-500">*</span></label>
             <textarea autoFocus value={actionTaken} onChange={(e) => setActionTaken(e.target.value)}
               placeholder="Describe what was done to resolve the issue..." rows={3}
-              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-100 placeholder-slate-400 dark:placeholder-gray-500"
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-100"
             />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1.5">
-              Resolution Notes <span className="text-slate-400 dark:text-slate-500 font-normal">(optional)</span>
+              Resolution Notes <span className="text-slate-400 font-normal">(optional)</span>
             </label>
             <textarea value={resolutionNotes} onChange={(e) => setResolutionNotes(e.target.value)}
               placeholder="Additional notes, recommendations, or follow-up needed..." rows={2}
-              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-100 placeholder-slate-400 dark:placeholder-gray-500"
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-100"
             />
           </div>
         </div>
         <div className="flex gap-2">
           <button onClick={onCancel} disabled={isLoading}
-            className="flex-1 px-4 py-2 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-300 rounded-lg text-sm font-semibold hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50">
+            className="flex-1 px-4 py-2 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-300 rounded-lg text-sm font-semibold hover:bg-slate-200 dark:hover:bg-gray-600 disabled:opacity-50">
             Cancel
           </button>
           <button
             onClick={() => actionTaken.trim() && onConfirm({ action_taken: actionTaken.trim(), resolution_notes: resolutionNotes.trim() || undefined })}
             disabled={isLoading || !actionTaken.trim()}
-            className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
             {isLoading ? 'Resolving...' : 'Mark as Resolved'}
           </button>
         </div>
@@ -241,17 +229,14 @@ function StatCard({ label, status, icon, color, count, isLoading, isActive, onCl
 }) {
   const darkColor = STAT_CARD_DARK[color] ?? '';
   return (
-    <button
-      onClick={onClick}
-      className={`border rounded-xl p-3 text-left transition-all hover:shadow-sm ${color} ${darkColor} ${isActive ? 'ring-2 ring-blue-400 ring-offset-1 dark:ring-offset-gray-950 shadow-sm' : ''}`}
-    >
+    <button onClick={onClick}
+      className={`border rounded-xl p-3 text-left transition-all hover:shadow-sm ${color} ${darkColor} ${isActive ? 'ring-2 ring-blue-400 ring-offset-1 dark:ring-offset-gray-950 shadow-sm' : ''}`}>
       <div className="text-xl mb-1">{icon}</div>
       <div className="flex items-end gap-1.5">
-        {isLoading ? (
-          <div className="h-7 w-8 bg-slate-200 dark:bg-gray-700 animate-pulse rounded" />
-        ) : (
-          <div className="text-2xl font-bold text-slate-900 dark:text-gray-100 tabular-nums">{count}</div>
-        )}
+        {isLoading
+          ? <div className="h-7 w-8 bg-slate-200 dark:bg-gray-700 animate-pulse rounded" />
+          : <div className="text-2xl font-bold text-slate-900 dark:text-gray-100 tabular-nums">{count}</div>
+        }
       </div>
       <div className="text-xs text-slate-500 dark:text-gray-400 font-medium mt-0.5">{label}</div>
     </button>
@@ -301,6 +286,12 @@ export function ITJobOrderOverview() {
     if (!data?.data) return [];
     return data.data.map(mapJobOrderToTicket);
   }, [data]);
+
+  // ── Approver pending approvals for the floating tracker ──
+  const pendingApprovals: Ticket[] = React.useMemo(() => {
+    if (!perms.isApprover) return [];
+    return tickets.filter((t) => t.status === 'pending_approval');
+  }, [tickets, perms.isApprover]);
 
   const approveMutation  = useApproveJobOrder();
   const rejectMutation   = useRejectJobOrder();
@@ -458,7 +449,7 @@ export function ITJobOrderOverview() {
                 <select
                   value={filters.status || ''}
                   onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value || undefined, page: 1 }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-100"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-100"
                 >
                   <option value="">All Statuses</option>
                   {perms.isRequester && <option value="pending_approval">Pending Approval</option>}
@@ -478,7 +469,7 @@ export function ITJobOrderOverview() {
               <select
                 value={filters.priority || ''}
                 onChange={(e) => setFilters((f) => ({ ...f, priority: e.target.value || undefined, page: 1 }))}
-                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-100"
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-100"
               >
                 <option value="">All Priorities</option>
                 <option value="low">🟢 Low</option>
@@ -490,23 +481,19 @@ export function ITJobOrderOverview() {
             {perms.isTroubleshooter && (
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1.5">Department</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Program, Follow Up"
+                <input type="text" placeholder="e.g., Program, Follow Up"
                   value={filters.department || ''}
                   onChange={(e) => setFilters((f) => ({ ...f, department: e.target.value || undefined, page: 1 }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-100 placeholder-slate-400 dark:placeholder-gray-500"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-100 placeholder-slate-400"
                 />
               </div>
             )}
             <div>
               <label className="block text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1.5">Search</label>
-              <input
-                type="text"
-                placeholder="Title, description, order no..."
+              <input type="text" placeholder="Title, description, order no..."
                 value={filters.search || ''}
                 onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value || undefined, page: 1 }))}
-                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-100 placeholder-slate-400 dark:placeholder-gray-500"
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-100 placeholder-slate-400"
               />
             </div>
             <div className="flex items-end">
@@ -516,7 +503,7 @@ export function ITJobOrderOverview() {
                   ...(perms.isTroubleshooter ? { status: 'assigned' } : {}),
                   ...(perms.isApprover ? { status: 'pending_approval', department: perms.approvableDept ?? undefined } : {}),
                 })}
-                className="w-full px-3 py-2 text-sm bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors font-medium"
+                className="w-full px-3 py-2 text-sm bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-gray-300 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-600 font-medium"
               >
                 Clear
               </button>
@@ -536,15 +523,12 @@ export function ITJobOrderOverview() {
                 ? `All ${perms.approvableDept} department tickets are up to date.`
                 : filters.status || filters.priority || filters.search || filters.department
                 ? 'No job orders match your current filters.'
-                : perms.isTroubleshooter
-                ? 'No job orders in this status.'
+                : perms.isTroubleshooter ? 'No job orders in this status.'
                 : "You haven't submitted any job orders yet."}
             </p>
             {!perms.isApprover && (
-              <button
-                onClick={() => setIsCreateModalOpen(true)}
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors text-sm"
-              >
+              <button onClick={() => setIsCreateModalOpen(true)}
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 text-sm">
                 Create First Job Order
               </button>
             )}
@@ -554,9 +538,7 @@ export function ITJobOrderOverview() {
             <div className="space-y-3 mb-6">
               {tickets.map((ticket) => (
                 <TicketCard
-                  key={ticket.id}
-                  ticket={ticket}
-                  perms={perms}
+                  key={ticket.id} ticket={ticket} perms={perms}
                   onCardClick={(t) => setSelectedTicket(t)}
                   onApprove={handleApprove}
                   onReject={(id, workOrderNo) => setRejectTarget({ id, workOrderNo })}
@@ -574,8 +556,7 @@ export function ITJobOrderOverview() {
                 <button
                   onClick={() => setFilters((f) => ({ ...f, page: Math.max(1, (f.page || 1) - 1) }))}
                   disabled={filters.page === 1}
-                  className="px-4 py-2 bg-white dark:bg-gray-800 border border-slate-300 dark:border-gray-600 rounded-lg text-sm font-medium text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
+                  className="px-4 py-2 bg-white dark:bg-gray-800 border border-slate-300 dark:border-gray-600 rounded-lg text-sm font-medium text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">
                   ← Previous
                 </button>
                 <div className="px-5 py-2 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg text-sm font-bold text-blue-700 dark:text-blue-400">
@@ -584,8 +565,7 @@ export function ITJobOrderOverview() {
                 <button
                   onClick={() => setFilters((f) => ({ ...f, page: Math.min(data.pagination.pages, (f.page || 1) + 1) }))}
                   disabled={filters.page === data.pagination.pages}
-                  className="px-4 py-2 bg-white dark:bg-gray-800 border border-slate-300 dark:border-gray-600 rounded-lg text-sm font-medium text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
+                  className="px-4 py-2 bg-white dark:bg-gray-800 border border-slate-300 dark:border-gray-600 rounded-lg text-sm font-medium text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">
                   Next →
                 </button>
               </div>
@@ -594,13 +574,29 @@ export function ITJobOrderOverview() {
         )}
       </div>
 
-      {/* ── Floating tracker ── */}
-      {perms.isRequester && (
+      {/* ── Floating tracker — requesters AND approvers track their own submitted orders ── */}
+      {(perms.isRequester || perms.isApprover) && (
         <FloatingJobOrderTracker
           activeTickets={myActiveTickets}
           onViewAll={() => setFilters({ page: 1, limit: 20, sort_by: 'created_at', sort_order: 'DESC' })}
           onCreateNew={() => setIsCreateModalOpen(true)}
         />
+      )}
+
+      {/* ── Floating approval tracker — approvers only, positioned bottom-left to avoid overlap ── */}
+      {perms.isApprover && (
+        <div className="fixed bottom-6 left-6 z-[9997]">
+          <FloatingApprovalTracker
+            pendingApprovals={pendingApprovals}
+            onViewAll={() => setFilters({
+              page: 1, limit: 20, sort_by: 'created_at', sort_order: 'DESC',
+              status: 'pending_approval', department: perms.approvableDept ?? undefined,
+            })}
+            onApprove={handleApprove}
+            onReject={(id, reason) => rejectMutation.mutate({ id, reason })}
+            isApproving={approveMutation.isPending || rejectMutation.isPending}
+          />
+        </div>
       )}
 
       {/* ── Modals ── */}
@@ -672,11 +668,8 @@ function TicketCard({
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          {/* ── Badges row ── */}
           <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="text-xs font-mono font-bold text-slate-400 dark:text-gray-500 bg-slate-100 dark:bg-gray-800 px-2.5 py-0.5 rounded-lg">
-              {ticket.id}
-            </span>
+            <span className="text-xs font-mono font-bold text-slate-400 dark:text-gray-500 bg-slate-100 dark:bg-gray-800 px-2.5 py-0.5 rounded-lg">{ticket.id}</span>
             <PriorityBadge priority={ticket.priority} />
             <StatusBadge status={ticket.status} />
             <span className="px-2.5 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800 rounded-full text-xs font-semibold">
@@ -684,15 +677,11 @@ function TicketCard({
             </span>
           </div>
 
-          {/* ── Title & description ── */}
           <h3 className="text-base font-bold text-slate-900 dark:text-gray-100 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1">
             {ticket.title}
           </h3>
-          <p className="text-sm text-slate-500 dark:text-gray-400 line-clamp-2 mb-3">
-            {ticket.description}
-          </p>
+          <p className="text-sm text-slate-500 dark:text-gray-400 line-clamp-2 mb-3">{ticket.description}</p>
 
-          {/* ── Meta row ── */}
           <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-gray-400">
             {(perms.isTroubleshooter || perms.isApprover) && (
               <div className="flex items-center gap-1.5">
@@ -705,7 +694,6 @@ function TicketCard({
                 </span>
               </div>
             )}
-
             {ticket.assignee && (
               <div className="flex items-center gap-1.5">
                 <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0">
@@ -717,54 +705,45 @@ function TicketCard({
                 </span>
               </div>
             )}
-
             <RelativeTime date={ticket.createdAt} />
 
-            {/* ── Action buttons ── */}
             {canApprove && (
               <div className="flex items-center gap-1.5 ml-auto">
                 <button onClick={(e) => { e.stopPropagation(); onApprove(numericId); }} disabled={isLoading}
-                  className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50">
-                  ✔ Approve
-                </button>
+                  className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 disabled:opacity-50">✔ Approve</button>
                 <button onClick={(e) => { e.stopPropagation(); onReject(numericId, ticket.id); }} disabled={isLoading}
-                  className="px-3 py-1 bg-red-500 text-white rounded-lg text-xs font-bold hover:bg-red-600 transition-colors disabled:opacity-50">
-                  ✘ Reject
-                </button>
+                  className="px-3 py-1 bg-red-500 text-white rounded-lg text-xs font-bold hover:bg-red-600 disabled:opacity-50">✘ Reject</button>
               </div>
             )}
             {canAssign && (
               <button onClick={(e) => { e.stopPropagation(); onAssign(numericId, ticket.id); }} disabled={isLoading}
-                className="ml-auto px-3 py-1 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors disabled:opacity-50">
+                className="ml-auto px-3 py-1 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 disabled:opacity-50">
                 👤 Assign IT Officer
               </button>
             )}
             {canStart && (
               <button onClick={(e) => { e.stopPropagation(); onStart(numericId); }} disabled={isLoading}
-                className="ml-auto px-3 py-1 bg-sky-600 text-white rounded-lg text-xs font-bold hover:bg-sky-700 transition-colors disabled:opacity-50">
-                🚀 Start Work
+                className="ml-auto px-3 py-1 bg-sky-600 text-white rounded-lg text-xs font-bold hover:bg-sky-700 disabled:opacity-50">
+                Start Work
               </button>
             )}
             {canResolve && (
               <button onClick={(e) => { e.stopPropagation(); onResolve(numericId, ticket.id); }} disabled={isLoading}
-                className="ml-auto px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50">
-                ✅ Mark Resolved
+                className="ml-auto px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 disabled:opacity-50">
+                Mark Resolved
               </button>
             )}
             {canClose && (
               <button onClick={(e) => { e.stopPropagation(); onClose(numericId); }} disabled={isLoading}
-                className="ml-auto px-3 py-1 bg-slate-600 dark:bg-slate-700 text-white rounded-lg text-xs font-bold hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors disabled:opacity-50">
-                🎉 Close Ticket
+                className="ml-auto px-3 py-1 bg-slate-600 dark:bg-slate-700 text-white rounded-lg text-xs font-bold hover:bg-slate-700 disabled:opacity-50">
+                Close Ticket
               </button>
             )}
           </div>
         </div>
 
-        {/* ── Chevron ── */}
-        <svg
-          className="w-5 h-5 text-slate-300 dark:text-gray-600 group-hover:text-blue-500 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-1"
-          fill="none" viewBox="0 0 24 24" stroke="currentColor"
-        >
+        <svg className="w-5 h-5 text-slate-300 dark:text-gray-600 group-hover:text-blue-500 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-1"
+          fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </div>

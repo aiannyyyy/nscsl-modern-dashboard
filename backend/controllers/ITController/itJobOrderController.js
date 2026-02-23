@@ -81,32 +81,62 @@ exports.createJobOrder = async (req, res) => {
         const workOrderNo = await generateWorkOrderNumber();
         console.log('🔍 [CREATE JOB ORDER] Generated work order no:', workOrderNo);
 
+        // ✅ Check if requester is an approver — if so, skip approval and go straight to queued
+        const APPROVER_POSITIONS = ['Program Manager', 'Follow Up Head', 'Laboratory Manager'];
+        const requesterPosition  = req.user?.position || '';
+        const isApprover         = APPROVER_POSITIONS.includes(requesterPosition);
+        const initialStatus      = isApprover ? 'queued' : 'pending_approval';
+
+        console.log('🔍 [CREATE JOB ORDER] Requester position:', requesterPosition, '| Is approver:', isApprover, '| Initial status:', initialStatus);
+
         const [result] = await connection.query(
-            `INSERT INTO it_job_order (work_order_no, title, description, type, category, priority, requester_id, department, location, asset_id, estimated_hours, tags, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_approval')`,
-            [workOrderNo, title, description, type, category, priority, requesterId, department, location, asset_id, estimated_hours, tags]
+            `INSERT INTO it_job_order (work_order_no, title, description, type, category, priority, requester_id, department, location, asset_id, estimated_hours, tags, status, approved_by_id, approved_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                workOrderNo, title, description, type, category, priority,
+                requesterId, department, location, asset_id, estimated_hours, tags,
+                initialStatus,
+                isApprover ? requesterId : null,  // auto-approve if approver
+                isApprover ? new Date() : null
+            ]
         );
         const jobOrderId = result.insertId;
         console.log('🔍 [CREATE JOB ORDER] Inserted job order ID:', jobOrderId);
 
-        await logHistory(connection, jobOrderId, requesterId, 'created', 'status', null, 'pending_approval');
-        await connection.commit();
+        await logHistory(connection, jobOrderId, requesterId, 'created', 'status', null, initialStatus);
 
+        if (isApprover) {
+            await logHistory(connection, jobOrderId, requesterId, 'auto_approved', 'status', 'pending_approval', 'queued');
+        }
+
+        await connection.commit();
         console.log('✅ [CREATE JOB ORDER] Successfully created:', workOrderNo);
 
-        // ✅ Notify the correct dept approver AFTER commit (fire-and-forget — won't affect response)
-        notifyApproversOnCreate({
-            jobOrderId,
-            workOrderNo,
-            requesterName,
-            createdBy:  requesterName,
-            department  // routes to the right approver based on dept
-        }).catch(err => console.error('❌ Notify approvers error:', err.message));
+        if (isApprover) {
+            // Approver created it — notify IT officers directly, no approval needed
+            notifyITOfficersOnQueue({
+                jobOrderId,
+                workOrderNo,
+                department,
+                createdBy: requesterName
+            }).catch(err => console.error('❌ Notify IT officers error:', err.message));
+        } else {
+            // Regular user — notify the correct dept approver
+            notifyApproversOnCreate({
+                jobOrderId,
+                workOrderNo,
+                requesterName,
+                createdBy:  requesterName,
+                department
+            }).catch(err => console.error('❌ Notify approvers error:', err.message));
+        }
 
         res.status(201).json({
             success: true,
-            message: 'Job order created successfully',
-            data: { id: jobOrderId, work_order_no: workOrderNo, status: 'pending_approval' }
+            message: isApprover
+                ? 'Job order created and queued successfully'
+                : 'Job order created successfully',
+            data: { id: jobOrderId, work_order_no: workOrderNo, status: initialStatus }
         });
     } catch (error) {
         await connection.rollback();

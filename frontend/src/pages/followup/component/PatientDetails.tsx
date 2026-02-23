@@ -183,7 +183,7 @@ const DetailModal: React.FC<{
 
                     <Section icon={<ClipboardList size={13} />} title="Provider & Submission">
                         <Field label="Physician ID"  value={patient.PHYSID} />
-                        <Field label="Submitter ID"  value={patient.SUBMID} />
+                        <Field label="Facility Code"  value={patient.SUBMID} />
                     </Section>
 
                     <hr className="border-slate-100 dark:border-slate-800" />
@@ -300,7 +300,7 @@ const COLUMNS: ColDef[] = [
     { key: 'CURRENT_DTCOLL', label: 'Curr. Collection'},
     { key: 'LINKED_DTCOLL',  label: 'Linked Collection'},
     { key: 'PHYSID',         label: 'Physician ID'    },
-    { key: 'SUBMID',         label: 'Submitter ID'    },
+    { key: 'SUBMID',         label: 'Facility Code'    },
     { key: 'CLINSTAT',       label: 'Clin. Status'    },
     { key: 'COUNTY',         label: 'Province/County' },
 ];
@@ -376,7 +376,7 @@ export const PatientDetails: React.FC = () => {
                 'Last Modified':     fmtStr(r.LASTMOD),
                 'Clinical Status':   r.CLINSTAT,
                 'Physician ID':      r.PHYSID,
-                'Submitter ID':      r.SUBMID,
+                'Facility Code':      r.SUBMID,
                 'Sex':               r.SEX,
                 'Birth Date':        fmtStr(r.BIRTHDT),
                 'Birth Weight':      r.BIRTHWT,
@@ -602,7 +602,7 @@ export const PatientDetails: React.FC = () => {
                                         <td className="px-4 py-2.5 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
                                             {row.PHYSID ?? '—'}
                                         </td>
-                                        {/* Submitter ID */}
+                                        {/* Facility Code */}
                                         <td className="px-4 py-2.5 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
                                             {row.SUBMID ?? '—'}
                                         </td>
