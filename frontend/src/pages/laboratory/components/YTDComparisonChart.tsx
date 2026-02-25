@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { Download, ChevronDown } from 'lucide-react';
 import { useYTDComparison } from '../../../hooks/LaboratoryHooks/useYTDSampleComparison';
+import type { YTDSampleType } from '../../../hooks/LaboratoryHooks/useYTDSampleComparison';
 import { downloadChart } from '../../../utils/chartDownloadUtils';
 
 interface MonthData {
@@ -26,29 +27,34 @@ interface Props {
   onExpand: () => void;
 }
 
+// ✅ Centralized type config — add new types here only
+const SAMPLE_TYPES: { value: YTDSampleType; label: string }[] = [
+  { value: 'received', label: 'Received' },
+  { value: 'screened', label: 'Screened' },
+  { value: 'initial',  label: 'Initial'  }
+];
+
+// ✅ Lookup for header title display
+const TYPE_LABELS: Record<YTDSampleType, string> = {
+  received: 'Received',
+  screened: 'Screened',
+  initial:  'Initial'
+};
+
 export const YTDComparisonChart: React.FC<Props> = ({ expanded, onExpand }) => {
-  // Get current year dynamically
   const currentYear = new Date().getFullYear();
-  
+
   const [year1, setYear1] = useState(currentYear - 1);
   const [year2, setYear2] = useState(currentYear);
-  const [sampleType, setSampleType] = useState<'received' | 'screened'>('received');
+  const [sampleType, setSampleType] = useState<YTDSampleType>('received');
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
   const chartRef = useRef<HTMLDivElement>(null);
 
-  const years = Array.from({ length: 12 }, (_, i) => (currentYear - i));
+  const years = Array.from({ length: 12 }, (_, i) => currentYear - i);
 
-  const sampleTypes = [
-    { value: 'received', label: 'Received' },
-    { value: 'screened', label: 'Screened' }
-  ];
-
-  // Use the custom hook
   const {
-    chartData: apiChartData,
     tableData,
-    summaryStats,
     isLoading,
     error
   } = useYTDComparison({
@@ -83,13 +89,11 @@ export const YTDComparisonChart: React.FC<Props> = ({ expanded, onExpand }) => {
     }));
   }, [tableData, year1, year2]);
 
-  // Custom label renderer for bar labels - positioned lower
+  // Custom label renderer
   const renderCustomLabel = (props: any) => {
     const { x, y, width, value } = props;
-    
-    // Only show label if value > 0
     if (value === 0) return null;
-    
+
     return (
       <text
         x={x + width / 2}
@@ -118,15 +122,15 @@ export const YTDComparisonChart: React.FC<Props> = ({ expanded, onExpand }) => {
           filename,
           format: 'excel',
           data: excelData,
-          sheetName: `YTD ${sampleType.charAt(0).toUpperCase() + sampleType.slice(1)}`,
+          sheetName: `YTD ${TYPE_LABELS[sampleType]}`,
         });
       } else {
         await downloadChart({
           elementId: 'ytd-comparison-chart',
           filename,
           format,
-          backgroundColor: document.documentElement.classList.contains('dark') 
-            ? '#1f2937' 
+          backgroundColor: document.documentElement.classList.contains('dark')
+            ? '#1f2937'
             : '#ffffff',
           scale: 2,
         });
@@ -148,31 +152,33 @@ export const YTDComparisonChart: React.FC<Props> = ({ expanded, onExpand }) => {
         bg-gray-50 dark:bg-gray-800
         border-gray-200 dark:border-gray-700"
       >
-        {/* Title */}
+        {/* Title — ✅ now uses TYPE_LABELS lookup instead of ternary chain */}
         <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
           <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+            />
           </svg>
-          YTD {sampleType === 'received' ? 'Received' : 'Screened'} Samples
+          YTD {TYPE_LABELS[sampleType]} Samples
         </h3>
 
         {/* Controls */}
         <div className="flex items-center gap-2 flex-wrap">
           {expanded && (
             <>
-              {/* Sample Type Dropdown */}
+              {/* Sample Type Dropdown — ✅ driven by SAMPLE_TYPES array */}
               <select
                 value={sampleType}
-                onChange={(e) => setSampleType(e.target.value as 'received' | 'screened')}
+                onChange={(e) => setSampleType(e.target.value as YTDSampleType)}
                 className="h-8 px-3 text-xs rounded-lg border font-semibold
                   bg-white dark:bg-gray-700
                   border-gray-300 dark:border-gray-600
                   text-gray-800 dark:text-gray-100
                   focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {sampleTypes.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
+                {SAMPLE_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
                   </option>
                 ))}
               </select>
@@ -231,45 +237,28 @@ export const YTDComparisonChart: React.FC<Props> = ({ expanded, onExpand }) => {
               <ChevronDown size={12} />
             </button>
 
-            {/* Dropdown Menu */}
             {showDownloadMenu && (
               <>
-                {/* Backdrop */}
                 <div
                   className="fixed inset-0 z-10"
                   onClick={() => setShowDownloadMenu(false)}
                 />
-
-                {/* Menu */}
                 <div className="absolute right-0 mt-1 w-48 rounded-lg shadow-lg border
                   bg-white dark:bg-gray-800
                   border-gray-200 dark:border-gray-700
                   z-20 overflow-hidden"
                 >
-                  <button
-                    onClick={() => handleDownload('png')}
-                    className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
-                      text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
-                  >
-                    <Download size={14} />
-                    Download as PNG
-                  </button>
-                  <button
-                    onClick={() => handleDownload('svg')}
-                    className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
-                      text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
-                  >
-                    <Download size={14} />
-                    Download as SVG
-                  </button>
-                  <button
-                    onClick={() => handleDownload('excel')}
-                    className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
-                      text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
-                  >
-                    <Download size={14} />
-                    Export to Excel
-                  </button>
+                  {(['png', 'svg', 'excel'] as const).map((fmt) => (
+                    <button
+                      key={fmt}
+                      onClick={() => handleDownload(fmt)}
+                      className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                        text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                    >
+                      <Download size={14} />
+                      {fmt === 'excel' ? 'Export to Excel' : `Download as ${fmt.toUpperCase()}`}
+                    </button>
+                  ))}
                 </div>
               </>
             )}
@@ -300,7 +289,9 @@ export const YTDComparisonChart: React.FC<Props> = ({ expanded, onExpand }) => {
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
               <svg className="w-12 h-12 text-red-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <p className="text-sm text-red-600 dark:text-red-400">Error loading chart data</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{error.message}</p>

@@ -1,14 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import labTotalDailySamplesService from '../../services/LaboratoryServices/labTotalDailySamples';
-import type { 
+import type {
     LabTotalDailySamplesResponse,
-    LabTotalDailySamplesParams 
+    LabTotalDailySamplesParams,
+    SampleType
 } from '../../services/LaboratoryServices/labTotalDailySamples';
 
-/**
- * Hook to fetch laboratory total daily samples
- */
 export const useLabTotalDailySamples = (
     params: LabTotalDailySamplesParams
 ): UseQueryResult<LabTotalDailySamplesResponse, Error> => {
@@ -23,9 +21,6 @@ export const useLabTotalDailySamples = (
     });
 };
 
-/**
- * Hook to fetch received samples
- */
 export const useReceivedSamples = (
     year: string | number,
     month: string
@@ -38,9 +33,6 @@ export const useReceivedSamples = (
     });
 };
 
-/**
- * Hook to fetch screened samples
- */
 export const useScreenedSamples = (
     year: string | number,
     month: string
@@ -53,11 +45,21 @@ export const useScreenedSamples = (
     });
 };
 
-/**
- * Hook to fetch current month samples
- */
+// ✅ New hook for initial samples
+export const useInitialSamples = (
+    year: string | number,
+    month: string
+): UseQueryResult<LabTotalDailySamplesResponse, Error> => {
+    return useQuery({
+        queryKey: ['initialSamples', year, month],
+        queryFn: () => labTotalDailySamplesService.getInitialSamples(year, month),
+        enabled: !!year && !!month,
+        staleTime: 5 * 60 * 1000,
+    });
+};
+
 export const useCurrentMonthSamples = (
-    sampleType: 'received' | 'screened' = 'received'
+    sampleType: SampleType = 'received'
 ): UseQueryResult<LabTotalDailySamplesResponse, Error> => {
     return useQuery({
         queryKey: ['currentMonthSamples', sampleType],

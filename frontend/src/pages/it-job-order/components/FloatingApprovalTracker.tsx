@@ -5,8 +5,8 @@ import { TicketDetailModal } from './TicketDetailModal';
 import { CreateTicketModal } from './CreateTicketModal';
 
 interface FloatingApproverTrackerProps {
-  activeTickets: Ticket[];       // approver's own submitted orders
-  pendingApprovals: Ticket[];    // tickets waiting for their approval
+  activeTickets: Ticket[];
+  pendingApprovals: Ticket[];
   onViewAll: () => void;
   onApprove: (id: number) => void;
   onReject: (id: number, reason: string) => void;
@@ -32,12 +32,10 @@ export function FloatingApproverTracker({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedTicket,    setSelectedTicket]    = useState<Ticket | null>(null);
 
-  // Filter to only this user's own tickets
   const myTickets = activeTickets.filter(
     (t) => t.requester?.id === String(user?.id ?? user?.user_id ?? '')
   );
 
-  // Keep selectedTicket in sync
   React.useEffect(() => {
     if (myTickets.length > 0) {
       setSelectedTicket((prev) =>
@@ -59,7 +57,6 @@ export function FloatingApproverTracker({
     setRejectReason('');
   };
 
-  // ── Status helpers ────────────────────────────────────────────────
   const getProgress = (ticket: Ticket): number => {
     const map: Record<string, number> = {
       pending_approval: 10, approved: 20, queued: 30, assigned: 45,
@@ -93,7 +90,7 @@ export function FloatingApproverTracker({
   if (!isExpanded) {
     return (
       <div
-        className="fixed bottom-6 right-6 z-[9998] animate-slideUp cursor-pointer"
+        className="fixed bottom-6 left-6 z-[9998] animate-slideUp cursor-pointer"
         onClick={() => setIsExpanded(true)}
       >
         <div className="bg-white rounded-2xl shadow-2xl border border-blue-200 overflow-hidden hover:shadow-xl transition-all w-80">
@@ -106,7 +103,6 @@ export function FloatingApproverTracker({
           </div>
           <div className="p-4">
             <div className="flex items-center gap-3">
-              {/* Icon */}
               <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md relative text-lg">
                 {pendingCount > 0 ? '📋' : '🎫'}
                 {urgentCount > 0 && (
@@ -184,7 +180,7 @@ export function FloatingApproverTracker({
   // ── Expanded panel ────────────────────────────────────────────────
   return (
     <>
-      <div className="fixed inset-0 z-[9998] flex items-end justify-end p-6 pointer-events-none">
+      <div className="fixed inset-0 z-[9998] flex items-end justify-start p-6 pointer-events-none">
         <div
           className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-[460px] max-h-[85vh] overflow-hidden pointer-events-auto flex flex-col"
           style={{ animation: 'slideUpExpand 0.3s ease-out' }}
@@ -400,10 +396,9 @@ export function FloatingApproverTracker({
                           </div>
                         )}
 
-                        {/* Timeline — shown when selected, no "Approved" step */}
                         {isSelected && (
                           <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
-                            <TimelineStep icon="⏳" label="Submitted"  completed={true}                                                                active={ticket.status === 'pending_approval'} />
+                            <TimelineStep icon="⏳" label="Submitted"   completed={true}                                                                active={ticket.status === 'pending_approval'} />
                             <TimelineStep icon="🔧" label="Being Fixed" completed={['in_progress','resolved','closed'].includes(ticket.status)}        active={ticket.status === 'in_progress'} />
                             <TimelineStep icon="✅" label="Resolved"    completed={['resolved','closed'].includes(ticket.status)}                      active={ticket.status === 'resolved'} />
                             <TimelineStep icon="🎉" label="Completed"   completed={ticket.status === 'closed'}                                         active={ticket.status === 'closed'} isLast />

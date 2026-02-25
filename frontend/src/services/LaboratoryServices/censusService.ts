@@ -1,8 +1,10 @@
-
 import api from '../api';
 
+// ✅ Added 'Initial' to the union type
+export type CumulativeSampleType = 'Received' | 'Screened' | 'Initial';
+
 export interface CumulativeCensusParams {
-    type: 'Received' | 'Screened';
+    type: CumulativeSampleType;
 }
 
 export interface CumulativeCensusDataItem {

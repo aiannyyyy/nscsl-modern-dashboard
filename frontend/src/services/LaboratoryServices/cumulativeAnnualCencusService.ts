@@ -1,20 +1,25 @@
 import api from '../api';
 
-interface AnnualCensusData {
+export interface AnnualCensusData {
   YEAR_MONTH: string;
   TOTAL_SAMPLES: number;
   TEST_6: number;
   ENBS: number;
+  CNT_SCREENED: number;  // renamed from SCREENED — Oracle reserved word
+  CNT_INITIAL: number;   // renamed from INITIAL  — Oracle reserved word
 }
 
-interface AnnualCensusResponse {
+export interface AnnualCensusResponse {
   success: boolean;
   data: AnnualCensusData[];
   filters: {
-    spectypes: string[];
-    dateRanges: {
-      test_6: string;
-      enbs: string;
+    breakdowns: {
+      received: {
+        test_6: { spectypes: string[]; dateRange: string };
+        enbs:   { spectypes: string[]; dateRange: string };
+      };
+      screened: { spectypes: string[]; dateRange: string };
+      initial:  { spectypes: string[]; dateRange: string };
     };
   };
   count: number;
@@ -22,13 +27,8 @@ interface AnnualCensusResponse {
   timestamp: string;
 }
 
-/**
- * Fetch cumulative annual census data
- * @returns Promise with annual census response
- */
 export const getCumulativeAnnualCensus = async (): Promise<AnnualCensusResponse> => {
   try {
-    // Remove the leading /api since it's already in the base URL
     const response = await api.get('/laboratory/cumulative-annual-census');
     return response.data;
   } catch (error) {

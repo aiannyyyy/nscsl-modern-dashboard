@@ -3,7 +3,8 @@ const oracledb = require('oracledb');
 // Valid sample types mapping
 const VALID_TYPES = {
     'received': ['1', '87', '20', '2', '3', '4', '5', '18'],
-    'screened': ['4', '3', '20', '2', '1', '18', '87']
+    'screened': ['4', '3', '20', '2', '1', '18', '87'],
+    'initial':  ['20']
 };
 
 /**
@@ -34,7 +35,7 @@ exports.getYTDSampleComparison = async (req, res) => {
         if (!VALID_TYPES[type]) {
             return res.status(400).json({
                 success: false,
-                error: "Invalid type. Use 'received' or 'screened'.",
+                error: "Invalid type. Use 'received', 'screened', or 'initial'.",
                 validTypes: Object.keys(VALID_TYPES)
             });
         }
@@ -43,7 +44,7 @@ exports.getYTDSampleComparison = async (req, res) => {
 
         // Get database connection
         const oraclePool = req.app.locals.oracleDb;
-        
+
         if (!oraclePool) {
             return res.status(500).json({
                 success: false,
@@ -60,6 +61,8 @@ exports.getYTDSampleComparison = async (req, res) => {
             binds[`spectype${i}`] = val;
         });
 
+        const spectypeBinds = spectypeValues.map((_, i) => `:spectype${i}`).join(', ');
+
         // Main Query - Combining ARCHIVE and MASTER tables
         const query = `
             SELECT 
@@ -73,7 +76,7 @@ exports.getYTDSampleComparison = async (req, res) => {
                     COUNT(*) AS total_samples
                 FROM PHMSDS.SAMPLE_DEMOG_ARCHIVE
                 WHERE EXTRACT(YEAR FROM DTRECV) IN (:year1, :year2) 
-                AND SPECTYPE IN (${spectypeValues.map((_, i) => `:spectype${i}`).join(', ')})
+                AND SPECTYPE IN (${spectypeBinds})
                 GROUP BY EXTRACT(YEAR FROM DTRECV), EXTRACT(MONTH FROM DTRECV)
                 
                 UNION ALL
@@ -84,7 +87,7 @@ exports.getYTDSampleComparison = async (req, res) => {
                     COUNT(*) AS total_samples
                 FROM PHMSDS.SAMPLE_DEMOG_MASTER
                 WHERE EXTRACT(YEAR FROM DTRECV) IN (:year1, :year2) 
-                AND SPECTYPE IN (${spectypeValues.map((_, i) => `:spectype${i}`).join(', ')})
+                AND SPECTYPE IN (${spectypeBinds})
                 GROUP BY EXTRACT(YEAR FROM DTRECV), EXTRACT(MONTH FROM DTRECV)
             )
             GROUP BY year, month
@@ -117,9 +120,9 @@ exports.getYTDSampleComparison = async (req, res) => {
 
     } catch (error) {
         console.error('❌ YTD Sample Comparison Error:', error);
-        
+
         const executionTime = Date.now() - startTime;
-        
+
         res.status(500).json({
             success: false,
             error: 'An error occurred while fetching YTD sample comparison',

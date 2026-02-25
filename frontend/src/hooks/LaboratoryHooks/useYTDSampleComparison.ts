@@ -1,5 +1,3 @@
-
-
 import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import ytdSampleComparisonService from '../../services/LaboratoryServices/ytdSampleComparisonService';
@@ -74,10 +72,13 @@ export interface YTDSummaryStats {
     trend: 'increase' | 'decrease' | 'stable';
 }
 
+// ✅ Added 'initial' to the union type
+export type YTDSampleType = 'received' | 'screened' | 'initial';
+
 export interface UseYTDSampleComparisonParams {
     year1: number | string;
     year2: number | string;
-    type: 'received' | 'screened';
+    type: YTDSampleType;
     enabled?: boolean;
 }
 
@@ -110,8 +111,8 @@ export const useYTDSampleComparison = ({
             return response as YTDResponse;
         },
         enabled: enabled && !!year1 && !!year2 && !!type,
-        staleTime: 5 * 60 * 1000, // 5 minutes
-        gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
         retry: 2,
         refetchOnWindowFocus: false
     });
@@ -121,8 +122,6 @@ export const useYTDSampleComparison = ({
 
 /**
  * Hook to get transformed chart data
- * @param params - Query parameters
- * @returns Query result with chart-ready data
  */
 export const useYTDChartData = ({
     year1,
@@ -159,8 +158,6 @@ export const useYTDChartData = ({
 
 /**
  * Hook to get transformed bar chart data
- * @param params - Query parameters
- * @returns Query result with bar chart-ready data
  */
 export const useYTDBarChartData = ({
     year1,
@@ -197,8 +194,6 @@ export const useYTDBarChartData = ({
 
 /**
  * Hook to get transformed table data
- * @param params - Query parameters
- * @returns Query result with table-ready data
  */
 export const useYTDTableData = ({
     year1,
@@ -235,8 +230,6 @@ export const useYTDTableData = ({
 
 /**
  * Hook to get summary statistics
- * @param params - Query parameters
- * @returns Query result with summary stats
  */
 export const useYTDSummaryStats = ({
     year1,
@@ -274,33 +267,22 @@ export const useYTDSummaryStats = ({
 // ==================== COMBINED HOOK ====================
 
 export interface UseYTDComparisonResult {
-    // Raw data
     rawData: YTDRawData[] | undefined;
-    
-    // Transformed data
     chartData: YTDChartData | undefined;
     tableData: YTDTableRow[] | undefined;
     summaryStats: YTDSummaryStats | undefined;
-    
-    // Loading states
     isLoading: boolean;
     isChartLoading: boolean;
     isTableLoading: boolean;
     isStatsLoading: boolean;
-    
-    // Error states
     error: Error | null;
     chartError: Error | null;
     tableError: Error | null;
     statsError: Error | null;
-    
-    // Refetch functions
     refetch: () => void;
     refetchChart: () => void;
     refetchTable: () => void;
     refetchStats: () => void;
-    
-    // Metadata
     filters: YTDFilters | undefined;
     recordCount: number | undefined;
     executionTime: string | undefined;
@@ -308,8 +290,6 @@ export interface UseYTDComparisonResult {
 
 /**
  * Combined hook that fetches all YTD comparison data at once
- * @param params - Query parameters
- * @returns Combined result with all data types
  */
 export const useYTDComparison = ({
     year1,
@@ -323,33 +303,22 @@ export const useYTDComparison = ({
     const statsQuery = useYTDSummaryStats({ year1, year2, type, enabled });
 
     return {
-        // Raw data
         rawData: rawQuery.data?.data,
-        
-        // Transformed data
         chartData: chartQuery.data,
         tableData: tableQuery.data,
         summaryStats: statsQuery.data,
-        
-        // Loading states
         isLoading: rawQuery.isLoading,
         isChartLoading: chartQuery.isLoading,
         isTableLoading: tableQuery.isLoading,
         isStatsLoading: statsQuery.isLoading,
-        
-        // Error states
         error: rawQuery.error,
         chartError: chartQuery.error,
         tableError: tableQuery.error,
         statsError: statsQuery.error,
-        
-        // Refetch functions
         refetch: rawQuery.refetch,
         refetchChart: chartQuery.refetch,
         refetchTable: tableQuery.refetch,
         refetchStats: statsQuery.refetch,
-        
-        // Metadata
         filters: rawQuery.data?.filters,
         recordCount: rawQuery.data?.recordCount,
         executionTime: rawQuery.data?.executionTime

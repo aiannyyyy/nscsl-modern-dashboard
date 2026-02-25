@@ -434,7 +434,7 @@ export function ITJobOrderOverview() {
                 Showing pending approvals for <strong>{perms.approvableDept}</strong> department
               </p>
               <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
-                As <strong>{user?.position}</strong>, approve or reject tickets from the floating tracker on the bottom right.
+                As <strong>{user?.position}</strong>, approve or reject tickets from the floating tracker on the bottom left.
               </p>
             </div>
           </div>
@@ -574,18 +574,16 @@ export function ITJobOrderOverview() {
         )}
       </div>
 
-      {/* ── Floating tracker — requesters AND approvers track their own submitted orders ── */}
-      {(perms.isRequester || perms.isApprover) && (
-        <FloatingJobOrderTracker
-          activeTickets={myActiveTickets}
-          onViewAll={() => setFilters({ page: 1, limit: 20, sort_by: 'created_at', sort_order: 'DESC' })}
-          onCreateNew={() => setIsCreateModalOpen(true)}
-        />
-      )}
-
-      {/* ── Floating approval tracker — approvers only, positioned bottom-left to avoid overlap ── */}
-      {perms.isApprover && (
-        <div className="fixed bottom-6 left-6 z-[9997]">
+      {/* ── Floating trackers — both stacked bottom-left ── */}
+      <div className="fixed bottom-6 left-6 z-[9997] flex flex-col-reverse gap-3 items-start">
+        {(perms.isRequester || perms.isApprover) && (
+          <FloatingJobOrderTracker
+            activeTickets={myActiveTickets}
+            onViewAll={() => setFilters({ page: 1, limit: 20, sort_by: 'created_at', sort_order: 'DESC' })}
+            onCreateNew={() => setIsCreateModalOpen(true)}
+          />
+        )}
+        {perms.isApprover && (
           <FloatingApprovalTracker
             pendingApprovals={pendingApprovals}
             onViewAll={() => setFilters({
@@ -596,8 +594,8 @@ export function ITJobOrderOverview() {
             onReject={(id, reason) => rejectMutation.mutate({ id, reason })}
             isApproving={approveMutation.isPending || rejectMutation.isPending}
           />
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ── Modals ── */}
       <CreateTicketModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />

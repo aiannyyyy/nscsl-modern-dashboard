@@ -4,22 +4,18 @@ import api from "../api";
 
 class YTDSampleComparisonService {
     // ==================== API CALLS ====================
-    
+
     /**
      * Get YTD Sample Comparison
      * @param {number|string} year1 - First year to compare
      * @param {number|string} year2 - Second year to compare
-     * @param {string} type - Sample type: 'received' or 'screened'
+     * @param {string} type - Sample type: 'received', 'screened', or 'initial'
      * @returns {Promise<Object>} API response with comparison data
      */
     async getYTDSampleComparison(year1, year2, type) {
         try {
             const response = await api.get('/laboratory/ytd-sample-comparison', {
-                params: {
-                    year1,
-                    year2,
-                    type
-                }
+                params: { year1, year2, type }
             });
 
             return {
@@ -32,7 +28,7 @@ class YTDSampleComparisonService {
             };
         } catch (error) {
             console.error('[YTDSampleComparisonService] Error:', error);
-            
+
             return {
                 success: false,
                 error: error.response?.data?.error || 'Failed to fetch YTD sample comparison',
@@ -46,9 +42,6 @@ class YTDSampleComparisonService {
 
     /**
      * Validate years before API call
-     * @param {number|string} year1 
-     * @param {number|string} year2 
-     * @returns {Object} Validation result
      */
     validateYears(year1, year2) {
         const errors = [];
@@ -65,34 +58,28 @@ class YTDSampleComparisonService {
             errors.push(`Second year must be between 2000 and ${currentYear + 1}`);
         }
 
-        return {
-            isValid: errors.length === 0,
-            errors
-        };
+        return { isValid: errors.length === 0, errors };
     }
 
     /**
      * Validate sample type
-     * @param {string} type 
-     * @returns {Object} Validation result
+     * ✅ Now includes 'initial'
      */
     validateType(type) {
-        const validTypes = ['received', 'screened'];
+        const validTypes = ['received', 'screened', 'initial'];
         const normalizedType = type?.toLowerCase().trim();
 
         return {
             isValid: validTypes.includes(normalizedType),
             normalizedType,
-            error: !validTypes.includes(normalizedType) ? 'Type must be either "received" or "screened"' : null
+            error: !validTypes.includes(normalizedType)
+                ? 'Type must be "received", "screened", or "initial"'
+                : null
         };
     }
 
     /**
      * Validate all parameters
-     * @param {number|string} year1 
-     * @param {number|string} year2 
-     * @param {string} type 
-     * @returns {Object} Complete validation result
      */
     validateAll(year1, year2, type) {
         const yearValidation = this.validateYears(year1, year2);
@@ -111,56 +98,47 @@ class YTDSampleComparisonService {
     }
 
     /**
-     * Get valid sample types
-     * @returns {Object} Valid types configuration
+     * Get valid sample types as object
+     * ✅ Now includes 'initial'
      */
     getValidTypes() {
         return {
             received: 'Received Samples',
-            screened: 'Screened Samples'
+            screened: 'Screened Samples',
+            initial: 'Initial Samples'
         };
     }
 
     /**
-     * Get valid sample types as array for dropdown
-     * @returns {Array} Array of type objects
+     * Get valid sample types as array for dropdowns
+     * ✅ Now includes 'initial'
      */
     getValidTypesArray() {
         return [
             { value: 'received', label: 'Received Samples' },
-            { value: 'screened', label: 'Screened Samples' }
+            { value: 'screened', label: 'Screened Samples' },
+            { value: 'initial', label: 'Initial Samples' }
         ];
     }
 
     // ==================== DATA TRANSFORMATION ====================
 
     /**
-     * Transform YTD data for chart visualization
-     * @param {Array} rawData - Raw data from API
-     * @param {number} year1 
-     * @param {number} year2 
-     * @returns {Object} Transformed data for charts (Chart.js format)
+     * Transform YTD data for line chart visualization
      */
     transformYTDDataForChart(rawData, year1, year2) {
         if (!rawData || !Array.isArray(rawData)) {
-            return {
-                labels: [],
-                datasets: []
-            };
+            return { labels: [], datasets: [] };
         }
 
-        const monthNames = [
-            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-        ];
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-        // Initialize arrays with zeros
         const year1Data = new Array(12).fill(0);
         const year2Data = new Array(12).fill(0);
 
-        // Populate data
         rawData.forEach(row => {
-            const monthIndex = row.MONTH - 1; // Convert to 0-based index
+            const monthIndex = row.MONTH - 1;
             const totalSamples = Number(row.TOTAL_SAMPLES) || 0;
 
             if (row.YEAR == year1) {
@@ -199,22 +177,17 @@ class YTDSampleComparisonService {
 
     /**
      * Transform YTD data for bar chart
-     * @param {Array} rawData - Raw data from API
-     * @param {number} year1 
-     * @param {number} year2 
-     * @returns {Object} Transformed data for bar charts
      */
     transformYTDDataForBarChart(rawData, year1, year2) {
         const chartData = this.transformYTDDataForChart(rawData, year1, year2);
-        
-        // Modify for bar chart styling
+
         chartData.datasets = chartData.datasets.map((dataset, index) => ({
             ...dataset,
-            backgroundColor: index === 0 
-                ? 'rgba(75, 192, 192, 0.6)' 
+            backgroundColor: index === 0
+                ? 'rgba(75, 192, 192, 0.6)'
                 : 'rgba(255, 99, 132, 0.6)',
-            borderColor: index === 0 
-                ? 'rgb(75, 192, 192)' 
+            borderColor: index === 0
+                ? 'rgb(75, 192, 192)'
                 : 'rgb(255, 99, 132)',
             borderWidth: 1
         }));
@@ -224,35 +197,27 @@ class YTDSampleComparisonService {
 
     /**
      * Transform YTD data for table display
-     * @param {Array} rawData - Raw data from API
-     * @param {number} year1 
-     * @param {number} year2 
-     * @returns {Array} Formatted table data
      */
     transformYTDDataForTable(rawData, year1, year2) {
-        if (!rawData || !Array.isArray(rawData)) {
-            return [];
-        }
+        if (!rawData || !Array.isArray(rawData)) return [];
 
         const monthNames = [
             'January', 'February', 'March', 'April', 'May', 'June',
             'July', 'August', 'September', 'October', 'November', 'December'
         ];
 
-        // Create a map for quick lookup
         const dataMap = {};
         rawData.forEach(row => {
             const key = `${row.YEAR}-${row.MONTH}`;
             dataMap[key] = Number(row.TOTAL_SAMPLES) || 0;
         });
 
-        // Build table rows
         const tableData = [];
         for (let month = 1; month <= 12; month++) {
             const year1Samples = dataMap[`${year1}-${month}`] || 0;
             const year2Samples = dataMap[`${year2}-${month}`] || 0;
             const difference = year2Samples - year1Samples;
-            const percentChange = year1Samples > 0 
+            const percentChange = year1Samples > 0
                 ? ((difference / year1Samples) * 100).toFixed(2)
                 : year2Samples > 0 ? 100 : 0;
 
@@ -277,24 +242,13 @@ class YTDSampleComparisonService {
 
     /**
      * Calculate summary statistics
-     * @param {Array} rawData - Raw data from API
-     * @param {number} year1 
-     * @param {number} year2 
-     * @returns {Object} Summary statistics
      */
     calculateSummaryStats(rawData, year1, year2) {
         if (!rawData || !Array.isArray(rawData)) {
             return {
-                year1Total: 0,
-                year2Total: 0,
-                difference: 0,
-                percentChange: 0,
-                year1Average: 0,
-                year2Average: 0,
-                year1Max: 0,
-                year2Max: 0,
-                year1Min: 0,
-                year2Min: 0
+                year1Total: 0, year2Total: 0, difference: 0, percentChange: 0,
+                year1Average: 0, year2Average: 0,
+                year1Max: 0, year2Max: 0, year1Min: 0, year2Min: 0
             };
         }
 
@@ -305,7 +259,7 @@ class YTDSampleComparisonService {
 
         rawData.forEach(row => {
             const totalSamples = Number(row.TOTAL_SAMPLES) || 0;
-            
+
             if (row.YEAR == year1) {
                 year1Total += totalSamples;
                 year1Values.push(totalSamples);
@@ -316,7 +270,7 @@ class YTDSampleComparisonService {
         });
 
         const difference = year2Total - year1Total;
-        const percentChange = year1Total > 0 
+        const percentChange = year1Total > 0
             ? ((difference / year1Total) * 100).toFixed(2)
             : year2Total > 0 ? 100 : 0;
 
@@ -325,12 +279,10 @@ class YTDSampleComparisonService {
             year2Total,
             difference,
             percentChange: parseFloat(percentChange),
-            year1Average: year1Values.length > 0 
-                ? parseFloat((year1Total / year1Values.length).toFixed(2)) 
-                : 0,
-            year2Average: year2Values.length > 0 
-                ? parseFloat((year2Total / year2Values.length).toFixed(2)) 
-                : 0,
+            year1Average: year1Values.length > 0
+                ? parseFloat((year1Total / year1Values.length).toFixed(2)) : 0,
+            year2Average: year2Values.length > 0
+                ? parseFloat((year2Total / year2Values.length).toFixed(2)) : 0,
             year1Max: year1Values.length > 0 ? Math.max(...year1Values) : 0,
             year2Max: year2Values.length > 0 ? Math.max(...year2Values) : 0,
             year1Min: year1Values.length > 0 ? Math.min(...year1Values) : 0,
@@ -344,42 +296,22 @@ class YTDSampleComparisonService {
 
     // ==================== UTILITY FUNCTIONS ====================
 
-    /**
-     * Format number with commas
-     * @param {number} num 
-     * @returns {string} Formatted number
-     */
     formatNumber(num) {
         if (num === null || num === undefined) return '0';
         return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     }
 
-    /**
-     * Get year range for dropdowns
-     * @param {number} startYear - Starting year (default: 2015)
-     * @returns {Array} Array of year objects
-     */
     getYearRange(startYear = 2015) {
         const currentYear = new Date().getFullYear();
         const years = [];
-        
+
         for (let year = currentYear + 1; year >= startYear; year--) {
-            years.push({
-                value: year,
-                label: year.toString()
-            });
+            years.push({ value: year, label: year.toString() });
         }
-        
+
         return years;
     }
 
-    /**
-     * Export data to CSV
-     * @param {Array} tableData - Table data to export
-     * @param {string} year1 
-     * @param {string} year2 
-     * @param {string} type 
-     */
     exportToCSV(tableData, year1, year2, type) {
         if (!tableData || tableData.length === 0) {
             console.warn('No data to export');
@@ -387,43 +319,29 @@ class YTDSampleComparisonService {
         }
 
         const filename = `YTD_Comparison_${year1}_vs_${year2}_${type}_${new Date().toISOString().split('T')[0]}.csv`;
-
-        // Define headers
         const headers = ['Month', year1, year2, 'Difference', 'Percent Change'];
-        
-        // Build CSV content
+
         const csvContent = [
             headers.join(','),
             ...tableData.map(row => [
-                row.month,
-                row.year1,
-                row.year2,
-                row.difference,
-                row.percentChange
+                row.month, row.year1, row.year2, row.difference, row.percentChange
             ].join(','))
         ].join('\n');
 
-        // Create blob and download
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
-        
+
         link.setAttribute('href', url);
         link.setAttribute('download', filename);
         link.style.visibility = 'hidden';
-        
+
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
         URL.revokeObjectURL(url);
     }
 
-    /**
-     * Export chart data to JSON
-     * @param {Object} chartData 
-     * @param {Object} filters 
-     */
     exportToJSON(chartData, filters) {
         const exportData = {
             exportDate: new Date().toISOString(),
@@ -432,64 +350,39 @@ class YTDSampleComparisonService {
         };
 
         const filename = `YTD_Chart_Data_${filters.year1}_vs_${filters.year2}_${new Date().toISOString().split('T')[0]}.json`;
-        
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { 
-            type: 'application/json' 
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+            type: 'application/json'
         });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
-        
+
         link.setAttribute('href', url);
         link.setAttribute('download', filename);
         link.style.visibility = 'hidden';
-        
+
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
         URL.revokeObjectURL(url);
     }
 
-    /**
-     * Get month name from number
-     * @param {number} monthNumber - Month number (1-12)
-     * @param {boolean} short - Return short name
-     * @returns {string} Month name
-     */
     getMonthName(monthNumber, short = false) {
-        const monthNames = short 
+        const monthNames = short
             ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-            : ['January', 'February', 'March', 'April', 'May', 'June', 
+            : ['January', 'February', 'March', 'April', 'May', 'June',
                'July', 'August', 'September', 'October', 'November', 'December'];
-        
+
         return monthNames[monthNumber - 1] || '';
     }
 
-    /**
-     * Get color for trend
-     * @param {string} trend - 'up', 'down', or 'neutral'
-     * @returns {string} Color code
-     */
     getTrendColor(trend) {
-        const colors = {
-            up: '#10b981',      // green
-            down: '#ef4444',    // red
-            neutral: '#6b7280' // gray
-        };
+        const colors = { up: '#10b981', down: '#ef4444', neutral: '#6b7280' };
         return colors[trend] || colors.neutral;
     }
 
-    /**
-     * Get trend icon
-     * @param {string} trend - 'up', 'down', or 'neutral'
-     * @returns {string} Icon name or symbol
-     */
     getTrendIcon(trend) {
-        const icons = {
-            up: '↑',
-            down: '↓',
-            neutral: '→'
-        };
+        const icons = { up: '↑', down: '↓', neutral: '→' };
         return icons[trend] || icons.neutral;
     }
 }

@@ -11,6 +11,7 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { useCumulativeMonthlyCensus } from '../../../hooks/LaboratoryHooks/useCensus';
+import type { CumulativeSampleType } from '../../../services/LaboratoryServices/censusService';
 import { downloadChart } from '../../../utils/chartDownloadUtils';
 
 interface CumulativeData {
@@ -23,13 +24,24 @@ interface Props {
   onExpand: () => void;
 }
 
+// ✅ Centralized type config — add new types here only
+const SAMPLE_TYPES: { value: CumulativeSampleType; label: string }[] = [
+  { value: 'Received', label: 'Received' },
+  { value: 'Screened', label: 'Screened' },
+  { value: 'Initial',  label: 'Initial'  },
+];
+
+const EXPORT_FORMATS = ['png', 'svg', 'excel'] as const;
+type ExportFormat = typeof EXPORT_FORMATS[number];
+
+const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const colors  = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+
 export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) => {
-  const [sampleType, setSampleType] = useState<'Received' | 'Screened'>('Received');
+  const [sampleType, setSampleType] = useState<CumulativeSampleType>('Received');
   const [showTable, setShowTable] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
-
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
   // Fetch data using React Query hook
   const { data, isLoading, error, refetch } = useCumulativeMonthlyCensus({
@@ -42,68 +54,87 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
       return { chartData: [], years: [] };
     }
 
-    // Extract unique years from data - FIX: Handle null/undefined YEAR values
     const uniqueYears = Array.from(
       new Set(
         data.data
-          .filter(item => item.YEAR != null) // Filter out null/undefined years
+          .filter(item => item.YEAR != null)
           .map(item => item.YEAR.toString())
       )
     ).sort();
 
-    // Initialize chart data structure with all 12 months
+    const currentYear  = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1; // 1-based
+
+    // ✅ Find the first and last real data month for each year
+    // so we can leave gaps outside that range as undefined (no ugly zero flatlines)
+    const yearBounds: Record<string, { first: number; last: number }> = {};
+    data.data.forEach(item => {
+      if (item.YEAR == null || item.MONTH == null) return;
+      const y = item.YEAR.toString();
+      if (!yearBounds[y]) {
+        yearBounds[y] = { first: item.MONTH, last: item.MONTH };
+      } else {
+        yearBounds[y].first = Math.min(yearBounds[y].first, item.MONTH);
+        yearBounds[y].last  = Math.max(yearBounds[y].last,  item.MONTH);
+      }
+    });
+
     const transformedData: CumulativeData[] = months.map((monthName, index) => ({
       month: monthName,
-      monthIndex: index + 1, // Store month index for mapping
+      monthIndex: index + 1,
     }));
 
-    // Populate data for each year and month
     data.data.forEach(item => {
-      // FIX: Skip items with null/undefined YEAR or MONTH
-      if (item.YEAR == null || item.MONTH == null) {
-        return;
-      }
+      if (item.YEAR == null || item.MONTH == null) return;
 
-      const monthIndex = item.MONTH - 1; // Convert to 0-based index
+      // Skip future months for the current year so the line ends naturally
+      if (item.YEAR === currentYear && item.MONTH > currentMonth) return;
+
+      const monthIndex = item.MONTH - 1;
       const year = item.YEAR.toString();
-      
+
       if (transformedData[monthIndex]) {
         transformedData[monthIndex][year] = item.TOTAL_SAMPLES || 0;
       }
     });
 
-    // Fill missing values with 0
-    transformedData.forEach(row => {
+    // Fill gaps with 0 only within the known data range for each year.
+    // Months before the first real entry or after the last real entry stay
+    // undefined so Recharts stops the line cleanly instead of flatling to zero.
+    transformedData.forEach((row, idx) => {
+      const monthNumber = idx + 1;
       uniqueYears.forEach(year => {
         if (row[year] === undefined) {
-          row[year] = 0;
+          const bounds = yearBounds[year];
+          const withinRange = bounds
+            && monthNumber >= bounds.first
+            && monthNumber <= bounds.last;
+          if (withinRange) {
+            row[year] = 0; // genuine mid-year gap — fill with 0
+          }
+          // outside the year's data range — leave undefined so line stops/starts cleanly
         }
       });
     });
 
-    return {
-      chartData: transformedData,
-      years: uniqueYears,
-    };
-  }, [data, months]);
+    return { chartData: transformedData, years: uniqueYears };
+  }, [data]);
 
   // Prepare export data
   const exportData = useMemo(() => {
     return chartData.map(row => {
-      const exportRow: any = { Month: row.month };
-      years.forEach(year => {
-        exportRow[year] = row[year];
-      });
+      const exportRow: Record<string, unknown> = { Month: row.month };
+      years.forEach(year => { exportRow[year] = row[year]; });
       return exportRow;
     });
   }, [chartData, years]);
 
   // Handle export
-  const handleExport = async (format: 'png' | 'svg' | 'excel') => {
+  const handleExport = async (format: ExportFormat) => {
     setExportMenuOpen(false);
-    
+
     const filename = `cumulative-monthly-${sampleType.toLowerCase()}-${new Date().toISOString().split('T')[0]}`;
-    
+
     try {
       await downloadChart({
         elementId: 'cumulative-chart-container',
@@ -118,6 +149,8 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
       console.error('Export failed:', err);
     }
   };
+
+  const hasData = !isLoading && !error && chartData.length > 0;
 
   return (
     <div
@@ -134,8 +167,11 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
         {/* Title */}
         <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
           <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0l-8 8m8-8v12M5 21H3a2 2 0 01-2-2V5a2 2 0 012-2h2m4 18h8" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M13 7h8m0 0l-8 8m8-8v12M5 21H3a2 2 0 01-2-2V5a2 2 0 012-2h2m4 18h8"
+            />
           </svg>
+          {/* ✅ Uses sampleType directly — works for any type without ternary chains */}
           Cumulative Monthly {data?.success && `(${sampleType})`}
         </h3>
 
@@ -143,21 +179,23 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
         <div className="flex items-center gap-2 flex-wrap">
           {expanded && (
             <>
+              {/* ✅ Dropdown driven by SAMPLE_TYPES array */}
               <select
                 value={sampleType}
-                onChange={(e) => setSampleType(e.target.value as 'Received' | 'Screened')}
+                onChange={(e) => setSampleType(e.target.value as CumulativeSampleType)}
                 className="h-8 px-3 text-xs rounded-lg border
                   bg-white dark:bg-gray-700
                   border-gray-300 dark:border-gray-600
                   text-gray-800 dark:text-gray-100
                   focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="Received">Received</option>
-                <option value="Screened">Screened</option>
+                {SAMPLE_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
               </select>
 
               {/* Show/Hide Table Button */}
-              {!isLoading && !error && chartData.length > 0 && (
+              {hasData && (
                 <button
                   onClick={() => setShowTable(!showTable)}
                   className="h-8 px-3 text-xs rounded-lg font-medium
@@ -168,39 +206,29 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
                   {showTable ? (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                        />
                       </svg>
                       Chart
                     </>
                   ) : (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                        />
                       </svg>
                       Table
                     </>
                   )}
                 </button>
               )}
-
-              {/* Refresh Button 
-              <button
-                onClick={() => refetch()}
-                className="h-8 px-3 text-xs rounded-lg font-medium
-                  bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600
-                  text-gray-800 dark:text-gray-100 transition-colors flex items-center gap-1.5"
-                title="Refresh data"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </button>
-              */}
             </>
           )}
 
-          {/* Export Dropdown - Always visible */}
-          {!isLoading && !error && chartData.length > 0 && (
+          {/* Export Dropdown */}
+          {hasData && (
             <div className="relative">
               <button
                 onClick={() => setExportMenuOpen(!exportMenuOpen)}
@@ -213,7 +241,9 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
                 title="Export chart"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
                 </svg>
                 Export
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -223,45 +253,28 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
 
               {exportMenuOpen && (
                 <>
-                  <div 
-                    className="fixed inset-0 z-10" 
-                    onClick={() => setExportMenuOpen(false)}
-                  />
+                  <div className="fixed inset-0 z-10" onClick={() => setExportMenuOpen(false)} />
                   <div className="absolute right-0 mt-1 w-48 rounded-lg shadow-lg border z-20
                     bg-white dark:bg-gray-800
                     border-gray-200 dark:border-gray-700
                     overflow-hidden"
                   >
-                    <button
-                      onClick={() => handleExport('png')}
-                      className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
-                        text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download as PNG
-                    </button>
-                    <button
-                      onClick={() => handleExport('svg')}
-                      className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
-                        text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download as SVG
-                    </button>
-                    <button
-                      onClick={() => handleExport('excel')}
-                      className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
-                        text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Export to Excel
-                    </button>
+                    {/* ✅ Export buttons driven by array — no repeated JSX */}
+                    {EXPORT_FORMATS.map((fmt) => (
+                      <button
+                        key={fmt}
+                        onClick={() => handleExport(fmt)}
+                        className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700
+                          text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                          />
+                        </svg>
+                        {fmt === 'excel' ? 'Export to Excel' : `Download as ${fmt.toUpperCase()}`}
+                      </button>
+                    ))}
                   </div>
                 </>
               )}
@@ -282,6 +295,7 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
 
       {/* Content Area */}
       <div className="flex-1 p-5 min-h-0 overflow-hidden" id="cumulative-chart-container">
+
         {/* Loading State */}
         {isLoading && (
           <div className="h-full flex items-center justify-center">
@@ -297,7 +311,9 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
               <svg className="w-12 h-12 text-red-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <p className="text-sm text-gray-800 dark:text-gray-200 font-medium mb-1">Failed to load data</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">{error.message}</p>
@@ -316,7 +332,9 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
               <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                />
               </svg>
               <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
             </div>
@@ -324,37 +342,28 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
         )}
 
         {/* Chart Display */}
-        {!isLoading && !error && chartData.length > 0 && !showTable && (
+        {hasData && !showTable && (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid 
-                strokeDasharray="3 3" 
+              <CartesianGrid
+                strokeDasharray="3 3"
                 className="dark:opacity-20 stroke-gray-300 dark:stroke-gray-600"
               />
-              <XAxis 
-                dataKey="month" 
+              <XAxis
+                dataKey="month"
                 tick={{ fontSize: 12 }}
                 className="fill-gray-600 dark:fill-gray-400"
               />
-              <YAxis 
+              <YAxis
                 tick={{ fontSize: 12 }}
                 className="fill-gray-600 dark:fill-gray-400"
                 tickFormatter={(value) => value.toLocaleString()}
               />
               <Tooltip
-                contentStyle={{
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                }}
+                contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
                 formatter={(value: number) => value.toLocaleString()}
-                wrapperClassName="[&_.recharts-tooltip-wrapper]:!bg-white dark:[&_.recharts-tooltip-wrapper]:!bg-gray-800 [&_.recharts-tooltip-wrapper]:!border [&_.recharts-tooltip-wrapper]:!border-gray-200 dark:[&_.recharts-tooltip-wrapper]:!border-gray-700"
               />
-              <Legend 
-                wrapperStyle={{ 
-                  fontSize: '12px', 
-                  paddingTop: '10px',
-                }} 
-              />
+              <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
               {years.map((year, index) => (
                 <Line
                   key={year}
@@ -365,6 +374,7 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
                   dot={{ r: 4 }}
                   activeDot={{ r: 6 }}
                   name={year}
+                  connectNulls={false}
                 />
               ))}
             </LineChart>
@@ -372,7 +382,7 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
         )}
 
         {/* Table Display */}
-        {!isLoading && !error && chartData.length > 0 && showTable && (
+        {hasData && showTable && (
           <div className="h-full overflow-auto">
             <table className="w-full text-center border-collapse text-sm">
               <thead className="sticky top-0 z-10">
@@ -395,8 +405,8 @@ export const CumulativeMonthlyChart: React.FC<Props> = ({ expanded, onExpand }) 
                     </td>
                     {years.map((year) => (
                       <td key={year} className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-gray-800 dark:text-gray-100">
-                        {typeof row[year] === 'number' 
-                          ? (row[year] as number).toLocaleString() 
+                        {typeof row[year] === 'number'
+                          ? (row[year] as number).toLocaleString()
                           : row[year] || '-'}
                       </td>
                     ))}

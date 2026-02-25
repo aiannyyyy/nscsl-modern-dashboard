@@ -234,6 +234,9 @@ app.use('/api/notifications', require('./routes/notificationRoutes'));
 // Patient Details Routes
 app.use('/api/followup', require('./routes/FollowupRoutes/patientDetailsRoutes'));
 
+//Patient Information System
+app.use('/api/laboratory/pis', require('./routes/LaboratoryRoutes/pisRoutes'))
+
 // Unsatisfactory Analysis
 app.use("/api/unsat", require("./routes/PDORoutes/unsatRoutes"));
 

@@ -17,6 +17,7 @@ import NSFPerformance from './pages/pdo/NSFPerformance';
 import DemoAndUnsat from './pages/laboratory/DemoAndUnsat';
 import AccountingOverview from './pages/admin/AccountingOverview';
 import { ITJobOrderSummary } from './pages/it-job-order/ITJobOrderSummary';
+import { PatientInformationSystemContainer } from './pages/laboratory/PatientInformationSystemContainer';
 
 // Create a QueryClient instance
 const queryClient = new QueryClient({
@@ -63,7 +64,8 @@ function App() {
               {/* Laboratory Routes */}
               <Route path="laboratory" element={<LaboratoryOverview />} />
               <Route path="laboratory/demo-unsat" element={<DemoAndUnsat />} />
-
+              <Route path="laboratory/patient-information-system" element={<PatientInformationSystemContainer />} />
+ 
               {/* Followup Routes */}
               <Route path="followup" element={<FollowupOverview />} />
 

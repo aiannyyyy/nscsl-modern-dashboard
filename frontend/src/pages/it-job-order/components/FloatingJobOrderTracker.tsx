@@ -16,7 +16,6 @@ export function FloatingJobOrderTracker({
   const { user } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // ✅ FIX: Only show tickets belonging to the current user
   const myTickets = activeTickets.filter(
     (t) => t.requester?.id === String(user?.id ?? user?.user_id ?? '')
   );
@@ -25,7 +24,6 @@ export function FloatingJobOrderTracker({
     myTickets.length > 0 ? myTickets[0] : null
   );
 
-  // Keep selectedTicket in sync when myTickets changes
   React.useEffect(() => {
     if (myTickets.length > 0) {
       setSelectedTicket((prev) =>
@@ -39,7 +37,6 @@ export function FloatingJobOrderTracker({
   const hasActiveTickets = myTickets.length > 0;
   const currentTicket = selectedTicket ?? myTickets[0] ?? null;
 
-  // ─── Status helpers ───────────────────────────────────────────────
   const getProgress = (ticket: Ticket): number => {
     const map: Record<string, number> = {
       pending_approval: 10,
@@ -58,29 +55,29 @@ export function FloatingJobOrderTracker({
 
   const getStatusConfig = (status: string) => {
     const configs: Record<string, { label: string; color: string; textColor: string; icon: string }> = {
-      pending_approval: { label: 'Awaiting Approval', color: 'bg-amber-400',   textColor: 'text-amber-600',  icon: '⏳' },
-      approved:         { label: 'Approved',           color: 'bg-blue-400',    textColor: 'text-blue-600',   icon: '✔️' },
-      queued:           { label: 'In Queue',            color: 'bg-indigo-400',  textColor: 'text-indigo-600', icon: '🔢' },
-      assigned:         { label: 'Assigned',            color: 'bg-purple-500',  textColor: 'text-purple-600', icon: '👤' },
-      in_progress:      { label: 'Being Fixed',         color: 'bg-blue-600',    textColor: 'text-blue-600',   icon: '🔧' },
-      on_hold:          { label: 'On Hold',             color: 'bg-orange-500',  textColor: 'text-orange-600', icon: '⏸️' },
-      resolved:         { label: 'Almost Done',         color: 'bg-emerald-500', textColor: 'text-emerald-600',icon: '✅' },
-      closed:           { label: 'Completed',           color: 'bg-slate-400',   textColor: 'text-slate-600',  icon: '🎉' },
-      cancelled:        { label: 'Cancelled',           color: 'bg-red-400',     textColor: 'text-red-600',    icon: '❌' },
-      rejected:         { label: 'Rejected',            color: 'bg-red-500',     textColor: 'text-red-600',    icon: '🚫' },
+      pending_approval: { label: 'Awaiting Approval', color: 'bg-amber-400',   textColor: 'text-amber-600',   icon: '⏳' },
+      approved:         { label: 'Approved',           color: 'bg-blue-400',    textColor: 'text-blue-600',    icon: '✔️' },
+      queued:           { label: 'In Queue',            color: 'bg-indigo-400',  textColor: 'text-indigo-600',  icon: '🔢' },
+      assigned:         { label: 'Assigned',            color: 'bg-purple-500',  textColor: 'text-purple-600',  icon: '👤' },
+      in_progress:      { label: 'Being Fixed',         color: 'bg-blue-600',    textColor: 'text-blue-600',    icon: '🔧' },
+      on_hold:          { label: 'On Hold',             color: 'bg-orange-500',  textColor: 'text-orange-600',  icon: '⏸️' },
+      resolved:         { label: 'Almost Done',         color: 'bg-emerald-500', textColor: 'text-emerald-600', icon: '✅' },
+      closed:           { label: 'Completed',           color: 'bg-slate-400',   textColor: 'text-slate-600',   icon: '🎉' },
+      cancelled:        { label: 'Cancelled',           color: 'bg-red-400',     textColor: 'text-red-600',     icon: '❌' },
+      rejected:         { label: 'Rejected',            color: 'bg-red-500',     textColor: 'text-red-600',     icon: '🚫' },
     };
     return configs[status] ?? configs.pending_approval;
   };
 
-  const statusConfig  = currentTicket ? getStatusConfig(currentTicket.status) : null;
-  const progress      = currentTicket ? getProgress(currentTicket) : 0;
+  const statusConfig = currentTicket ? getStatusConfig(currentTicket.status) : null;
+  const progress     = currentTicket ? getProgress(currentTicket) : 0;
 
   return (
     <>
       {/* ── Collapsed Pill ── */}
       {!isExpanded && (
         <div
-          className="fixed bottom-6 right-6 z-[9998] animate-slideUp cursor-pointer"
+          className="fixed bottom-6 left-6 z-[9998] animate-slideUp cursor-pointer"
           onClick={() => setIsExpanded(true)}
         >
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition-all w-80">
@@ -162,7 +159,7 @@ export function FloatingJobOrderTracker({
 
       {/* ── Expanded Panel ── */}
       {isExpanded && (
-        <div className="fixed inset-0 z-[9998] flex items-end justify-end p-6 pointer-events-none">
+        <div className="fixed inset-0 z-[9998] flex items-end justify-start p-6 pointer-events-none">
           <div
             className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-[400px] max-h-[85vh] overflow-hidden pointer-events-auto"
             style={{ animation: 'slideUpExpand 0.3s ease-out' }}
@@ -221,8 +218,8 @@ export function FloatingJobOrderTracker({
                 </div>
               ) : (
                 myTickets.map((ticket) => {
-                  const tStatus   = getStatusConfig(ticket.status);
-                  const tProgress = getProgress(ticket);
+                  const tStatus    = getStatusConfig(ticket.status);
+                  const tProgress  = getProgress(ticket);
                   const isSelected = selectedTicket?.id === ticket.id;
 
                   return (
@@ -281,11 +278,11 @@ export function FloatingJobOrderTracker({
                       {/* Timeline (expanded for selected) */}
                       {isSelected && (
                         <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
-                          <TimelineStep icon="⏳" label="Submitted"       completed={true}                                                                active={ticket.status === 'pending_approval'} />
-                          <TimelineStep icon="✔️" label="Approved"         completed={['approved','queued','assigned','in_progress','resolved','closed'].includes(ticket.status)} active={ticket.status === 'approved'} />
-                          <TimelineStep icon="🔧" label="Being Fixed"      completed={['in_progress','resolved','closed'].includes(ticket.status)}        active={ticket.status === 'in_progress'} />
-                          <TimelineStep icon="✅" label="Resolved"         completed={['resolved','closed'].includes(ticket.status)}                      active={ticket.status === 'resolved'} />
-                          <TimelineStep icon="🎉" label="Completed"        completed={ticket.status === 'closed'}                                         active={ticket.status === 'closed'} isLast />
+                          <TimelineStep icon="⏳" label="Submitted"   completed={true}                                                                           active={ticket.status === 'pending_approval'} />
+                          <TimelineStep icon="✔️" label="Approved"    completed={['approved','queued','assigned','in_progress','resolved','closed'].includes(ticket.status)} active={ticket.status === 'approved'} />
+                          <TimelineStep icon="🔧" label="Being Fixed" completed={['in_progress','resolved','closed'].includes(ticket.status)}                    active={ticket.status === 'in_progress'} />
+                          <TimelineStep icon="✅" label="Resolved"    completed={['resolved','closed'].includes(ticket.status)}                                  active={ticket.status === 'resolved'} />
+                          <TimelineStep icon="🎉" label="Completed"   completed={ticket.status === 'closed'}                                                     active={ticket.status === 'closed'} isLast />
                         </div>
                       )}
                     </div>

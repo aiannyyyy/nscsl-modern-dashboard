@@ -13,6 +13,7 @@ import {
 import { Download, ChevronDown } from 'lucide-react';
 import { useLabTotalDailySamples } from '../../../hooks/LaboratoryHooks';
 import { downloadChart } from '../../../utils/chartDownloadUtils';
+import type { SampleType } from '../../../services/LaboratoryServices/labTotalDailySamples';
 
 interface ChartData {
   day: string;
@@ -33,8 +34,9 @@ export const DailyComparisonChart: React.FC<Props> = ({ expanded, onExpand }) =>
   const [year1, setYear1] = useState((currentYear - 1).toString());
   const [year2, setYear2] = useState(currentYear.toString());
   const [month, setMonth] = useState(currentMonth);
-  const [sampleType, setSampleType] = useState<'received' | 'screened'>('received');
+  const [sampleType, setSampleType] = useState<SampleType>('received');
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  
   
   const chartRef = useRef<HTMLDivElement>(null);
 
@@ -44,9 +46,10 @@ export const DailyComparisonChart: React.FC<Props> = ({ expanded, onExpand }) =>
     'july', 'august', 'september', 'october', 'november', 'december'
   ];
 
-  const sampleTypes = [
+  const sampleTypes: { value: SampleType; label: string }[] = [
     { value: 'received', label: 'Received' },
-    { value: 'screened', label: 'Screened' }
+    { value: 'screened', label: 'Screened' },
+    { value: 'initial', label: 'Initial' },
   ];
 
   // Use React Query for both years
@@ -188,7 +191,7 @@ export const DailyComparisonChart: React.FC<Props> = ({ expanded, onExpand }) =>
           <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
-          Daily {sampleType === 'received' ? 'Received' : 'Screened'} Samples
+          Daily {sampleType === 'received' ? 'Received' : sampleType === 'screened' ? 'Screened' : 'Initial'}{' '} Samples
         </h3>
 
         {/* Controls */}
@@ -198,7 +201,7 @@ export const DailyComparisonChart: React.FC<Props> = ({ expanded, onExpand }) =>
               {/* Sample Type Dropdown */}
               <select
                 value={sampleType}
-                onChange={(e) => setSampleType(e.target.value as 'received' | 'screened')}
+                onChange={(e) => setSampleType(e.target.value as SampleType)}
                 className="h-8 px-3 text-xs rounded-lg border font-semibold
                   bg-white dark:bg-gray-700
                   border-gray-300 dark:border-gray-600

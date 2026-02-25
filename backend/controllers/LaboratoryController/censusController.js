@@ -2,12 +2,13 @@ const oracledb = require('oracledb');
 
 const validTypes = {
     "Received": ["1", "87", "20", "2", "3", "4", "5", "18"],
-    "Screened": ["4", "3", "20", "2", "1", "87"]
+    "Screened": ["4", "3", "20", "2", "1", "87"],
+    "Initial":  ["20", "1"]
 };
 
 /**
  * Get Cumulative Monthly Census Samples
- * Returns: Monthly aggregated sample counts by type (Received or Screened)
+ * Returns: Monthly aggregated sample counts by type (Received, Screened, or Initial)
  */
 exports.getCumulativeMonthlyCensus = async (req, res) => {
     let connection;
@@ -25,14 +26,15 @@ exports.getCumulativeMonthlyCensus = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 error: 'Invalid type parameter',
-                message: "Type must be either 'Received' or 'Screened'",
+                // ✅ Updated message to include 'Initial'
+                message: "Type must be 'Received', 'Screened', or 'Initial'",
                 validTypes: Object.keys(validTypes)
             });
         }
 
         // Get database connection from app.locals
         const oraclePool = req.app.locals.oracleDb;
-        
+
         if (!oraclePool) {
             return res.status(500).json({
                 success: false,
@@ -47,6 +49,9 @@ exports.getCumulativeMonthlyCensus = async (req, res) => {
         const spectypeValues = validTypes[type.trim()];
         console.log('[Cumulative Monthly Census] Spectype Values:', spectypeValues);
 
+        // Build bind placeholders once to avoid duplication
+        const spectypeBinds = spectypeValues.map((_, i) => `:spectype${i}`).join(', ');
+
         // Build query with dynamic parameter placeholders using UNION ALL
         const query = `
             SELECT MONTH, YEAR, SUM(TOTAL_SAMPLES) AS TOTAL_SAMPLES
@@ -55,7 +60,7 @@ exports.getCumulativeMonthlyCensus = async (req, res) => {
                        EXTRACT(YEAR FROM DTRECV) AS YEAR, 
                        COUNT(*) AS TOTAL_SAMPLES
                 FROM PHMSDS.SAMPLE_DEMOG_ARCHIVE
-                WHERE SPECTYPE IN (${spectypeValues.map((_, i) => `:spectype${i}`).join(", ")})
+                WHERE SPECTYPE IN (${spectypeBinds})
                 GROUP BY EXTRACT(YEAR FROM DTRECV), EXTRACT(MONTH FROM DTRECV)
                 
                 UNION ALL
@@ -64,7 +69,7 @@ exports.getCumulativeMonthlyCensus = async (req, res) => {
                        EXTRACT(YEAR FROM DTRECV) AS YEAR, 
                        COUNT(*) AS TOTAL_SAMPLES
                 FROM PHMSDS.SAMPLE_DEMOG_MASTER
-                WHERE SPECTYPE IN (${spectypeValues.map((_, i) => `:spectype${i}`).join(", ")})
+                WHERE SPECTYPE IN (${spectypeBinds})
                 GROUP BY EXTRACT(YEAR FROM DTRECV), EXTRACT(MONTH FROM DTRECV)
             )
             GROUP BY YEAR, MONTH
@@ -81,8 +86,8 @@ exports.getCumulativeMonthlyCensus = async (req, res) => {
         console.log('[Cumulative Monthly Census] Query Parameters:', params);
 
         // Execute query
-        const result = await connection.execute(query, params, { 
-            outFormat: oracledb.OUT_FORMAT_OBJECT 
+        const result = await connection.execute(query, params, {
+            outFormat: oracledb.OUT_FORMAT_OBJECT
         });
 
         const executionTime = Date.now() - startTime;
@@ -104,9 +109,9 @@ exports.getCumulativeMonthlyCensus = async (req, res) => {
 
     } catch (error) {
         console.error('❌ [Cumulative Monthly Census] Error:', error);
-        
+
         const executionTime = Date.now() - startTime;
-        
+
         res.status(500).json({
             success: false,
             error: 'An error occurred while fetching cumulative monthly census data',
