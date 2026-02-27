@@ -3,7 +3,8 @@ import {
   X, User, ZoomIn, Image as ImageIcon,
   ClipboardList, Download, Mail, FileText, BookOpen,
 } from 'lucide-react';
-import { getPatientDetail, PISDetailRecord, getPatientResults, PISResultRecord } from '../services/pisService';
+import { getPatientDetail,  getPatientResults } from '../../../services/LaboratoryServices/pisServices';
+import type {PISDetailRecord, PISResultRecord} from '../../../services/LaboratoryServices/pisServices';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -28,6 +29,17 @@ export interface SampleRecord {
 interface PatientRecordModalProps {
   record: SampleRecord | null;
   onClose: () => void;
+}
+
+interface NoteRow {
+  LABNO:          string;
+  NOTES:          string;
+  LASTMOD:        string;
+  USER_ID:        number | null;
+  CREATE_DT:      string;
+  CREATE_USER_ID: number | null;
+  FIRSTNAME:      string | null;
+  LASTNAME:       string | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

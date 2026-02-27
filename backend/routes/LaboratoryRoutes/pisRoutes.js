@@ -6,32 +6,23 @@ const pisController = require('../../controllers/LaboratoryController/pisControl
  * PIS Routes — Patient Information System
  * ─────────────────────────────────────────────────────────────────────────────
  *
- * GET /api/laboratory/pis/search
- *   Search patients across SAMPLE_DEMOG_ARCHIVE + SAMPLE_DEMOG_MASTER
- *   Query parameters (all optional, at least one required):
- *     labno, labid, lname, fname, submid, phyid, sex,
- *     outsideLab, formno, birthdt, dtcoll, dtrecv, dtrptd
- *
- * GET /api/laboratory/pis/detail/:labno
- *   Full patient detail for a single Lab No
- *   Joins:
- *     PHMSDS.SAMPLE_DEMOG_ARCHIVE  — specimen / demographic data
- *     PHMSDS.REF_PROVIDER_ADDRESS  — facility / provider info
- *     PHCMS.CASE_DEMOG_ARCHIVE     — disposition / case info
- *   Response includes resolved names:
- *     INIT_TECH_NAME, VER_TECH_NAME, CLOSED_BY_NAME
- *
- * Examples:
- *   GET /api/laboratory/pis/search?labno=20250020001
- *   GET /api/laboratory/pis/search?lname=flores&sex=F
- *   GET /api/laboratory/pis/search?dtrecv=2026-01-02&sex=1
- *   GET /api/laboratory/pis/detail/20260350259
+ * GET /api/laboratory/pis/search        — Search patients
+ * GET /api/laboratory/pis/detail        — Full patient detail by labno
+ * GET /api/laboratory/pis/results       — Lab results for a labno
+ * GET /api/laboratory/pis/testsequence  — Test sequence / analytes
+ * GET /api/laboratory/pis/filtercards   — All labnos for same patient (fname+lname)
+ * GET /api/laboratory/pis/image         — Specimen scan image file
+ * GET /api/laboratory/pis/audit-trail   — Audit trail (AUDIT_RESULTS + AUDIT_SAMPLE)
+ * GET /api/laboratory/pis/notes         — Sample notes (SAMPLE_NOTES_ARCHIVE + USERS)
  */
 
-router.get('/search',  pisController.searchPatients);
-router.get('/detail',  pisController.getPatientDetail);
-router.get('/results',     pisController.getPatientResults);
-router.get('/testsequence',  pisController.getTestSequence);
-router.get('/filtercards',   pisController.getPatientFilterCards);
+router.get('/search',       pisController.searchPatients);
+router.get('/detail',       pisController.getPatientDetail);
+router.get('/results',      pisController.getPatientResults);
+router.get('/testsequence', pisController.getTestSequence);
+router.get('/filtercards',  pisController.getPatientFilterCards);
+router.get('/image',        pisController.fetchImage);
+router.get('/audit-trail',  pisController.getAuditTrail);
+router.get('/notes',        pisController.getNotes);
 
 module.exports = router;

@@ -3,132 +3,46 @@ import api from '../api';
 // ==================== TYPES ====================
 
 export interface PISSearchParams {
-  labno?: string;
-  labid?: string;
-  lname?: string;
-  fname?: string;
-  submid?: string;
-  birthdt?: string;
-  dtcoll?: string;
-  dtrecv?: string;
-  dtrptd?: string;
-  sex?: string;
-  phyid?: string;
-  outsideLab?: string;
-  formno?: string;
+  labno?: string; labid?: string; lname?: string; fname?: string; submid?: string;
+  birthdt?: string; dtcoll?: string; dtrecv?: string; dtrptd?: string;
+  sex?: string; phyid?: string; outsideLab?: string; formno?: string;
 }
 
 export interface PISRecord {
-  LABNO: string;
-  LABID: string;
-  FNAME: string;
-  LNAME: string;
-  SUBMID: string;
-  BIRTHDT: string;
-  BIRTHTM: string;
-  DTCOLL: string;
-  TMCOLL: string;
-  DTRECV: string;
-  TMRECV: string;
-  DTRPTD: string;
-  GESTAGE: string;
-  AGECOLL: string;
-  SEX: string;
+  LABNO: string; LABID: string; FNAME: string; LNAME: string; SUBMID: string;
+  BIRTHDT: string; BIRTHTM: string; DTCOLL: string; TMCOLL: string;
+  DTRECV: string; TMRECV: string; DTRPTD: string; GESTAGE: string; AGECOLL: string; SEX: string;
 }
 
 export interface PISDetailRecord {
-  // Patient Identification
-  LABNO: string;              // Lab No
-  LABID: string;              // Form No
-  LNAME: string;              // Last Name
-  FNAME: string;              // First Name
-
-  // Birth Info
-  BIRTHDT: string;            // Birth Date
-  BIRTHTM: string;            // Birth Time
-
-  // Collection Info
-  DTCOLL: string;             // Date Collection
-  TMCOLL: string;             // Time Collection
-  SPECTYPE: string;           // Spec Type
-  MILKTYPE: string;           // Milk Type
-
-  // Demographics
-  SEX: string;                // Sex
-  BIRTHWT: string;            // Birth Weight
-  TWIN: string;               // Birth Order
-  TRANSFUS: string;           // Blood Transfused
-  DTXFUS: string;             // Transfused Date
-  GESTAGE: string;            // Gestation Age
-  SPECIMEN_AGE_DAYS: number;  // Specimen Age (DTRECV - DTCOLL)
-  AGECOLL: string;            // Age at Collection
-
-  // Received / Reported
-  DTRECV: string;             // Date Received
-  TMRECV: string;             // Time Received
-  DTRPTD: string;             // Date Reported
-
-  // Status / Codes
-  CLINSTAT: string;           // Clinic Stat
-  DEMCODE: string;            // Demog Acceptable
-  PHYSID: string;             // Physician ID
-  BIRTHHOSP: string;          // Birth Hospital ID
-  RELEASEDT: string;          // Demog Release
-
-  // Entry Technicians
-  INIT_TECH: number;          // Initial Entry (user ID)
-  INIT_TECH_NAME: string;     // Initial Entry (resolved name)
-  VER_TECH: number;           // Verification Entry (user ID)
-  VER_TECH_NAME: string;      // Verification Entry (resolved name)
-
-  // Facility / Provider
-  PROVIDERID: string;         // Facility Code
-  DESCR1: string;             // Birth Hospital Name & Facility Name
-  STREET1: string;            // Address 1
-  STREET2: string;            // Address 2
-  CITY: string;               // City
-  COUNTY: string;             // Province
-  PHONE: string;              // Phone
-  FAX: string;                // Fax
-  DESCR7: string;             // Mobile
-  EMAIL: string;              // Email
-  DESCR4: string;             // Coordinator (part 1)
-  DESCR5: string;             // Coordinator (part 2)
-  DESCR6: string;             // Coordinator (part 3)
-
-  // Disposition / Case
-  DISPOSITION: string;        // Disposition
-  DISPDATE: string;           // Disposition Date
-  USER_ID: number;            // Closed By (user ID)
-  CLOSED_BY_NAME: string;     // Closed By (resolved name)
+  LABNO: string; LABID: string; LNAME: string; FNAME: string;
+  BIRTHDT: string; BIRTHTM: string; DTCOLL: string; TMCOLL: string;
+  SPECTYPE: string; MILKTYPE: string; SEX: string; BIRTHWT: string;
+  TWIN: string; TRANSFUS: string; DTXFUS: string; GESTAGE: string;
+  SPECIMEN_AGE_DAYS: number; AGECOLL: string;
+  DTRECV: string; TMRECV: string; DTRPTD: string;
+  CLINSTAT: string; DEMCODE: string; PHYSID: string; BIRTHHOSP: string; RELEASEDT: string;
+  INIT_TECH: number; INIT_TECH_NAME: string; VER_TECH: number; VER_TECH_NAME: string;
+  PROVIDERID: string; DESCR1: string; STREET1: string; STREET2: string;
+  CITY: string; COUNTY: string; PHONE: string; FAX: string;
+  DESCR7: string; EMAIL: string; DESCR4: string; DESCR5: string; DESCR6: string;
+  DISPOSITION: string; DISPDATE: string; USER_ID: number; CLOSED_BY_NAME: string;
 }
 
 export interface PISResponse {
-  success: boolean;
-  data: PISRecord[];
-  count: number;
-  filters: PISSearchParams;
-  executionTime: string;
-  timestamp: string;
+  success: boolean; data: PISRecord[]; count: number;
+  filters: PISSearchParams; executionTime: string; timestamp: string;
 }
 
 export interface PISDetailResponse {
-  success: boolean;
-  data: Record<string, PISDetailRecord[]>; // grouped by LABNO
-  count: number;
-  labno: string;
-  executionTime: string;
-  timestamp: string;
+  success: boolean; data: Record<string, PISDetailRecord[]>;
+  count: number; labno: string; executionTime: string; timestamp: string;
 }
 
 // ==================== SERVICE ====================
 
-/**
- * Maps frontend SearchParams field names to backend query param names
- */
 const mapParamsToQuery = (params: Record<string, string>): PISSearchParams => {
   const mapped: PISSearchParams = {};
-
   if (params.labNumber)            mapped.labno      = params.labNumber;
   if (params.lastName)             mapped.lname      = params.lastName;
   if (params.firstName)            mapped.fname      = params.firstName;
@@ -141,175 +55,146 @@ const mapParamsToQuery = (params: Record<string, string>): PISSearchParams => {
   if (params.dateCollection)       mapped.dtcoll     = params.dateCollection;
   if (params.dateReceived)         mapped.dtrecv     = params.dateReceived;
   if (params.dateReported)         mapped.dtrptd     = params.dateReported;
-
   return mapped;
 };
 
-/**
- * Search patients — all params optional, at least one required
- * GET /api/laboratory/pis/search
- */
-export const searchPatients = async (
-  params: Record<string, string>
-): Promise<PISResponse> => {
+export const searchPatients = async (params: Record<string, string>): Promise<PISResponse> => {
   try {
     const queryParams = mapParamsToQuery(params);
-
-    // Strip empty strings so backend doesn't receive blank params
-    const cleanParams = Object.fromEntries(
-      Object.entries(queryParams).filter(([, v]) => v && v.trim() !== '')
-    );
-
-    const response = await api.get('/laboratory/pis/search', {
-      params: cleanParams,
-    });
-
+    const cleanParams = Object.fromEntries(Object.entries(queryParams).filter(([, v]) => v && v.trim() !== ''));
+    const response = await api.get('/laboratory/pis/search', { params: cleanParams });
     return response.data;
-  } catch (error) {
-    console.error('[pisService] searchPatients error:', error);
-    throw error;
-  }
+  } catch (error) { console.error('[pisService] searchPatients error:', error); throw error; }
 };
 
-/**
- * Get full patient detail by Lab No
- * GET /api/laboratory/pis/detail?labno=:labno
- * Response data is grouped by LABNO
- */
-export const getPatientDetail = async (
-  labno: string
-): Promise<PISDetailResponse> => {
+export const getPatientDetail = async (labno: string): Promise<PISDetailResponse> => {
   try {
-    const response = await api.get('/laboratory/pis/detail', {
-      params: { labno: labno.trim() },
-    });
+    const response = await api.get('/laboratory/pis/detail', { params: { labno: labno.trim() } });
     return response.data;
-  } catch (error) {
-    console.error('[pisService] getPatientDetail error:', error);
-    throw error;
-  }
+  } catch (error) { console.error('[pisService] getPatientDetail error:', error); throw error; }
 };
 
-// ==================== RESULTS TYPES ====================
+// ==================== RESULTS ====================
 
 export interface PISResultRecord {
-  ABBREV:              string;   // Test name / abbreviation (TEST column)
-  VALUE:               string;   // Result value
-  TESTCODE:            string;   // Test code (CODE column)
-  EXPECTED:            string;   // Reference range
-  MNEMONIC:            string;   // Mnemonic
-  INSTRUCT:            string;   // Instruction
-  DISORDERRESULTTEXT:  string;   // Result text
+  ABBREV: string; VALUE: string; TESTCODE: string;
+  EXPECTED: string; MNEMONIC: string; INSTRUCT: string; DISORDERRESULTTEXT: string;
 }
-
 export interface PISResultsResponse {
-  success:       boolean;
-  data:          PISResultRecord[];
-  count:         number;
-  labno:         string;
-  executionTime: string;
-  timestamp:     string;
+  success: boolean; data: PISResultRecord[]; count: number;
+  labno: string; executionTime: string; timestamp: string;
 }
-
-// ==================== RESULTS SERVICE ====================
-
-/**
- * Get lab test results for a single Lab No
- * GET /api/laboratory/pis/results?labno=:labno
- * Populates the Results/Mailers table in the Patient Record Modal
- */
-export const getPatientResults = async (
-  labno: string
-): Promise<PISResultsResponse> => {
+export const getPatientResults = async (labno: string): Promise<PISResultsResponse> => {
   try {
-    const response = await api.get('/laboratory/pis/results', {
-      params: { labno: labno.trim() },
-    });
+    const response = await api.get('/laboratory/pis/results', { params: { labno: labno.trim() } });
     return response.data;
-  } catch (error) {
-    console.error('[pisService] getPatientResults error:', error);
-    throw error;
-  }
+  } catch (error) { console.error('[pisService] getPatientResults error:', error); throw error; }
 };
 
-// ==================== TEST SEQUENCE TYPES ====================
+// ==================== TEST SEQUENCE ====================
 
 export interface PISTestSeqRecord {
-  LABNO:    string;
-  TESTSEQ:  string | number;  // SEQ column
-  MNEMONIC: string;           // MNC column
-  VALUE:    string;           // Value
-  RFLAG:    string;           // Reference flag (blank = normal, * = abnormal)
-  ABBREV:   string;           // Test abbreviation
+  LABNO: string; TESTSEQ: string | number; MNEMONIC: string; VALUE: string; RFLAG: string; ABBREV: string;
 }
-
 export interface PISTestSeqResponse {
-  success:       boolean;
-  data:          PISTestSeqRecord[];
-  count:         number;
-  labno:         string;
-  executionTime: string;
-  timestamp:     string;
+  success: boolean; data: PISTestSeqRecord[]; count: number;
+  labno: string; executionTime: string; timestamp: string;
 }
-
-// ==================== TEST SEQUENCE SERVICE ====================
-
-/**
- * Get test sequence / analytes for a given LABNO
- * GET /api/laboratory/pis/testsequence?labno=:labno
- * Populates the Test Sequence / Analytes panel when a result row is clicked
- */
-export const getTestSequence = async (
-  labno: string
-): Promise<PISTestSeqResponse> => {
+export const getTestSequence = async (labno: string): Promise<PISTestSeqResponse> => {
   try {
-    const response = await api.get('/laboratory/pis/testsequence', {
-      params: { labno: labno.trim() },
-    });
+    const response = await api.get('/laboratory/pis/testsequence', { params: { labno: labno.trim() } });
     return response.data;
-  } catch (error) {
-    console.error('[pisService] getTestSequence error:', error);
+  } catch (error) { console.error('[pisService] getTestSequence error:', error); throw error; }
+};
+
+// ==================== PATIENT FILTER CARDS ====================
+
+export interface PISFilterCardRecord { LABNO: string; LNAME: string; FNAME: string; DTRPTD: string; }
+export interface PISFilterCardsResponse {
+  success: boolean; data: PISFilterCardRecord[]; count: number;
+  fname: string; lname: string; executionTime: string; timestamp: string;
+}
+export const getPatientFilterCards = async (fname: string, lname: string): Promise<PISFilterCardsResponse> => {
+  try {
+    const response = await api.get('/laboratory/pis/filtercards', { params: { fname: fname.trim(), lname: lname.trim() } });
+    return response.data;
+  } catch (error) { console.error('[pisService] getPatientFilterCards error:', error); throw error; }
+};
+
+// ==================== AUDIT TRAIL ====================
+
+export interface PISAuditRecord {
+  LABNO: string; TABLECOLUMN: string; OLDDATA: string; NEWDATA: string;
+  AUDIT_DATE: string; AUDIT_USER: string; LASTMOD: string;
+  USER_ID: number | null; FIRSTNAME: string | null; LASTNAME: string | null;
+  FULL_NAME: string | null; SOURCE_TABLE: 'AUDIT_RESULTS' | 'AUDIT_SAMPLE';
+}
+export interface PISAuditResponse {
+  success: boolean; data: PISAuditRecord[]; count: number;
+  labno: string; executionTime: string; timestamp: string;
+}
+export const getAuditTrail = async (labno: string): Promise<PISAuditResponse> => {
+  try {
+    const response = await api.get('/laboratory/pis/audit-trail', { params: { labno: labno.trim() } });
+    return response.data;
+  } catch (error) { console.error('[pisService] getAuditTrail error:', error); throw error; }
+};
+
+// ==================== IMAGE ====================
+
+export const fetchPatientImage = async (labno: string): Promise<string> => {
+  try {
+    const response = await api.get('/laboratory/pis/image', {
+      params: { labno: labno.trim() }, responseType: 'blob',
+    });
+    return URL.createObjectURL(response.data);
+  } catch (error: any) {
+    if (error?.response?.status === 404) throw new Error('NOT_FOUND');
+    console.error('[pisService] fetchPatientImage error:', error);
     throw error;
   }
 };
 
-// ==================== PATIENT FILTER CARDS TYPES ====================
+// ==================== NOTES ====================
 
-export interface PISFilterCardRecord {
-  LABNO:  string;
-  LNAME:  string;
-  FNAME:  string;
-  DTRPTD: string; // null = UNMAILED, has date = MAILED
+export interface PISNoteRecord {
+  LABNO:           string;
+  NOTES:           string;
+  STATUS:          string | null;
+  NOTEID:          number | null;
+  LASTMOD:         string;
+  USER_ID:         number | null;
+  NOTEPRIORITY:    string | null;
+  ERROR:           string | null;
+  PHONECALL:       string | null;
+  CREATE_DT:       string;
+  CREATE_USER_ID:  number | null;
+  CREATETIME:      string | null;
+  USER_FIRSTNAME:  string | null;
+  USER_LASTNAME:   string | null;
+  CREATE_FIRSTNAME: string | null;
+  CREATE_LASTNAME:  string | null;
 }
 
-export interface PISFilterCardsResponse {
-  success:       boolean;
-  data:          PISFilterCardRecord[];
-  count:         number;
-  fname:         string;
-  lname:         string;
-  executionTime: string;
-  timestamp:     string;
+export interface PISNotesResponse {
+  success: boolean; data: PISNoteRecord[]; count: number;
+  labno: string; executionTime: string; timestamp: string;
 }
-
-// ==================== PATIENT FILTER CARDS SERVICE ====================
 
 /**
- * Get all LABNOs for a patient by FNAME + LNAME
- * GET /api/laboratory/pis/filtercards?fname=:fname&lname=:lname
- * Populates the Patient Filter Cards panel in the modal
+ * Get sample notes for a LABNO
+ * GET /api/laboratory/pis/notes?labno=:labno
+ * Joins PHCMS.SAMPLE_NOTES_ARCHIVE with PHSECURE.USERS (modifier + creator)
+ * Ordered by CREATE_DT DESC
  */
-export const getPatientFilterCards = async (
-  fname: string,
-  lname: string
-): Promise<PISFilterCardsResponse> => {
+export const getNotes = async (labno: string): Promise<PISNotesResponse> => {
   try {
-    const response = await api.get('/laboratory/pis/filtercards', {
-      params: { fname: fname.trim(), lname: lname.trim() },
+    const response = await api.get('/laboratory/pis/notes', {
+      params: { labno: labno.trim() },
     });
     return response.data;
   } catch (error) {
-    console.error('[pisService] getPatientFilterCards error:', error);
+    console.error('[pisService] getNotes error:', error);
     throw error;
   }
 };

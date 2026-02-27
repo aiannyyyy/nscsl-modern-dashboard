@@ -235,7 +235,10 @@ app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/followup', require('./routes/FollowupRoutes/patientDetailsRoutes'));
 
 //Patient Information System
-app.use('/api/laboratory/pis', require('./routes/LaboratoryRoutes/pisRoutes'))
+app.use('/api/laboratory/pis', require('./routes/LaboratoryRoutes/pisRoutes'));
+
+//User Routes
+app.use('/api/users', require('./routes/LaboratoryRoutes/userRoutes'));
 
 // Unsatisfactory Analysis
 app.use("/api/unsat", require("./routes/PDORoutes/unsatRoutes"));

@@ -1,81 +1,71 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Search, ChevronDown, X, ChevronLeft, ChevronRight,
   User, ZoomIn, Image as ImageIcon, ClipboardList,
   Download, Mail, FileText, BookOpen, FlaskConical,
+  Maximize2, Send,
 } from 'lucide-react';
-import { getPatientDetail, getPatientResults, getTestSequence, getPatientFilterCards } from '../../../services/LaboratoryServices/pisServices';
+import {
+  getPatientDetail,
+  getPatientResults,
+  getTestSequence,
+  getPatientFilterCards,
+  fetchPatientImage,
+  getAuditTrail,
+  getNotes,
+} from '../../../services/LaboratoryServices/pisServices';
 
 // ═══════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════
 
 export interface SearchParams {
-  lastName: string;
-  firstName: string;
-  patientNumber: string;
-  formNumber: string;
-  birthDate: string;
-  collectionHospitalId: string;
-  dateCollection: string;
-  sex: string;
-  labNumber: string;
-  physicianId: string;
-  dateReceived: string;
-  outsideLab: string;
-  contactLastName: string;
-  contactFirstName: string;
-  dateReported: string;
+  lastName: string; firstName: string; patientNumber: string; formNumber: string;
+  birthDate: string; collectionHospitalId: string; dateCollection: string; sex: string;
+  labNumber: string; physicianId: string; dateReceived: string; outsideLab: string;
+  contactLastName: string; contactFirstName: string; dateReported: string;
 }
 
 export interface SampleRecord {
-  LABNO:   string;
-  LABID:   string;
-  LNAME:   string;
-  FNAME:   string;
-  SUBMID:  string;
-  BIRTHDT: string;
-  BIRTHTM: string;
-  DTCOLL:  string;
-  TMCOLL:  string;
-  DTRECV:  string;
-  TMRECV:  string;
-  DTRPTD:  string;
-  GESTAGE: string;
-  AGECOLL: string;
-  SEX:     string;
+  LABNO: string; LABID: string; LNAME: string; FNAME: string; SUBMID: string;
+  BIRTHDT: string; BIRTHTM: string; DTCOLL: string; TMCOLL: string;
+  DTRECV: string; TMRECV: string; DTRPTD: string; GESTAGE: string; AGECOLL: string; SEX: string;
 }
 
-interface FilterCardRow {
-  LABNO:  string;
-  LNAME:  string;
-  FNAME:  string;
-  DTRPTD: string;
+interface FilterCardRow { LABNO: string; LNAME: string; FNAME: string; DTRPTD: string; }
+interface TestSeqRow { LABNO: string; TESTSEQ: string | number; MNEMONIC: string; VALUE: string; RFLAG: string; ABBREV: string; }
+interface ResultRow { ABBREV: string; VALUE: string; TESTCODE: string; EXPECTED: string; MNEMONIC: string; INSTRUCT: string; DISORDERRESULTTEXT: string; }
+
+interface AuditRow {
+  LABNO: string; TABLECOLUMN: string; OLDDATA: string; NEWDATA: string;
+  AUDIT_DATE: string; AUDIT_USER: string; LASTMOD: string;
+  USER_ID: number | null; FIRSTNAME: string | null; LASTNAME: string | null;
+  FULL_NAME: string | null; SOURCE_TABLE: 'AUDIT_RESULTS' | 'AUDIT_SAMPLE';
 }
 
-interface TestSeqRow {
-  LABNO:    string;
-  TESTSEQ:  string | number;
-  MNEMONIC: string;
-  VALUE:    string;
-  RFLAG:    string;
-  ABBREV:   string;
-}
-
-interface ResultRow {
-  ABBREV:             string;
-  VALUE:              string;
-  TESTCODE:           string;
-  EXPECTED:           string;
-  MNEMONIC:           string;
-  INSTRUCT:           string;
-  DISORDERRESULTTEXT: string;
+interface NoteRow {
+  LABNO:            string;
+  NOTES:            string;
+  LASTMOD:          string;
+  USER_ID:          number | null;
+  NOTEPRIORITY:     string | null;
+  ERROR:            string | null;
+  CREATE_DT:        string;
+  CREATE_USER_ID:   number | null;
+  STATUS:           string | null;
+  NOTEID:           number | null;
+  PHONECALL:        string | null;
+  CREATETIME:       string | null;
+  USER_FIRSTNAME:   string | null;
+  USER_LASTNAME:    string | null;
+  CREATE_FIRSTNAME: string | null;
+  CREATE_LASTNAME:  string | null;
 }
 
 interface Props {
-  onSearch:   (params: SearchParams) => void;
-  results:    SampleRecord[];
-  isLoading:  boolean;
+  onSearch: (params: SearchParams) => void;
+  results: SampleRecord[];
+  isLoading: boolean;
   totalCount: number;
 }
 
@@ -103,10 +93,10 @@ const fmt12h = (time?: unknown): string => {
   if (!t) return '—';
   const digits = t.replace(/:/g, '');
   if (digits.length < 4) return t;
-  const hh     = parseInt(digits.slice(0, 2), 10);
-  const mm     = digits.slice(2, 4);
+  const hh = parseInt(digits.slice(0, 2), 10);
+  const mm = digits.slice(2, 4);
   const period = hh >= 12 ? 'PM' : 'AM';
-  const h12    = hh % 12 === 0 ? 12 : hh % 12;
+  const h12 = hh % 12 === 0 ? 12 : hh % 12;
   return `${String(h12).padStart(2, '0')}:${mm} ${period}`;
 };
 
@@ -176,14 +166,9 @@ const PanelBar: React.FC<{ title: string }> = ({ title }) => (
   </div>
 );
 
-// Row with explicit bg color — matches screenshot section grouping
 const DR: React.FC<{
   label: string; value: string;
-  bg?: string;
-  labelColor?: string;
-  valueColor?: string;
-  bold?: boolean;
-  first?: boolean; // first row of a section — draws gap above
+  bg?: string; labelColor?: string; valueColor?: string; bold?: boolean; first?: boolean;
 }> = ({ label, value, bg = '#ffffff', labelColor = '#374151', valueColor = '#111827', bold = false, first = false }) => (
   <div style={{
     display: 'flex', alignItems: 'baseline',
@@ -202,85 +187,37 @@ const DR: React.FC<{
   </div>
 );
 
-const ABtn: React.FC<{ icon: React.ReactNode; label: string }> = ({ icon, label }) => (
-  <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium
-    bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700
-    text-gray-700 dark:text-gray-300
-    hover:bg-blue-50 dark:hover:bg-blue-900/30
-    hover:text-blue-600 dark:hover:text-blue-400
-    hover:border-blue-300 dark:hover:border-blue-700
-    transition-all duration-150">
-    {icon}
-    {label}
+const ABtn: React.FC<{
+  icon: React.ReactNode; label: string; onClick?: () => void; disabled?: boolean;
+}> = ({ icon, label, onClick, disabled }) => (
+  <button onClick={onClick} disabled={disabled}
+    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium
+      bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700
+      text-gray-700 dark:text-gray-300
+      hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400
+      hover:border-blue-300 dark:hover:border-blue-700
+      transition-all duration-150
+      disabled:opacity-40 disabled:cursor-not-allowed
+      disabled:hover:bg-gray-50 disabled:hover:text-gray-700 disabled:hover:border-gray-200">
+    {icon}{label}
   </button>
 );
 
 // ═══════════════════════════════════════════════
-// PATIENT RECORD MODAL
+// EMAIL MODAL
 // ═══════════════════════════════════════════════
 
-const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () => void }> = ({
-  record, onClose,
-}) => {
-  const [zoom,       setZoom]       = useState(300);
-  const [detail,     setDetail]     = useState<Record<string, any> | null>(null);
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState<string | null>(null);
-  const [results,    setResults]    = useState<ResultRow[]>([]);
-  const [resLoading,  setResLoading]  = useState(false);
-  const [testSeq,     setTestSeq]     = useState<TestSeqRow[]>([]);
-  const [testSeqLoading, setTestSeqLoading] = useState(false);
-  const [selectedRow,    setSelectedRow]    = useState<number | null>(null);
-  const [filterCards,   setFilterCards]   = useState<FilterCardRow[]>([]);
-  const [filterLoading, setFilterLoading] = useState(false);
-  const [activeLabno,   setActiveLabno]   = useState<string>('');
-  // activeRecord overrides external record when user clicks View PIS on a filter card
-  const [activeRecord,  setActiveRecord]  = useState<SampleRecord | null>(null);
-  const currentRecord = activeRecord ?? record;
-  const currentLabno  = activeRecord?.LABNO ?? record?.LABNO ?? '';
-
-  // ── Fetch detail ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!currentLabno) return;
-    setDetail(null);
-    setError(null);
-    setLoading(true);
-    setTestSeq([]);
-    setSelectedRow(null);
-
-    getPatientDetail(currentLabno)
-      .then((res) => {
-        const rows = res.data?.[currentLabno];
-        if (rows?.length > 0) setDetail(rows[0]);
-        else setError('No detail record found.');
-      })
-      .catch(() => setError('Failed to load patient detail.'))
-      .finally(() => setLoading(false));
-  }, [currentLabno]);
-
-  // ── Fetch results (Results/Mailers table) ─────────────────────────────────
-  useEffect(() => {
-    if (!currentLabno) return;
-    setResults([]);
-    setResLoading(true);
-
-    getPatientResults(currentLabno)
-      .then((res) => setResults(res.data ?? []))
-      .catch(() => setResults([]))
-      .finally(() => setResLoading(false));
-  }, [currentLabno]);
-
-  // Fetch patient filter cards by fname + lname
-  useEffect(() => {
-    if (!record?.FNAME || !record?.LNAME) return;
-    setFilterCards([]);
-    setFilterLoading(true);
-    setActiveLabno(record?.LABNO ?? '');
-    getPatientFilterCards(record.FNAME, record.LNAME)
-      .then((res) => setFilterCards(res.data ?? []))
-      .catch(() => setFilterCards([]))
-      .finally(() => setFilterLoading(false));
-  }, [record?.LABNO, record?.FNAME, record?.LNAME]);
+const EmailModal: React.FC<{
+  detail: Record<string, any> | null;
+  record: SampleRecord;
+  includePatientInfo: boolean;
+  onClose: () => void;
+}> = ({ detail, record, includePatientInfo, onClose }) => {
+  const d = detail;
+  const facilityEmail = val(d?.EMAIL) !== '—' ? val(d?.EMAIL) : '';
+  const [sendTo,  setSendTo]  = useState(facilityEmail);
+  const [status,  setStatus]  = useState('');
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -288,29 +225,447 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
 
+  const labno    = pick(d?.LABNO,   record.LABNO);
+  const labid    = pick(d?.LABID,   record.LABID);
+  const lname    = pick(d?.LNAME,   record.LNAME);
+  const fname    = pick(d?.FNAME,   record.FNAME);
+  const birthdt  = pick(d?.BIRTHDT, record.BIRTHDT);
+  const birthtm  = fmt12h(d?.BIRTHTM  ?? record.BIRTHTM);
+  const dtcoll   = pick(d?.DTCOLL,  record.DTCOLL);
+  const tmcoll   = fmt12h(d?.TMCOLL   ?? record.TMCOLL);
+  const dtrecv   = pick(d?.DTRECV,  record.DTRECV);
+  const dtrptd   = pick(d?.DTRPTD,  record.DTRPTD);
+  const gestage  = pick(d?.GESTAGE, record.GESTAGE);
+  const agecoll  = pick(d?.AGECOLL, record.AGECOLL);
+  const sex      = sexLabel(pick(d?.SEX, record.SEX));
+  const spectype = val(d?.SPECTYPE);
+  const milktype = val(d?.MILKTYPE);
+  const birthwt  = d?.BIRTHWT ? `${val(d.BIRTHWT)} gms` : '—';
+  const twin     = val(d?.TWIN);
+  const transfus = val(d?.TRANSFUS);
+  const dtxfus   = val(d?.DTXFUS);
+  const clinstat = val(d?.CLINSTAT);
+  const demcode  = val(d?.DEMCODE);
+  const physid   = val(d?.PHYSID);
+  const birthhosp     = val(d?.BIRTHHOSP);
+  const birthhospname = val(d?.DESCR1);
+  const providerid    = val(d?.PROVIDERID);
+  const descr1        = val(d?.DESCR1);
+  const street1       = val(d?.STREET1);
+  const street2       = val(d?.STREET2);
+  const city          = val(d?.CITY);
+  const county        = val(d?.COUNTY);
+  const phone         = val(d?.PHONE);
+  const fax           = val(d?.FAX);
+  const mobile        = val(d?.DESCR7);
+  const emailAddr     = val(d?.EMAIL);
+  const coord         = [d?.DESCR4, d?.DESCR5, d?.DESCR6].filter(Boolean).join(' ').trim() || '—';
+  const releasedt     = val(d?.RELEASEDT);
+  const initTech      = val(d?.INIT_TECH_NAME);
+  const verTech       = val(d?.VER_TECH_NAME);
+  const secondcpy     = val(d?.SECONDCOPY);
+  const outlab        = val(d?.OUTLAB);
+  const mailStatus    = (pick(d?.DTRPTD, record.DTRPTD) !== '—') ? 'MAILED' : 'UNMAILED';
+  const disposition   = val(d?.DISPOSITION);
+  const dispdate      = val(d?.DISPDATE);
+  const closedBy      = val(d?.CLOSED_BY_NAME);
+  const specimenAge   = d?.SPECIMEN_AGE_DAYS != null ? formatAge(String(d.SPECIMEN_AGE_DAYS * 24)) : formatAge(agecoll);
+
+  const patientInfoLines: string[] = includePatientInfo ? [
+    '', `Lab No: ${labno}`, `Form No: ${labid}`, `Last Name: ${lname}`, `First Name: ${fname}`,
+    '', `Birth: ${birthdt} @ ${birthtm}`, `Collection: ${dtcoll} @ ${tmcoll}`,
+    `Specimen Type: ${spectype}`, `Milk Type: ${milktype}`,
+    '', `Sex: ${sex}`, `Birth Weight: ${birthwt}`, `Birth Order: ${twin}`,
+    `Blood Transfused: ${transfus}`, `Transfused Date: ${dtxfus}`,
+    `Gestation Age: ${gestage !== '—' ? `${gestage} Weeks` : '—'}`,
+    `Specimen Age: ${specimenAge}`, `Age at Collection: ${formatAge(agecoll)}`,
+    '', `Date Received: ${dtrecv}`, `Date Reported: ${dtrptd}`,
+    `Clinical Status: ${clinstat}`, `Demog Acceptable: ${demcode}`,
+    '', `Physician ID: ${physid}`, `Birth Hospital ID: ${birthhosp}`, `Birth Hospital Name: ${birthhospname}`,
+    '', `Facility Code: ${providerid}`, `Facility Name: ${descr1}`,
+    `Address 1: ${street1}`, `Address 2: ${street2}`, `City: ${city}`, `Province: ${county}`,
+    `Phone: ${phone}`, `Fax: ${fax}`, `Mobile: ${mobile}`, `Email: ${emailAddr}`,
+    '', `Coordinator: ${coord}`, `Demog Release: ${releasedt}`,
+    `Initial Entry: ${initTech}`, `Verification Entry: ${verTech}`,
+    `Second Copy Date: ${secondcpy}`, `Outside Lab: ${outlab}`,
+    '', `Status: ${mailStatus}`,
+    '', `Disposition: ${disposition}`, `Disposition Date: ${dispdate}`, `Closed By: ${closedBy}`,
+  ] : [];
+
+  const baseLines = ['Newborn Screening Center - Southern Luzon', 'Please see attachment for Filter Card Image'];
+  const allLines  = [...baseLines, ...patientInfoLines];
+
+  const handleSend = () => {
+    if (!sendTo.trim()) { setStatus('Please enter a recipient email address.'); return; }
+    setSending(true); setStatus('Sending…');
+    const subject = encodeURIComponent(`Filter Card Image - Lab No: ${labno}`);
+    const body    = encodeURIComponent(allLines.join('\n'));
+    window.location.href = `mailto:${sendTo.trim()}?subject=${subject}&body=${body}`;
+    setTimeout(() => { setSending(false); setStatus('Email client opened. Please verify and send from your mail app.'); }, 1000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[30000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="flex flex-col bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+        style={{ animation: 'pisIn .2s cubic-bezier(.34,1.56,.64,1)', width: '560px', maxWidth: '96vw', height: '600px' }}>
+        <div className="flex-shrink-0 bg-gradient-to-r from-blue-700 to-blue-600 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center"><Mail size={13} className="text-white" /></div>
+            <p className="text-sm font-bold text-white">Send Email of Filter Card Image</p>
+          </div>
+          <button onClick={onClose} className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/25 flex items-center justify-center text-white transition-colors"><X size={13} /></button>
+        </div>
+        <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center gap-3">
+          <label className="text-[12px] font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap">Send To:</label>
+          <input type="email" value={sendTo} onChange={e => setSendTo(e.target.value)} placeholder="recipient@email.com"
+            className="flex-1 h-8 px-3 text-[12px] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div className="flex-1 overflow-auto px-4 py-3">
+          <div className="text-[12px] leading-relaxed text-gray-800 dark:text-gray-200 font-mono whitespace-pre-wrap select-text">
+            {allLines.map((line, i) => <div key={i} className={line === '' ? 'h-3' : ''}>{line}</div>)}
+          </div>
+        </div>
+        <div className="flex-shrink-0 px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {status ? (
+              <span className={`text-[11px] font-medium ${status.includes('opened') ? 'text-emerald-600 dark:text-emerald-400' : status.includes('Please enter') ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}`}>{status}</span>
+            ) : (
+              <span className="text-[11px] text-gray-400 dark:text-gray-500">{includePatientInfo ? 'Patient info included' : 'Patient info not included'}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="h-7 px-3 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Cancel</button>
+            <button onClick={handleSend} disabled={sending} className="h-7 px-4 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <Send size={11} />Send
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════
+// AUDIT TRAIL MODAL
+// ═══════════════════════════════════════════════
+
+const AuditTrailModal: React.FC<{ labno: string; patientName: string; onClose: () => void }> = ({ labno, patientName, onClose }) => {
+  const [audit,   setAudit]   = useState<AuditRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [filter,  setFilter]  = useState<'ALL' | 'AUDIT_RESULTS' | 'AUDIT_SAMPLE'>('ALL');
+  const [search,  setSearch]  = useState('');
+
+  useEffect(() => {
+    if (!labno) return;
+    setLoading(true);
+    getAuditTrail(labno).then(res => setAudit(res.data ?? [])).catch(() => setAudit([])).finally(() => setLoading(false));
+  }, [labno]);
+
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onClose]);
+
+  const filtered = audit.filter(row => {
+    if (filter !== 'ALL' && row.SOURCE_TABLE !== filter) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      return (row.TABLECOLUMN || '').toLowerCase().includes(q) ||
+             (row.OLDDATA     || '').toLowerCase().includes(q) ||
+             (row.NEWDATA     || '').toLowerCase().includes(q) ||
+             (row.FULL_NAME   || '').toLowerCase().includes(q) ||
+             (row.AUDIT_USER  || '').toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  return (
+    <div className="fixed inset-0 z-[20000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="flex flex-col bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+        style={{ animation: 'pisIn .2s cubic-bezier(.34,1.56,.64,1)', width: '1100px', maxWidth: '98vw', height: '80vh' }}>
+        <div className="flex-shrink-0 bg-gradient-to-r from-slate-700 to-slate-600 px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center"><ClipboardList size={15} className="text-white" /></div>
+            <div>
+              <p className="text-sm font-bold text-white">Audit Trail</p>
+              <p className="text-[11px] text-slate-300">Lab No: <span className="font-mono font-semibold">{labno}</span><span className="mx-2 opacity-50">·</span>{patientName}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/25 flex items-center justify-center text-white transition-colors"><X size={14} /></button>
+        </div>
+        <div className="flex-shrink-0 px-4 py-2.5 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center gap-3">
+          <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-[11px] font-semibold">
+            {([{ key: 'ALL', label: 'All' }, { key: 'AUDIT_RESULTS', label: 'Results' }, { key: 'AUDIT_SAMPLE', label: 'Sample' }] as const).map(({ key, label }) => (
+              <button key={key} onClick={() => setFilter(key)}
+                className={`px-3 py-1.5 transition-colors border-r border-gray-200 dark:border-gray-700 last:border-r-0 ${filter === key ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="relative flex-1 max-w-xs">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input type="text" placeholder="Search column, value, user…" value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full h-8 pl-7 pr-3 text-[11px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <span className="ml-auto text-[11px] text-gray-500 dark:text-gray-400">
+            {loading ? 'Loading…' : <span><span className="font-semibold text-gray-700 dark:text-gray-200">{filtered.length}</span> record{filtered.length !== 1 ? 's' : ''}</span>}
+          </span>
+        </div>
+        <div className="flex-1 overflow-auto">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400">
+              <div className="w-8 h-8 border-[3px] border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm">Loading audit trail…</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-400">
+              <ClipboardList size={36} className="opacity-20" />
+              <p className="text-sm">{audit.length === 0 ? 'No audit records found' : 'No records match filter'}</p>
+            </div>
+          ) : (
+            <table className="w-full border-collapse text-[11px]">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  {['Source','Column','Old Value','New Value','Name','Audit Date','Last Modified'].map(h => (
+                    <th key={h} className="px-3 py-2 text-left font-bold text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 last:border-r-0 whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((row, i) => (
+                  <tr key={i} className={`border-b border-gray-100 dark:border-gray-800 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors ${i % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50/60 dark:bg-gray-800/40'}`}>
+                    <td className="px-3 py-2 border-r border-gray-100 dark:border-gray-800 whitespace-nowrap">
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${row.SOURCE_TABLE === 'AUDIT_RESULTS' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
+                        {row.SOURCE_TABLE === 'AUDIT_RESULTS' ? 'RESULTS' : 'SAMPLE'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 border-r border-gray-100 dark:border-gray-800 whitespace-nowrap font-semibold text-gray-800 dark:text-gray-200">{row.TABLECOLUMN || '—'}</td>
+                    <td className="px-3 py-2 border-r border-gray-100 dark:border-gray-800 max-w-[160px]">
+                      <span className="block truncate text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded font-mono">
+                        {row.OLDDATA != null && row.OLDDATA !== '' ? row.OLDDATA : <span className="text-gray-300 italic">empty</span>}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 border-r border-gray-100 dark:border-gray-800 max-w-[160px]">
+                      <span className="block truncate text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded font-mono">
+                        {row.NEWDATA != null && row.NEWDATA !== '' ? row.NEWDATA : <span className="text-gray-300 italic">empty</span>}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 border-r border-gray-100 dark:border-gray-800 whitespace-nowrap">
+                      {row.FULL_NAME ? (
+                        <div className="flex flex-col leading-tight">
+                          <span className="font-medium text-gray-800 dark:text-gray-200 uppercase">{row.FULL_NAME}</span>
+                          {row.AUDIT_USER && <span className="text-[9px] text-gray-400 dark:text-gray-500 font-mono uppercase">{row.AUDIT_USER}</span>}
+                        </div>
+                      ) : (
+                        <span className="font-medium text-gray-500 dark:text-gray-400 uppercase">{row.AUDIT_USER || '—'}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 border-r border-gray-100 dark:border-gray-800 whitespace-nowrap font-mono text-gray-500 dark:text-gray-400">{row.AUDIT_DATE || '—'}</td>
+                    <td className="px-3 py-2 whitespace-nowrap font-mono text-gray-500 dark:text-gray-400">{row.LASTMOD || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="flex-shrink-0 px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
+          <span className="text-[10px] text-gray-400">AUDIT_RESULTS + AUDIT_SAMPLE · ordered by AUDIT_DATE DESC</span>
+          <button onClick={onClose} className="h-7 px-4 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════
+// MAGNIFIER VIEWER
+// ═══════════════════════════════════════════════
+
+const MagnifierViewer: React.FC<{ src: string; zoom: number; labno: string }> = ({ src, zoom, labno }) => {
+  const imgRef  = useRef<HTMLImageElement>(null);
+  const lensRef = useRef<HTMLDivElement>(null);
+  const [hovering, setHovering] = useState(false);
+  const [lensPos,  setLensPos]  = useState({ x: 0, y: 0 });
+  const [bgPos,    setBgPos]    = useState({ x: 0, y: 0 });
+
+  const LENS_SIZE  = 120;
+  const MAG_FACTOR = 3;
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const img = imgRef.current;
+    if (!img) return;
+    const rect = img.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const lx = Math.max(LENS_SIZE / 2, Math.min(x, rect.width  - LENS_SIZE / 2));
+    const ly = Math.max(LENS_SIZE / 2, Math.min(y, rect.height - LENS_SIZE / 2));
+    setLensPos({ x: lx - LENS_SIZE / 2, y: ly - LENS_SIZE / 2 });
+    setBgPos({ x: -(lx * MAG_FACTOR - LENS_SIZE / 2), y: -(ly * MAG_FACTOR - LENS_SIZE / 2) });
+  }, []);
+
+  return (
+    <div className="w-full h-full overflow-auto flex items-start justify-center p-3 relative"
+      onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)} onMouseMove={handleMouseMove}
+      style={{ cursor: hovering ? 'crosshair' : 'default' }}>
+      <div className="relative inline-block" style={{ width: `${zoom}%`, flexShrink: 0 }}>
+        <img ref={imgRef} src={src} alt={`Specimen scan for ${labno}`} draggable={false}
+          style={{ width: '100%', height: 'auto', maxWidth: 'none', display: 'block', userSelect: 'none' }}
+          className="rounded shadow-md" />
+        {hovering && imgRef.current && (
+          <div ref={lensRef} style={{
+            position: 'absolute', left: `${lensPos.x}px`, top: `${lensPos.y}px`,
+            width: `${LENS_SIZE}px`, height: `${LENS_SIZE}px`,
+            borderRadius: '50%', border: '2px solid rgba(59,130,246,0.8)',
+            boxShadow: '0 0 0 1px rgba(255,255,255,0.4), 0 4px 20px rgba(0,0,0,0.35)',
+            backgroundImage: `url(${src})`, backgroundRepeat: 'no-repeat',
+            backgroundSize: `${imgRef.current.getBoundingClientRect().width * MAG_FACTOR}px auto`,
+            backgroundPosition: `${bgPos.x}px ${bgPos.y}px`,
+            pointerEvents: 'none', zIndex: 10,
+          }}>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+              <div style={{ width: '1px', height: '100%', background: 'rgba(59,130,246,0.4)', position: 'absolute' }} />
+              <div style={{ height: '1px', width: '100%', background: 'rgba(59,130,246,0.4)', position: 'absolute' }} />
+            </div>
+          </div>
+        )}
+        {!hovering && (
+          <div className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium pointer-events-none select-none"
+            style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)' }}>
+            <ZoomIn size={10} /> Hover to magnify
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════
+// PATIENT RECORD MODAL
+// ═══════════════════════════════════════════════
+
+const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () => void }> = ({ record, onClose }) => {
+  const [zoom,       setZoom]       = useState(300);
+  const [detail,     setDetail]     = useState<Record<string, any> | null>(null);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState<string | null>(null);
+  const [results,    setResults]    = useState<ResultRow[]>([]);
+  const [resLoading,     setResLoading]     = useState(false);
+  const [testSeq,        setTestSeq]        = useState<TestSeqRow[]>([]);
+  const [testSeqLoading, setTestSeqLoading] = useState(false);
+  const [selectedRow,    setSelectedRow]    = useState<number | null>(null);
+  const [filterCards,   setFilterCards]   = useState<FilterCardRow[]>([]);
+  const [filterLoading, setFilterLoading] = useState(false);
+  const [activeLabno,   setActiveLabno]   = useState<string>('');
+  const [activeRecord,  setActiveRecord]  = useState<SampleRecord | null>(null);
+  const [showAudit,          setShowAudit]          = useState(false);
+  const [includePatientInfo, setIncludePatientInfo] = useState(false);
+  const [showEmail,          setShowEmail]          = useState(false);
+  // ── Notes state ──────────────────────────────────────────────────────────
+  const [showNotes,    setShowNotes]    = useState(false);
+  const [notes,        setNotes]        = useState<NoteRow[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [notesFetched, setNotesFetched] = useState(false); // track if already fetched for this labno
+
+  // Image states
+  const [imageUrl,     setImageUrl]     = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError,   setImageError]   = useState<'not_found' | 'error' | null>(null);
+
+  const currentRecord = activeRecord ?? record;
+  const currentLabno  = activeRecord?.LABNO ?? record?.LABNO ?? '';
+
+  // ── Fetch detail ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!currentLabno) return;
+    setDetail(null); setError(null); setLoading(true); setTestSeq([]); setSelectedRow(null);
+    getPatientDetail(currentLabno)
+      .then(res => { const rows = res.data?.[currentLabno]; if (rows?.length > 0) setDetail(rows[0]); else setError('No detail record found.'); })
+      .catch(() => setError('Failed to load patient detail.'))
+      .finally(() => setLoading(false));
+  }, [currentLabno]);
+
+  // ── Fetch results ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!currentLabno) return;
+    setResults([]); setResLoading(true);
+    getPatientResults(currentLabno).then(res => setResults(res.data ?? [])).catch(() => setResults([])).finally(() => setResLoading(false));
+  }, [currentLabno]);
+
+  // ── Fetch filter cards ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!record?.FNAME || !record?.LNAME) return;
+    setFilterCards([]); setFilterLoading(true); setActiveLabno(record?.LABNO ?? '');
+    getPatientFilterCards(record.FNAME, record.LNAME).then(res => setFilterCards(res.data ?? [])).catch(() => setFilterCards([])).finally(() => setFilterLoading(false));
+  }, [record?.LABNO, record?.FNAME, record?.LNAME]);
+
+  // ── Fetch specimen image ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!currentLabno) return;
+    setImageUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+    setImageError(null); setImageLoading(true); setZoom(100);
+    fetchPatientImage(currentLabno)
+      .then(url => { setImageUrl(url); setImageError(null); })
+      .catch(err => { setImageError(err?.message === 'NOT_FOUND' ? 'not_found' : 'error'); setImageUrl(null); })
+      .finally(() => setImageLoading(false));
+    return () => { setImageUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; }); };
+  }, [currentLabno]);
+
+  // ── Reset notes when labno changes ───────────────────────────────────────
+  useEffect(() => {
+    setNotes([]); setNotesFetched(false);
+    // Don't close the panel — just clear so it refetches if open
+  }, [currentLabno]);
+
+  // ── Fetch notes when panel opens (lazy) ──────────────────────────────────
+  useEffect(() => {
+    if (!showNotes || !currentLabno || notesFetched) return;
+    setNotesLoading(true);
+    getNotes(currentLabno)
+      .then(res => setNotes(res.data ?? []))
+      .catch(() => setNotes([]))
+      .finally(() => { setNotesLoading(false); setNotesFetched(true); });
+  }, [showNotes, currentLabno, notesFetched]);
+
+  // ── Keyboard escape ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showAudit)  { setShowAudit(false);  return; }
+        if (showEmail)  { setShowEmail(false);   return; }
+        if (showNotes)  { setShowNotes(false);   return; }
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onClose, showAudit, showEmail, showNotes]);
+
   if (!record) return null;
   if (!currentRecord) return null;
 
-  // Fetch test sequence for a clicked result row
   const handleResultClick = (abbrev: string, rowIndex: number) => {
-    if (selectedRow === rowIndex) {
-      // deselect if clicking same row
-      setSelectedRow(null);
-      setTestSeq([]);
-      return;
-    }
-    setSelectedRow(rowIndex);
-    setTestSeqLoading(true);
-    setTestSeq([]);
+    if (selectedRow === rowIndex) { setSelectedRow(null); setTestSeq([]); return; }
+    setSelectedRow(rowIndex); setTestSeqLoading(true); setTestSeq([]);
     getTestSequence(currentLabno)
-      .then((res) => {
-        // Filter to only rows matching the clicked ABBREV
-        const filtered = res.data.filter(r => r.ABBREV === abbrev);
-        setTestSeq(filtered.length > 0 ? filtered : res.data);
-      })
+      .then(res => { const filtered = res.data.filter(r => r.ABBREV === abbrev); setTestSeq(filtered.length > 0 ? filtered : res.data); })
       .catch(() => setTestSeq([]))
       .finally(() => setTestSeqLoading(false));
   };
+
+  const handleDownload = () => {
+    if (!imageUrl) return;
+    const a = document.createElement('a');
+    a.href = imageUrl; a.download = `specimen_${currentLabno}.jpg`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+
+  const handleFullImage = () => { if (imageUrl) window.open(imageUrl, '_blank'); };
+  const zoomIn    = () => setZoom(z => Math.min(600, z + 25));
+  const zoomOut   = () => setZoom(z => Math.max(25,  z - 25));
+  const zoomReset = () => setZoom(100);
 
   const d = detail;
 
@@ -330,6 +685,7 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
   const sex      = sexLabel(pick(d?.SEX, record.SEX));
   const status   = dtrptd !== '—' ? 'MAILED' : 'UNMAILED';
   const fullName = `${lname}, ${fname}`;
+  const hasImage = !!imageUrl;
 
   const spectype    = val(d?.SPECTYPE);
   const milktype    = val(d?.MILKTYPE);
@@ -355,41 +711,39 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
   const mobile      = val(d?.DESCR7);
   const email       = val(d?.EMAIL);
   const coord       = [d?.DESCR4, d?.DESCR5, d?.DESCR6].filter(Boolean).join(' ').trim() || '—';
-  const specimenAge = d?.SPECIMEN_AGE_DAYS != null
-    ? formatAge(String(d.SPECIMEN_AGE_DAYS * 24))
-    : formatAge(agecoll);
+  const specimenAge = d?.SPECIMEN_AGE_DAYS != null ? formatAge(String(d.SPECIMEN_AGE_DAYS * 24)) : formatAge(agecoll);
   const disposition = val(d?.DISPOSITION);
   const dispdate    = val(d?.DISPDATE);
   const closedBy    = val(d?.CLOSED_BY_NAME);
 
+  // ── Priority badge helper ─────────────────────────────────────────────────
+  const notePriorityBadge = (p: string | null) => {
+    if (!p || !p.trim()) return null;
+    const cls = p === '1'
+      ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700'
+      : p === '2'
+      ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700'
+      : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
+    return <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${cls}`}>P{p}</span>;
+  };
+
   return (
-    <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center p-3 bg-black/50 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        className="flex flex-col bg-gray-50 dark:bg-gray-950 rounded-xl shadow-2xl overflow-hidden border border-blue-200 dark:border-blue-900/60"
-        style={{ animation: 'pisIn .22s cubic-bezier(.34,1.56,.64,1)', width: '98vw', maxWidth: '1600px', height: '95vh' }}
-      >
+    <>
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 bg-black/50 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="flex flex-col bg-gray-50 dark:bg-gray-950 rounded-xl shadow-2xl overflow-hidden border border-blue-200 dark:border-blue-900/60"
+        style={{ animation: 'pisIn .22s cubic-bezier(.34,1.56,.64,1)', width: '98vw', maxWidth: '1600px', height: '95vh' }}>
 
         {/* ─── HEADER ─── */}
         <div className="flex-shrink-0 bg-gradient-to-r from-blue-700 to-blue-600 px-5 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-              <User size={18} className="text-white" />
-            </div>
+            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0"><User size={18} className="text-white" /></div>
             <div>
               <p className="text-sm font-bold text-white leading-tight">Patient Information</p>
-              <p className="text-[11px] text-blue-200 mt-0.5">
-                Lab No:&nbsp;<span className="font-mono font-semibold">{labno}</span>
-                <span className="mx-2 opacity-50">·</span>{fullName}
-              </p>
+              <p className="text-[11px] text-blue-200 mt-0.5">Lab No:&nbsp;<span className="font-mono font-semibold">{labno}</span><span className="mx-2 opacity-50">·</span>{fullName}</p>
             </div>
           </div>
-          <button onClick={onClose}
-            className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/25 flex items-center justify-center text-white transition-colors">
-            <X size={14} />
-          </button>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/25 flex items-center justify-center text-white transition-colors"><X size={14} /></button>
         </div>
 
         {/* ─── BODY ─── */}
@@ -398,27 +752,18 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
           {/* ── LEFT: Demographics ── */}
           <div className="flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col" style={{ width: '410px' }}>
             <PanelBar title="Demographics" />
-
             {loading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              </div>
+              <div className="flex-1 flex items-center justify-center"><div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
             ) : (
               <div className="flex-1 overflow-y-auto" style={{ padding: '2px 6px 8px 6px' }}>
-
-                {/* ── white: Patient IDs ── */}
                 <DR label="Lab No"              value={labno}   bg="#ffffff" labelColor="#374151" valueColor="#1d4ed8" bold />
                 <DR label="Form No"             value={labid}   bg="#ffffff" />
                 <DR label="Last Name"           value={lname}   bg="#ffffff" />
                 <DR label="First Name"          value={fname}   bg="#ffffff" />
-
-                {/* ── light blue: Birth & Collection ── */}
                 <DR label="Birth"               value={`${birthdt} @ ${birthtm}`} bg="#eff6ff" first />
                 <DR label="Collection"          value={`${dtcoll} @ ${tmcoll}`}   bg="#eff6ff" />
                 <DR label="Specimen Type"       value={spectype}                  bg="#eff6ff" />
                 <DR label="Milk Type"           value={milktype}                  bg="#eff6ff" />
-
-                {/* ── white: Demographics ── */}
                 <DR label="Sex"                 value={sex}     bg="#ffffff" first />
                 <DR label="Birth Weight"        value={birthwt} bg="#ffffff" />
                 <DR label="Birth Order"         value={twin}    bg="#ffffff" />
@@ -427,19 +772,13 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                 <DR label="Gestation Age"       value={gestage !== '—' ? `${gestage} Weeks` : '—'} bg="#ffffff" />
                 <DR label="Specimen Age"        value={specimenAge}            bg="#ffffff" />
                 <DR label="Age at Collection"   value={formatAge(agecoll)}     bg="#ffffff" />
-
-                {/* ── light blue: Received / Reported ── */}
                 <DR label="Date Received"       value={tmrecv !== '—' ? `${dtrecv} @ ${tmrecv}` : dtrecv} bg="#eff6ff" first />
                 <DR label="Date Reported"       value={dtrptd}   bg="#eff6ff" />
                 <DR label="Clinical Status"     value={clinstat} bg="#eff6ff" />
                 <DR label="Demog Acceptable"    value={demcode}  bg="#eff6ff" />
-
-                {/* ── light green: Physician / Hospital ── */}
                 <DR label="Physician ID"        value={physid}    bg="#f0fdf4" valueColor="#15803d" bold first />
                 <DR label="Birth Hospital ID"   value={birthhosp} bg="#f0fdf4" />
                 <DR label="Birth Hospital Name" value={descr1}    bg="#f0fdf4" valueColor="#15803d" />
-
-                {/* ── white: Facility / Provider ── */}
                 <DR label="Facility Code"       value={providerid} bg="#ffffff" first />
                 <DR label="Facility Name"       value={descr1}     bg="#ffffff" />
                 <DR label="Address 1"           value={street1}    bg="#ffffff" />
@@ -450,19 +789,13 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                 <DR label="Fax"                 value={fax}        bg="#ffffff" />
                 <DR label="Mobile"              value={mobile}     bg="#ffffff" />
                 <DR label="Email"               value={email}      bg="#ffffff" />
-
-                {/* ── light green: Coordinator / Release ── */}
                 <DR label="Coordinator"         value={coord}      bg="#f0fdf4" valueColor="#15803d" bold first />
                 <DR label="Demog Release"       value={releasedt}  bg="#eff6ff" valueColor="#1d4ed8" bold />
                 <DR label="Initial Entry"       value={initTech}   bg="#f0fdf4" valueColor="#15803d" bold />
                 <DR label="Verification Entry"  value={verTech}    bg="#f0fdf4" valueColor="#15803d" />
                 <DR label="Second Copy Date"    value={val(d?.SECONDCOPY)} bg="#ffffff" />
                 <DR label="Outside Lab"         value={val(d?.OUTLAB)}     bg="#ffffff" />
-
-                {/* ── blue highlight: Status ── */}
                 <DR label="Status"              value={status}     bg="#dbeafe" valueColor="#1d4ed8" bold first />
-
-                {/* ── orange highlight: Disposition ── */}
                 <DR label="Disposition"      value={disposition} bg={disposition !== '—' ? '#fff7ed' : '#ffffff'} valueColor={disposition !== '—' ? '#c2410c' : '#374151'} bold={disposition !== '—'} first />
                 <DR label="Disposition Date" value={dispdate}    bg={dispdate    !== '—' ? '#fff7ed' : '#ffffff'} valueColor={dispdate    !== '—' ? '#c2410c' : '#374151'} bold={dispdate    !== '—'} />
                 <DR label="Closed By"        value={closedBy}    bg={closedBy    !== '—' ? '#fff7ed' : '#ffffff'} valueColor={closedBy    !== '—' ? '#c2410c' : '#374151'} bold={closedBy    !== '—'} />
@@ -484,52 +817,38 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-gray-100 dark:bg-gray-800">
                         {['TEST','CODE','MNEMONIC','VALUE','RESULT','TEXT','REFERENCE RANGE','INSTRUCT'].map(h => (
-                          <th key={h} className="px-2 py-1.5 text-left text-[10px] font-bold text-gray-600 dark:text-gray-300 border-b border-r border-gray-200 dark:border-gray-700 whitespace-nowrap last:border-r-0">
-                            {h}
-                          </th>
+                          <th key={h} className="px-2 py-1.5 text-left text-[10px] font-bold text-gray-600 dark:text-gray-300 border-b border-r border-gray-200 dark:border-gray-700 whitespace-nowrap last:border-r-0">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {resLoading ? (
-                        <tr>
-                          <td colSpan={8} className="py-8 text-center" style={{ fontSize: '11px' }}>
-                            <div className="flex items-center justify-center gap-2 text-gray-400">
-                              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                              Loading results…
-                            </div>
-                          </td>
-                        </tr>
+                        <tr><td colSpan={8} className="py-8 text-center" style={{ fontSize: '11px' }}>
+                          <div className="flex items-center justify-center gap-2 text-gray-400">
+                            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />Loading results…
+                          </div>
+                        </td></tr>
                       ) : results.length === 0 ? (
-                        <tr>
-                          <td colSpan={8} className="py-8 text-center text-gray-300 dark:text-gray-600" style={{ fontSize: '11px' }}>
-                            No results found
-                          </td>
-                        </tr>
+                        <tr><td colSpan={8} className="py-8 text-center text-gray-300 dark:text-gray-600" style={{ fontSize: '11px' }}>No results found</td></tr>
                       ) : results.map((row, i) => {
                         const resultText = (row.DISORDERRESULTTEXT || '').toLowerCase();
                         const isNormal = resultText.includes('normal') || resultText === '' || resultText === '—';
-                        const rowBg = isNormal
-                          ? (i % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50/70 dark:bg-gray-800/50')
-                          : 'bg-red-50 dark:bg-red-900/20';
+                        const rowBg = isNormal ? (i % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50/70 dark:bg-gray-800/50') : 'bg-red-50 dark:bg-red-900/20';
                         return (
-                        <tr key={i}
-                          onClick={() => handleResultClick(row.ABBREV, i)}
-                          className={`border-b border-gray-100 dark:border-gray-800 hover:bg-blue-50/70 dark:hover:bg-blue-900/20 transition-colors cursor-pointer ${selectedRow === i ? 'ring-2 ring-inset ring-blue-400' : ''} ${rowBg}`}>
-                          <td className={`px-2 py-[3px] text-[11px] font-semibold whitespace-nowrap border-r border-gray-100 dark:border-gray-800 ${isNormal ? 'text-gray-800 dark:text-gray-100' : 'text-red-700 dark:text-red-300'}`}>{row.ABBREV || '—'}</td>
-                          <td className="px-2 py-[3px] text-[11px] font-mono text-gray-600 dark:text-gray-400 border-r border-gray-100 dark:border-gray-800">{row.TESTCODE || '—'}</td>
-                          <td className="px-2 py-[3px] text-[11px] text-gray-600 dark:text-gray-400 border-r border-gray-100 dark:border-gray-800">{row.MNEMONIC || '—'}</td>
-                          <td className={`px-2 py-[3px] text-[11px] font-semibold tabular-nums border-r border-gray-100 dark:border-gray-800 ${isNormal ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>{row.VALUE || '—'}</td>
-                          <td className="px-2 py-[3px] border-r border-gray-100 dark:border-gray-800">
-                            {isNormal
-                              ? <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Normal</span>
-                              : <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Abnormal</span>
-                            }
-                          </td>
-                          <td className={`px-2 py-[3px] text-[11px] whitespace-nowrap border-r border-gray-100 dark:border-gray-800 ${isNormal ? 'text-gray-500 dark:text-gray-400' : 'text-red-600 dark:text-red-400 font-medium'}`}>{row.DISORDERRESULTTEXT || '—'}</td>
-                          <td className="px-2 py-[3px] text-[11px] text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap border-r border-gray-100 dark:border-gray-800">{row.EXPECTED || '—'}</td>
-                          <td className="px-2 py-[3px] text-[11px] text-gray-400 dark:text-gray-500 whitespace-nowrap">{row.INSTRUCT || '—'}</td>
-                        </tr>
+                          <tr key={i} onClick={() => handleResultClick(row.ABBREV, i)}
+                            className={`border-b border-gray-100 dark:border-gray-800 hover:bg-blue-50/70 dark:hover:bg-blue-900/20 transition-colors cursor-pointer ${selectedRow === i ? 'ring-2 ring-inset ring-blue-400' : ''} ${rowBg}`}>
+                            <td className={`px-2 py-[3px] text-[11px] font-semibold whitespace-nowrap border-r border-gray-100 dark:border-gray-800 ${isNormal ? 'text-gray-800 dark:text-gray-100' : 'text-red-700 dark:text-red-300'}`}>{row.ABBREV || '—'}</td>
+                            <td className="px-2 py-[3px] text-[11px] font-mono text-gray-600 dark:text-gray-400 border-r border-gray-100 dark:border-gray-800">{row.TESTCODE || '—'}</td>
+                            <td className="px-2 py-[3px] text-[11px] text-gray-600 dark:text-gray-400 border-r border-gray-100 dark:border-gray-800">{row.MNEMONIC || '—'}</td>
+                            <td className={`px-2 py-[3px] text-[11px] font-semibold tabular-nums border-r border-gray-100 dark:border-gray-800 ${isNormal ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>{row.VALUE || '—'}</td>
+                            <td className="px-2 py-[3px] border-r border-gray-100 dark:border-gray-800">
+                              {isNormal ? <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Normal</span>
+                                        : <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Abnormal</span>}
+                            </td>
+                            <td className={`px-2 py-[3px] text-[11px] whitespace-nowrap border-r border-gray-100 dark:border-gray-800 ${isNormal ? 'text-gray-500 dark:text-gray-400' : 'text-red-600 dark:text-red-400 font-medium'}`}>{row.DISORDERRESULTTEXT || '—'}</td>
+                            <td className="px-2 py-[3px] text-[11px] text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap border-r border-gray-100 dark:border-gray-800">{row.EXPECTED || '—'}</td>
+                            <td className="px-2 py-[3px] text-[11px] text-gray-400 dark:text-gray-500 whitespace-nowrap">{row.INSTRUCT || '—'}</td>
+                          </tr>
                         );
                       })}
                     </tbody>
@@ -551,20 +870,15 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                     </thead>
                     <tbody>
                       {testSeqLoading ? (
-                        <tr>
-                          <td colSpan={4} className="px-2 py-8 text-center" style={{ fontSize: '10px' }}>
-                            <div className="flex items-center justify-center gap-1.5 text-gray-400">
-                              <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                              Loading…
-                            </div>
-                          </td>
-                        </tr>
+                        <tr><td colSpan={4} className="px-2 py-8 text-center" style={{ fontSize: '10px' }}>
+                          <div className="flex items-center justify-center gap-1.5 text-gray-400">
+                            <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />Loading…
+                          </div>
+                        </td></tr>
                       ) : testSeq.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="px-2 py-8 text-center text-[10px] text-gray-300 dark:text-gray-600">
-                            {selectedRow !== null ? 'No sequence data' : 'Click a result row'}
-                          </td>
-                        </tr>
+                        <tr><td colSpan={4} className="px-2 py-8 text-center text-[10px] text-gray-300 dark:text-gray-600">
+                          {selectedRow !== null ? 'No sequence data' : 'Click a result row'}
+                        </td></tr>
                       ) : testSeq.map((s, i) => {
                         const isAbnormal = s.RFLAG && s.RFLAG.trim() !== '';
                         return (
@@ -572,10 +886,7 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                             <td className="px-2 py-[3px] text-[10px] font-mono text-gray-600 dark:text-gray-400 border-r border-gray-100">{s.TESTSEQ || '—'}</td>
                             <td className="px-2 py-[3px] text-[10px] text-gray-600 dark:text-gray-400 border-r border-gray-100 truncate max-w-[60px]">{s.MNEMONIC || '—'}</td>
                             <td className="px-2 py-[3px] text-[10px] border-r border-gray-100">
-                              {isAbnormal
-                                ? <span className="text-red-600 dark:text-red-400 font-bold">{s.RFLAG}</span>
-                                : <span className="text-gray-300 dark:text-gray-600">—</span>
-                              }
+                              {isAbnormal ? <span className="text-red-600 dark:text-red-400 font-bold">{s.RFLAG}</span> : <span className="text-gray-300 dark:text-gray-600">—</span>}
                             </td>
                             <td className={`px-2 py-[3px] text-[10px] font-semibold tabular-nums ${isAbnormal ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>{s.VALUE || '—'}</td>
                           </tr>
@@ -587,48 +898,191 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
               </div>
             </div>
 
-            {/* BOTTOM: Specimen image + Sidebar */}
+            {/* BOTTOM: Specimen image + Right sidebar */}
             <div className="flex flex-1 overflow-hidden min-h-0">
-              <div className="flex-1 bg-gray-200 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
-                <div className="text-center text-gray-400 dark:text-gray-600 select-none pointer-events-none">
-                  <ImageIcon size={56} className="mx-auto mb-2 opacity-20" />
-                  <p className="text-xs opacity-40">Specimen scan image</p>
-                  <p className="text-[10px] opacity-30 mt-0.5 font-mono">Zoom: {zoom}%</p>
+
+              {/* ── Image viewer + Notes panel stacked ── */}
+              <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+
+                {/* Image viewer — shrinks when notes panel is open */}
+                <div
+                  className={`bg-gray-200 dark:bg-gray-800 flex items-center justify-center overflow-hidden relative transition-all duration-300 ${showNotes ? 'flex-shrink-0' : 'flex-1'}`}
+                  style={showNotes ? { height: '50%' } : {}}>
+                  {imageLoading ? (
+                    <div className="flex flex-col items-center gap-3 text-gray-400 dark:text-gray-500 select-none">
+                      <div className="w-9 h-9 border-[3px] border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      <p className="text-xs font-medium">Loading image…</p>
+                      <p className="text-[10px] opacity-60 font-mono">{currentLabno}</p>
+                    </div>
+                  ) : imageUrl ? (
+                    <MagnifierViewer src={imageUrl} zoom={zoom} labno={currentLabno} />
+                  ) : (
+                    <div className="text-center text-gray-400 dark:text-gray-600 select-none pointer-events-none">
+                      <ImageIcon size={52} className="mx-auto mb-2.5 opacity-20" />
+                      <p className="text-xs font-medium opacity-50">
+                        {imageError === 'not_found' ? 'No specimen image found' : imageError === 'error' ? 'Failed to load image' : 'Specimen scan image'}
+                      </p>
+                      <p className="text-[10px] opacity-30 mt-1 font-mono">{currentLabno}</p>
+                    </div>
+                  )}
+                  {imageUrl && !imageLoading && (
+                    <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-mono font-bold pointer-events-none select-none"
+                      style={{ background: 'rgba(0,0,0,0.4)', color: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(4px)' }}>
+                      {zoom}%
+                    </div>
+                  )}
                 </div>
+
+                {/* ── Notes panel (shown when showNotes is true) ── */}
+                {showNotes && (
+                  <div className="flex-1 flex flex-col overflow-hidden border-t-2 border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-900/10">
+                    {/* Notes panel header */}
+                    <div className="flex-shrink-0 flex items-center justify-between px-3 py-1.5 bg-amber-100 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-800/60">
+                      <div className="flex items-center gap-2">
+                        <FileText size={11} className="text-amber-600 dark:text-amber-400" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-300">Sample Notes</span>
+                        {!notesLoading && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-800 dark:bg-amber-800/60 dark:text-amber-300">
+                            {notes.length} note{notes.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                      <button onClick={() => setShowNotes(false)}
+                        className="w-5 h-5 rounded flex items-center justify-center text-amber-500 hover:bg-amber-200 dark:hover:bg-amber-800/60 transition-colors">
+                        <X size={10} />
+                      </button>
+                    </div>
+
+                    {/* Notes list */}
+                    <div className="flex-1 overflow-y-auto">
+                      {notesLoading ? (
+                        <div className="flex items-center justify-center h-full gap-2 text-amber-500">
+                          <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                          <span className="text-xs">Loading notes…</span>
+                        </div>
+                      ) : notes.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-400 dark:text-gray-600">
+                          <FileText size={28} className="opacity-20" />
+                          <p className="text-xs">No notes found for this record</p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-amber-100 dark:divide-amber-900/30">
+                          {notes.map((note, i) => (
+                            <div key={i} className="px-3 py-2.5 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors">
+                              {/* Note meta row */}
+                              <div className="flex items-start justify-between gap-2 mb-1.5">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {notePriorityBadge(note.NOTEPRIORITY)}
+                                  {note.ERROR && note.ERROR.trim() && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700">ERR</span>
+                                  )}
+                                  <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 uppercase">
+                                    {note.USER_FIRSTNAME && note.USER_LASTNAME
+                                      ? `${note.USER_FIRSTNAME} ${note.USER_LASTNAME}`
+                                      : note.USER_ID ? `User #${note.USER_ID}` : '—'}
+                                  </span>
+                                </div>
+                                {/* Timestamps */}
+                                <div className="flex flex-col items-end flex-shrink-0 gap-0.5">
+                                  <span className="text-[9px] font-mono text-amber-600 dark:text-amber-400 whitespace-nowrap">{note.CREATE_DT}</span>
+                                  {note.LASTMOD && note.LASTMOD !== note.CREATE_DT && (
+                                    <span className="text-[9px] font-mono text-gray-400 dark:text-gray-500 whitespace-nowrap">mod: {note.LASTMOD}</span>
+                                  )}
+                                </div>
+                              </div>
+                              {/* Note text */}
+                              <p className="text-[11px] text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap break-words">
+                                {note.NOTES}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Right sidebar */}
-              <div className="flex-shrink-0 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col overflow-y-auto" style={{ width: '160px' }}>
+              <div className="flex-shrink-0 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col overflow-y-auto" style={{ width: '200px' }}>
+                {/* Zoom controls */}
                 <div className="px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
                   <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 text-center mb-2">Zoom Percentage</p>
                   <div className="flex items-center justify-center gap-1.5">
-                    <button onClick={() => setZoom(z => Math.max(50,  z - 50))}
-                      className="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold text-base flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 transition-colors">−</button>
-                    <span className="w-10 text-center text-[12px] font-mono font-bold text-gray-900 dark:text-gray-100 tabular-nums">{zoom}</span>
-                    <button onClick={() => setZoom(z => Math.min(600, z + 50))}
-                      className="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold text-base flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 transition-colors">+</button>
+                    <button onClick={zoomOut} disabled={!hasImage}
+                      className="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold text-base flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">−</button>
+                    <button onClick={zoomReset} disabled={!hasImage} title="Reset to 100%"
+                      className="w-10 text-center text-[12px] font-mono font-bold text-gray-900 dark:text-gray-100 tabular-nums hover:text-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                      {zoom}
+                    </button>
+                    <button onClick={zoomIn} disabled={!hasImage}
+                      className="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold text-base flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">+</button>
                   </div>
+                  {hasImage && (
+                    <div className="flex flex-wrap gap-1 mt-2 justify-center">
+                      {[50, 100, 150, 200].map(pct => (
+                        <button key={pct} onClick={() => setZoom(pct)}
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ${zoom === pct ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300'}`}>
+                          {pct}%
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
+                {/* Action buttons */}
                 <div className="flex flex-col gap-1.5 px-2 py-2 flex-shrink-0">
-                  <ABtn icon={<ZoomIn        size={11} />} label="Full Image" />
-                  <ABtn icon={<ClipboardList size={11} />} label="Audit Trail" />
-                  <ABtn icon={<Download      size={11} />} label="Download Image" />
-                  <ABtn icon={<User          size={11} />} label="Include Patient Info" />
-                  <ABtn icon={<Mail          size={11} />} label="Email" />
-                  <ABtn icon={<FileText      size={11} />} label="Show Notes" />
-                  <ABtn icon={<BookOpen      size={11} />} label="Show Letters" />
+                  <ABtn icon={<Maximize2     size={11} />} label="Full Image"     onClick={handleFullImage} disabled={!hasImage} />
+                  <ABtn icon={<ClipboardList size={11} />} label="Audit Trail"    onClick={() => setShowAudit(true)} />
+                  <ABtn icon={<Download      size={11} />} label="Download Image" onClick={handleDownload}  disabled={!hasImage} />
+
+                  {/* Include Patient Info checkbox */}
+                  <button onClick={() => setIncludePatientInfo(v => !v)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all duration-150 ${
+                      includePatientInfo
+                        ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+                        : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 dark:hover:border-blue-700'
+                    }`}>
+                    <div className={`w-3.5 h-3.5 rounded flex-shrink-0 border-[1.5px] flex items-center justify-center transition-all ${includePatientInfo ? 'bg-blue-600 border-blue-600' : 'bg-white dark:bg-gray-700 border-gray-400 dark:border-gray-500'}`}>
+                      {includePatientInfo && (
+                        <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
+                          <path d="M1 3L3 5L7 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </div>
+                    Include Patient Info
+                  </button>
+
+                  {/* Email button */}
+                  <ABtn icon={<Mail size={11} />} label="Email" onClick={() => setShowEmail(true)} />
+
+                  {/* ── Show Notes — toggle button ── */}
+                  <button onClick={() => setShowNotes(v => !v)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all duration-150 ${
+                      showNotes
+                        ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300'
+                        : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-300 dark:hover:bg-amber-900/20 dark:hover:text-amber-400 dark:hover:border-amber-700'
+                    }`}>
+                    <FileText size={11} className="flex-shrink-0" />
+                    {showNotes ? 'Hide Notes' : 'Show Notes'}
+                    {notes.length > 0 && (
+                      <span className={`ml-auto text-[9px] font-bold px-1 rounded ${showNotes ? 'bg-amber-200 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
+                        {notes.length}
+                      </span>
+                    )}
+                  </button>
+
+                  <ABtn icon={<BookOpen size={11} />} label="Show Letters" />
                 </div>
+
+                {/* Patient Filter Cards */}
                 <div className="mt-auto px-2 py-2 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1.5">
                     Patient Filter Cards
-                    {filterCards.length > 1 && (
-                      <span className="ml-1 text-blue-500">({filterCards.length})</span>
-                    )}
+                    {filterCards.length > 1 && <span className="ml-1 text-blue-500">({filterCards.length})</span>}
                   </p>
                   {filterLoading ? (
-                    <div className="flex justify-center py-2">
-                      <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                    </div>
+                    <div className="flex justify-center py-2"><div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
                   ) : (
                     <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700" style={{ fontSize: '10px', maxHeight: '160px', overflowY: 'auto' }}>
                       <div className="flex bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0">
@@ -639,7 +1093,7 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                       {filterCards.length === 0 ? (
                         <div className="flex items-center bg-white dark:bg-gray-900">
                           <span className="px-1.5 py-1 font-mono text-gray-700 dark:text-gray-200 border-r border-gray-200 dark:border-gray-700 truncate" style={{ width: '72px', flexShrink: 0 }}>{labno}</span>
-                          <span className={`px-1.5 py-1 font-semibold border-r border-gray-200 dark:border-gray-700" style={{ width: '52px', flexShrink: 0 }} ${status === 'MAILED' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>{status}</span>
+                          <span className={`px-1.5 py-1 font-semibold border-r border-gray-200 dark:border-gray-700 ${status === 'MAILED' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`} style={{ width: '52px', flexShrink: 0 }}>{status}</span>
                           <span className="px-1 py-0.5 flex-shrink-0">
                             <button className="h-5 px-1.5 text-[9px] rounded font-semibold bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors flex items-center gap-0.5">
                               <FlaskConical size={8} /> PIS
@@ -650,20 +1104,11 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                         const cardStatus = card.DTRPTD && card.DTRPTD.trim() ? 'MAILED' : 'UNMAILED';
                         const isActive = card.LABNO === activeLabno;
                         return (
-                          <div key={i}
-                            className={`flex items-center border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${isActive ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-white dark:bg-gray-900'}`}>
-                            <span className={`px-1.5 py-1 font-mono border-r border-gray-200 dark:border-gray-700 truncate ${isActive ? 'text-blue-700 dark:text-blue-300 font-bold' : 'text-gray-700 dark:text-gray-200'}`} style={{ width: '72px', flexShrink: 0 }}>
-                              {card.LABNO}
-                            </span>
-                            <span className={`px-1.5 py-1 font-semibold border-r border-gray-200 dark:border-gray-700 ${cardStatus === 'MAILED' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`} style={{ width: '52px', flexShrink: 0 }}>
-                              {cardStatus}
-                            </span>
+                          <div key={i} className={`flex items-center border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${isActive ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-white dark:bg-gray-900'}`}>
+                            <span className={`px-1.5 py-1 font-mono border-r border-gray-200 dark:border-gray-700 truncate ${isActive ? 'text-blue-700 dark:text-blue-300 font-bold' : 'text-gray-700 dark:text-gray-200'}`} style={{ width: '72px', flexShrink: 0 }}>{card.LABNO}</span>
+                            <span className={`px-1.5 py-1 font-semibold border-r border-gray-200 dark:border-gray-700 ${cardStatus === 'MAILED' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`} style={{ width: '52px', flexShrink: 0 }}>{cardStatus}</span>
                             <span className="px-1 py-0.5 flex-shrink-0">
-                              <button
-                                onClick={() => {
-                                  setActiveLabno(card.LABNO);
-                                  setActiveRecord({ ...record!, LABNO: card.LABNO });
-                                }}
+                              <button onClick={() => { setActiveLabno(card.LABNO); setActiveRecord({ ...record!, LABNO: card.LABNO }); }}
                                 className={`h-5 px-1.5 text-[9px] rounded font-semibold border transition-colors flex items-center gap-0.5 ${isActive ? 'bg-blue-600 text-white border-blue-600' : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'}`}>
                                 <FlaskConical size={8} /> PIS
                               </button>
@@ -684,6 +1129,14 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
           <span className="text-[11px] text-gray-400 dark:text-gray-500">
             Record:&nbsp;<span className="font-mono text-gray-600 dark:text-gray-300">{labno}</span>
             <span className="mx-2 opacity-40">·</span>{fullName}
+            {includePatientInfo && (
+              <span className="ml-3 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400">Patient Info Included in Email</span>
+            )}
+            {showNotes && notes.length > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                {notes.length} Note{notes.length !== 1 ? 's' : ''}
+              </span>
+            )}
           </span>
           <button onClick={onClose}
             className="h-7 px-4 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
@@ -699,6 +1152,10 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
         }
       `}} />
     </div>
+
+    {showAudit && <AuditTrailModal labno={currentLabno} patientName={fullName} onClose={() => setShowAudit(false)} />}
+    {showEmail && currentRecord && <EmailModal detail={detail} record={currentRecord} includePatientInfo={includePatientInfo} onClose={() => setShowEmail(false)} />}
+    </>
   );
 };
 
@@ -714,12 +1171,7 @@ const Field: React.FC<{
   <div className="flex flex-col gap-1">
     <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{label}</label>
     <input type={type} value={value} disabled={disabled} onChange={(e) => onChange(name, e.target.value)}
-      className="h-9 px-3 text-sm rounded-lg border border-gray-300 dark:border-gray-700
-        bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-        transition-all duration-150
-        disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-800/50"
-    />
+      className="h-9 px-3 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-800/50" />
   </div>
 );
 
@@ -731,11 +1183,7 @@ const SelectField: React.FC<{
     <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{label}</label>
     <div className="relative">
       <select value={value} onChange={(e) => onChange(name, e.target.value)}
-        className="h-9 w-full px-3 pr-8 text-sm rounded-lg border appearance-none
-          border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800
-          text-gray-900 dark:text-gray-100
-          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-          transition-all duration-150">
+        className="h-9 w-full px-3 pr-8 text-sm rounded-lg border appearance-none border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150">
         {options.map(o => <option key={o} value={o}>{o === '' ? '— All —' : o}</option>)}
       </select>
       <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -748,11 +1196,8 @@ const SelectField: React.FC<{
 // ═══════════════════════════════════════════════
 
 const SearchForm: React.FC<{
-  params: SearchParams;
-  onChange: (name: keyof SearchParams, value: string) => void;
-  onSearch: () => void;
-  onClear: () => void;
-  isLoading: boolean;
+  params: SearchParams; onChange: (name: keyof SearchParams, value: string) => void;
+  onSearch: () => void; onClear: () => void; isLoading: boolean;
 }> = ({ params, onChange, onSearch, onClear, isLoading }) => (
   <div onKeyDown={(e) => { if (e.key === 'Enter') onSearch(); }}
     className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
@@ -782,18 +1227,12 @@ const SearchForm: React.FC<{
     </div>
     <div className="flex items-center justify-end gap-3">
       <button onClick={onClear}
-        className="h-9 px-4 text-sm rounded-lg border border-gray-300 dark:border-gray-600
-          text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700
-          flex items-center gap-2 transition-all duration-150">
+        className="h-9 px-4 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 transition-all duration-150">
         <X size={14} /> Clear
       </button>
       <button onClick={onSearch} disabled={isLoading}
-        className="h-9 px-5 text-sm rounded-lg font-semibold
-          bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20
-          flex items-center gap-2 transition-all duration-150
-          disabled:opacity-50 disabled:cursor-not-allowed">
-        <Search size={14} />
-        {isLoading ? 'Searching…' : 'Search'}
+        className="h-9 px-5 text-sm rounded-lg font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20 flex items-center gap-2 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed">
+        <Search size={14} />{isLoading ? 'Searching…' : 'Search'}
       </button>
     </div>
   </div>
@@ -804,9 +1243,7 @@ const SearchForm: React.FC<{
 // ═══════════════════════════════════════════════
 
 const Pagination: React.FC<{
-  currentPage: number; totalPages: number;
-  totalCount: number; pageSize: number;
-  onPageChange: (page: number) => void;
+  currentPage: number; totalPages: number; totalCount: number; pageSize: number; onPageChange: (page: number) => void;
 }> = ({ currentPage, totalPages, totalCount, pageSize, onPageChange }) => {
   if (totalPages <= 1) return null;
   const from  = (currentPage - 1) * pageSize + 1;
@@ -829,25 +1266,19 @@ const Pagination: React.FC<{
       </p>
       <div className="flex items-center gap-1">
         <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1}
-          className="h-8 w-8 flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600
-            text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700
-            disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          className="h-8 w-8 flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
           <ChevronLeft size={14} />
         </button>
         {pages.map((p, i) =>
           p === '...'
             ? <span key={`e-${i}`} className="h-8 w-8 flex items-center justify-center text-xs text-gray-400">…</span>
             : <button key={p} onClick={() => onPageChange(p as number)}
-                className={`h-8 w-8 flex items-center justify-center rounded-lg border text-xs font-medium transition-colors ${
-                  p === currentPage ? 'bg-blue-600 border-blue-600 text-white'
-                  : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
+                className={`h-8 w-8 flex items-center justify-center rounded-lg border text-xs font-medium transition-colors ${p === currentPage ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
                 {p}
               </button>
         )}
         <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages}
-          className="h-8 w-8 flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600
-            text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700
-            disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          className="h-8 w-8 flex items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
           <ChevronRight size={14} />
         </button>
       </div>
@@ -860,8 +1291,7 @@ const Pagination: React.FC<{
 // ═══════════════════════════════════════════════
 
 const ResultsTable: React.FC<{
-  results: SampleRecord[]; totalCount: number;
-  isLoading: boolean; onView: (record: SampleRecord) => void;
+  results: SampleRecord[]; totalCount: number; isLoading: boolean; onView: (record: SampleRecord) => void;
 }> = ({ results = [], totalCount = 0, isLoading, onView }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const sorted        = [...results].sort((a, b) => String(b.LABNO).localeCompare(String(a.LABNO), undefined, { numeric: true }));
@@ -881,14 +1311,11 @@ const ResultsTable: React.FC<{
       {totalCount > 0 && (
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Search Results</span>
-          <span className="px-2 py-0.5 text-xs font-bold rounded-full
-            bg-blue-50 dark:bg-blue-600/20 text-blue-600 dark:text-blue-400
-            border border-blue-200 dark:border-blue-500/30">
+          <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-blue-50 dark:bg-blue-600/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30">
             {totalCount} record{totalCount !== 1 ? 's' : ''} found
           </span>
         </div>
       )}
-
       {results.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-500">
           <Search size={36} className="mb-3 opacity-25" />
@@ -911,26 +1338,17 @@ const ResultsTable: React.FC<{
                     const sx = sexBadge(row.SEX);
                     return (
                       <tr key={`${row.LABNO}-${i}`}
-                        className={`border-b border-gray-100 dark:border-gray-700/50 transition-colors duration-100
-                          ${i % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50/50 dark:bg-gray-800/40'}
-                          hover:bg-blue-50/50 dark:hover:bg-gray-700/50`}>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-tight">{row.LABNO || '—'}</span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="font-mono text-xs text-gray-500 dark:text-gray-400">{row.LABID || '—'}</span>
-                        </td>
+                        className={`border-b border-gray-100 dark:border-gray-700/50 transition-colors duration-100 ${i % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50/50 dark:bg-gray-800/40'} hover:bg-blue-50/50 dark:hover:bg-gray-700/50`}>
+                        <td className="px-4 py-3 whitespace-nowrap"><span className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-tight">{row.LABNO || '—'}</span></td>
+                        <td className="px-4 py-3 whitespace-nowrap"><span className="font-mono text-xs text-gray-500 dark:text-gray-400">{row.LABID || '—'}</span></td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
-                              <User size={13} className="text-blue-500 dark:text-blue-400" />
-                            </div>
+                            <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0"><User size={13} className="text-blue-500 dark:text-blue-400" /></div>
                             {formatPatientName(row.LNAME, row.FNAME)}
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {row.SUBMID
-                            ? <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded font-mono bg-gray-100 dark:bg-gray-700/60 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">{row.SUBMID}</span>
+                          {row.SUBMID ? <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded font-mono bg-gray-100 dark:bg-gray-700/60 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">{row.SUBMID}</span>
                             : <span className="text-gray-300 dark:text-gray-600">—</span>}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm">{formatDateTime(row.BIRTHDT, row.BIRTHTM)}</td>
@@ -943,25 +1361,15 @@ const ResultsTable: React.FC<{
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
                           {row.AGECOLL ? <span className="font-semibold text-gray-700 dark:text-gray-300">{formatAge(row.AGECOLL)}</span> : <span className="text-gray-300 dark:text-gray-600">—</span>}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${sx.cls}`}>{sx.label}</span>
-                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap"><span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${sx.cls}`}>{sx.label}</span></td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {row.DTRPTD?.trim()
-                            ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-700">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" /> Mailed
-                              </span>
-                            : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-700">
-                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 dark:bg-red-400" /> Unmailed
-                              </span>}
+                            ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-700"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" /> Mailed</span>
+                            : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-700"><span className="w-1.5 h-1.5 rounded-full bg-red-500 dark:bg-red-400" /> Unmailed</span>}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <button onClick={() => onView(row)}
-                            className="h-7 px-3 text-xs rounded-lg font-medium
-                              bg-blue-50 dark:bg-blue-600/20 hover:bg-blue-100 dark:hover:bg-blue-600/40
-                              text-blue-600 dark:text-blue-400
-                              border border-blue-200 dark:border-blue-500/30 hover:border-blue-300 dark:hover:border-blue-400/60
-                              flex items-center gap-1.5 transition-all duration-150">
+                            className="h-7 px-3 text-xs rounded-lg font-medium bg-blue-50 dark:bg-blue-600/20 hover:bg-blue-100 dark:hover:bg-blue-600/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 hover:border-blue-300 dark:hover:border-blue-400/60 flex items-center gap-1.5 transition-all duration-150">
                             <FlaskConical size={11} /> View
                           </button>
                         </td>
@@ -983,14 +1391,10 @@ const ResultsTable: React.FC<{
 // ROOT COMPONENT
 // ═══════════════════════════════════════════════
 
-export const PatientInformationSystem: React.FC<Props> = ({
-  onSearch, results = [], isLoading, totalCount,
-}) => {
+export const PatientInformationSystem: React.FC<Props> = ({ onSearch, results = [], isLoading, totalCount }) => {
   const [params,     setParams]     = useState<SearchParams>(EMPTY_PARAMS);
   const [viewRecord, setViewRecord] = useState<SampleRecord | null>(null);
-
-  const handleChange = (name: keyof SearchParams, value: string) =>
-    setParams(prev => ({ ...prev, [name]: value }));
+  const handleChange = (name: keyof SearchParams, value: string) => setParams(prev => ({ ...prev, [name]: value }));
 
   return (
     <div className="p-6 text-gray-900 dark:text-gray-100">
@@ -1001,11 +1405,8 @@ export const PatientInformationSystem: React.FC<Props> = ({
           <p className="text-xs text-gray-500 dark:text-gray-400">Search and manage patient sample records</p>
         </div>
       </div>
-
       <SearchForm params={params} onChange={handleChange} onSearch={() => onSearch(params)} onClear={() => setParams(EMPTY_PARAMS)} isLoading={isLoading} />
-
       <ResultsTable results={results} totalCount={totalCount} isLoading={isLoading} onView={(record) => setViewRecord(record)} />
-
       <PatientRecordModal record={viewRecord} onClose={() => setViewRecord(null)} />
     </div>
   );
