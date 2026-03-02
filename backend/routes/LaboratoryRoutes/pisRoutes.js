@@ -24,5 +24,7 @@ router.get('/filtercards',  pisController.getPatientFilterCards);
 router.get('/image',        pisController.fetchImage);
 router.get('/audit-trail',  pisController.getAuditTrail);
 router.get('/notes',        pisController.getNotes);
+router.get('/letters',      pisController.fetchLetters);
+router.get('/letter-image', pisController.fetchLetterImage);
 
 module.exports = router;

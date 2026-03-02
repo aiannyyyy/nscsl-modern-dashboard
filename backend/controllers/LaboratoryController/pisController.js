@@ -600,3 +600,98 @@ exports.getNotes = async (req, res) => {
         }
     }
 };
+
+// ── Controller 9: Fetch Letters List ─────────────────────────────────────────
+// Files live at: \\nscsl-data\Digital-Archive\Documents\
+// Filename pattern: 20260580130_2026058_041656PM.jpg
+// Match rule: filename starts with labno (first segment before underscore)
+exports.fetchLetters = async (req, res) => {
+    let { labno } = req.query;
+    if (!labno) return res.status(400).json({ error: 'Missing required parameter: labno' });
+
+    try {
+        const fs   = require('fs');
+        const path = require('path');
+
+        labno = labno.split(':')[0].trim();
+
+        const folder = `\\\\nscsl-data\\Digital-Archive\\Documents`;
+        const extensions = new Set(['.jpg', '.jpeg', '.png', '.JPG', '.JPEG', '.PNG']);
+
+        // Folder must exist
+        if (!fs.existsSync(folder)) {
+            return res.status(404).json({ error: 'Documents folder not found', labno });
+        }
+
+        const allFiles = fs.readdirSync(folder);
+
+        // Keep only files whose name (before first underscore) matches labno exactly
+        const matched = allFiles.filter(file => {
+            const ext = path.extname(file);
+            if (!extensions.has(ext)) return false;
+            const nameOnly = path.basename(file, ext);          // e.g. "20260580130_2026058_041656PM"
+            const prefix   = nameOnly.split('_')[0];            // e.g. "20260580130"
+            return prefix === labno;
+        });
+
+        if (matched.length === 0) {
+            return res.status(404).json({ error: 'No letters found', labno });
+        }
+
+        // Return the list of filenames so frontend can request each one
+        res.json({
+            success:  true,
+            labno,
+            count:    matched.length,
+            files:    matched,          // array of filenames
+            timestamp: new Date().toISOString(),
+        });
+
+    } catch (error) {
+        console.error('❌ [PIS-Letters] Error listing letters:', error);
+        res.status(500).json({ error: 'Internal server error', details: error.message });
+    }
+};
+
+// ── Controller 10: Fetch Single Letter Image ──────────────────────────────────
+// GET /api/laboratory/pis/letter-image?labno=:labno&filename=:filename
+exports.fetchLetterImage = async (req, res) => {
+    let { labno, filename } = req.query;
+    if (!labno || !filename) {
+        return res.status(400).json({ error: 'Missing required parameters: labno and filename' });
+    }
+
+    try {
+        const fs   = require('fs');
+        const path = require('path');
+
+        labno    = labno.split(':')[0].trim();
+        filename = path.basename(filename); // strip any path traversal
+
+        // Validate: filename must start with labno
+        const nameOnly = path.basename(filename, path.extname(filename));
+        const prefix   = nameOnly.split('_')[0];
+        if (prefix !== labno) {
+            return res.status(403).json({ error: 'Filename does not match labno' });
+        }
+
+        const filePath = `\\\\nscsl-data\\Digital-Archive\\Documents\\${filename}`;
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'Letter image not found', filename });
+        }
+
+        const ext      = path.extname(filename).toLowerCase();
+        const mimeMap  = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' };
+        const mimeType = mimeMap[ext] || 'image/jpeg';
+
+        const imageBuffer = fs.readFileSync(filePath);
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.send(imageBuffer);
+
+    } catch (error) {
+        console.error('❌ [PIS-LetterImage] Error:', error);
+        res.status(500).json({ error: 'Internal server error', details: error.message });
+    }
+};

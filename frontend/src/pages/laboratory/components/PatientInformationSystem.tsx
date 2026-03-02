@@ -13,6 +13,8 @@ import {
   fetchPatientImage,
   getAuditTrail,
   getNotes,
+  fetchPatientLetters,
+  fetchLetterImage,
 } from '../../../services/LaboratoryServices/pisServices';
 
 // ═══════════════════════════════════════════════
@@ -543,6 +545,373 @@ const MagnifierViewer: React.FC<{ src: string; zoom: number; labno: string }> = 
 };
 
 // ═══════════════════════════════════════════════
+// LETTERS MODAL
+// ═══════════════════════════════════════════════
+
+const LettersModal: React.FC<{
+  labno:       string;
+  patientName: string;
+  onClose:     () => void;
+}> = ({ labno, patientName, onClose }) => {
+  const [files,        setFiles]        = useState<string[]>([]);
+  const [listLoading,  setListLoading]  = useState(true);
+  const [listError,    setListError]    = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [imageUrls,    setImageUrls]    = useState<Record<string, string>>({});
+  const [imgLoading,   setImgLoading]   = useState<Record<string, boolean>>({});
+  const [zoom,         setZoom]         = useState(100);
+  const [hovering,     setHovering]     = useState(false);
+  const [lensPos,      setLensPos]      = useState({ x: 0, y: 0 });
+  const [bgPos,        setBgPos]        = useState({ x: 0, y: 0 });
+  const viewerImgRef = useRef<HTMLImageElement>(null);
+
+  const LENS_SIZE  = 130;
+  const MAG_FACTOR = 3;
+
+  // ── Fetch file list ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!labno) return;
+    setListLoading(true); setListError(null); setFiles([]);
+    fetchPatientLetters(labno)
+      .then(res => {
+        const f = res.files ?? [];
+        setFiles(f);
+        if (f.length > 0) setSelectedFile(f[0]);
+      })
+      .catch(err => {
+        setListError(err?.message === 'NOT_FOUND' ? 'No letters found for this record.' : 'Failed to load letters list.');
+      })
+      .finally(() => setListLoading(false));
+  }, [labno]);
+
+  // ── Load individual letter image ────────────────────────────────────────────
+  const loadImage = useCallback((file: string) => {
+    if (imageUrls[file] !== undefined) return;
+    setImgLoading(prev => ({ ...prev, [file]: true }));
+    fetchLetterImage(labno, file)
+      .then(url  => setImageUrls(prev => ({ ...prev, [file]: url })))
+      .catch(()  => setImageUrls(prev => ({ ...prev, [file]: '' })))
+      .finally(() => setImgLoading(prev => ({ ...prev, [file]: false })));
+  }, [labno, imageUrls]);
+
+  // ── Preload all thumbnails when file list arrives ───────────────────────────
+  useEffect(() => {
+    files.forEach(file => loadImage(file));
+  }, [files]);
+
+  // ── Also load when selected changes (redundant but safe) ───────────────────
+  useEffect(() => {
+    if (selectedFile) loadImage(selectedFile);
+  }, [selectedFile]);
+
+  // ── Cleanup blob URLs on unmount ────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      Object.values(imageUrls).forEach(url => { if (url) URL.revokeObjectURL(url); });
+    };
+  }, []);
+
+  // ── Escape key ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onClose]);
+
+  // ── Magnifier ───────────────────────────────────────────────────────────────
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const img = viewerImgRef.current;
+    if (!img) return;
+    const rect = img.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const lx = Math.max(LENS_SIZE / 2, Math.min(x, rect.width  - LENS_SIZE / 2));
+    const ly = Math.max(LENS_SIZE / 2, Math.min(y, rect.height - LENS_SIZE / 2));
+    setLensPos({ x: lx - LENS_SIZE / 2, y: ly - LENS_SIZE / 2 });
+    setBgPos({ x: -(lx * MAG_FACTOR - LENS_SIZE / 2), y: -(ly * MAG_FACTOR - LENS_SIZE / 2) });
+  }, []);
+
+  const selectedUrl  = selectedFile ? (imageUrls[selectedFile] ?? null) : null;
+  const isImgLoading = selectedFile ? (imgLoading[selectedFile] ?? false) : false;
+
+  const handleDownload = () => {
+    if (!selectedUrl || !selectedFile) return;
+    const a = document.createElement('a');
+    a.href = selectedUrl; a.download = selectedFile;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+
+  const handleFullImage = () => { if (selectedUrl) window.open(selectedUrl, '_blank'); };
+
+  // ── Parse timestamp from filename ──────────────────────────────────────────
+  // e.g. 20260580130_2026058_041656PM.jpg → "04:16:56 PM"
+  const parseFileTime = (filename: string): string => {
+    const parts = filename.replace(/\.[^.]+$/, '').split('_');
+    if (parts.length >= 3) {
+      const raw  = parts[parts.length - 1];
+      const ampm = raw.slice(-2);
+      const digs = raw.slice(0, -2);
+      if (digs.length === 6) {
+        return `${digs.slice(0,2)}:${digs.slice(2,4)}:${digs.slice(4,6)} ${ampm}`;
+      }
+    }
+    return filename;
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[25000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div
+        className="flex flex-col bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+        style={{ animation: 'pisIn .2s cubic-bezier(.34,1.56,.64,1)', width: '1150px', maxWidth: '98vw', height: '88vh' }}>
+
+        {/* ── Header ── */}
+        <div className="flex-shrink-0 bg-gradient-to-r from-emerald-700 to-emerald-600 px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+              <BookOpen size={15} className="text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white">Letters</p>
+              <p className="text-[11px] text-emerald-200">
+                Lab No: <span className="font-mono font-semibold">{labno}</span>
+                <span className="mx-2 opacity-50">·</span>{patientName}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {!listLoading && !listError && files.length > 0 && (
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white/20 text-white">
+                {files.length} letter{files.length !== 1 ? 's' : ''}
+              </span>
+            )}
+            <button onClick={onClose}
+              className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/25 flex items-center justify-center text-white transition-colors">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Body ── */}
+        <div className="flex flex-1 overflow-hidden min-h-0">
+
+          {/* ── Left thumbnail sidebar ── */}
+          <div
+            className="flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col overflow-y-auto"
+            style={{ width: '185px' }}>
+            <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 sticky top-0 bg-gray-50 dark:bg-gray-800/50 z-10">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                Documents
+              </p>
+            </div>
+
+            {listLoading ? (
+              <div className="flex flex-col items-center justify-center flex-1 gap-2 text-gray-400">
+                <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-[11px]">Loading…</p>
+              </div>
+            ) : listError ? (
+              <div className="flex flex-col items-center justify-center flex-1 gap-2 text-gray-400 px-3 text-center">
+                <BookOpen size={28} className="opacity-20" />
+                <p className="text-[11px]">{listError}</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                {files.map((file, i) => {
+                  const isSelected   = file === selectedFile;
+                  const thumbUrl     = imageUrls[file];
+                  const thumbLoading = imgLoading[file] ?? false;
+                  const timeLabel    = parseFileTime(file);
+
+                  return (
+                    <button
+                      key={file}
+                      onClick={() => { setSelectedFile(file); setZoom(100); }}
+                      className={`w-full text-left p-2.5 transition-colors ${
+                        isSelected
+                          ? 'bg-emerald-50 dark:bg-emerald-900/30 border-l-2 border-emerald-500'
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 border-l-2 border-transparent'
+                      }`}>
+                      {/* Thumbnail */}
+                      <div
+                        className="w-full rounded-md overflow-hidden bg-gray-200 dark:bg-gray-700 mb-1.5 flex items-center justify-center"
+                        style={{ height: '115px' }}>
+                        {thumbLoading ? (
+                          <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                        ) : thumbUrl ? (
+                          <img src={thumbUrl} alt={`Letter ${i + 1}`}
+                            className="w-full h-full object-contain" draggable={false} />
+                        ) : (
+                          <BookOpen size={24} className="text-gray-400 opacity-40" />
+                        )}
+                      </div>
+                      <p className={`text-[10px] font-bold leading-tight text-center truncate ${isSelected ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-400'}`}>
+                        Letter {i + 1}
+                      </p>
+                      <p className="text-[9px] text-gray-400 dark:text-gray-500 text-center font-mono leading-tight mt-0.5 truncate">
+                        {timeLabel}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ── Right: viewer ── */}
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+
+            {/* Toolbar */}
+            {!listLoading && !listError && files.length > 0 && (
+              <div className="flex-shrink-0 px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center gap-3">
+                {/* Zoom controls */}
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setZoom(z => Math.max(25, z - 25))}
+                    className="w-7 h-7 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 transition-colors text-base">−</button>
+                  <button onClick={() => setZoom(100)} title="Reset zoom"
+                    className="w-12 text-center text-[12px] font-mono font-bold text-gray-700 dark:text-gray-200 tabular-nums hover:text-blue-600 transition-colors">
+                    {zoom}%
+                  </button>
+                  <button onClick={() => setZoom(z => Math.min(600, z + 25))}
+                    className="w-7 h-7 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 transition-colors text-base">+</button>
+                </div>
+                {/* Zoom presets */}
+                <div className="flex gap-1">
+                  {[50, 100, 150, 200].map(pct => (
+                    <button key={pct} onClick={() => setZoom(pct)}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ${
+                        zoom === pct
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300'
+                      }`}>{pct}%</button>
+                  ))}
+                </div>
+                <div className="ml-auto flex items-center gap-2">
+                  {selectedFile && (
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono truncate max-w-[280px]">{selectedFile}</span>
+                  )}
+                  <button onClick={handleFullImage} disabled={!selectedUrl}
+                    className="h-7 px-2.5 text-[11px] font-semibold rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5">
+                    <Maximize2 size={11} /> Full View
+                  </button>
+                  <button onClick={handleDownload} disabled={!selectedUrl}
+                    className="h-7 px-2.5 text-[11px] font-semibold rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5">
+                    <Download size={11} /> Download
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Image viewer area */}
+            <div
+              className="flex-1 bg-gray-200 dark:bg-gray-800 overflow-auto flex items-start justify-center relative"
+              onMouseEnter={() => setHovering(true)}
+              onMouseLeave={() => setHovering(false)}
+              onMouseMove={handleMouseMove}
+              style={{ cursor: hovering && !!selectedUrl ? 'crosshair' : 'default' }}>
+
+              {listLoading ? (
+                <div className="flex flex-col items-center justify-center h-full w-full gap-3 text-gray-400">
+                  <div className="w-9 h-9 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs font-medium">Loading…</p>
+                </div>
+              ) : listError ? (
+                <div className="flex flex-col items-center justify-center h-full w-full gap-2 text-gray-400 select-none">
+                  <BookOpen size={52} className="opacity-20" />
+                  <p className="text-xs font-medium opacity-60">{listError}</p>
+                  <p className="text-[10px] opacity-30 font-mono">{labno}</p>
+                </div>
+              ) : isImgLoading ? (
+                <div className="flex flex-col items-center justify-center h-full w-full gap-3 text-gray-400">
+                  <div className="w-9 h-9 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs font-medium">Loading letter…</p>
+                </div>
+              ) : selectedUrl ? (
+                <div className="p-4 relative inline-block" style={{ width: `${zoom}%`, minWidth: '200px', flexShrink: 0 }}>
+                  <img
+                    ref={viewerImgRef}
+                    src={selectedUrl}
+                    alt={selectedFile ?? 'Letter'}
+                    draggable={false}
+                    style={{ width: '100%', height: 'auto', maxWidth: 'none', display: 'block', userSelect: 'none' }}
+                    className="rounded shadow-lg" />
+
+                  {/* Magnifier lens */}
+                  {hovering && viewerImgRef.current && (
+                    <div style={{
+                      position: 'absolute',
+                      left: `${lensPos.x + 16}px`,
+                      top:  `${lensPos.y + 16}px`,
+                      width: `${LENS_SIZE}px`, height: `${LENS_SIZE}px`,
+                      borderRadius: '50%',
+                      border: '2px solid rgba(16,185,129,0.8)',
+                      boxShadow: '0 0 0 1px rgba(255,255,255,0.4), 0 4px 20px rgba(0,0,0,0.35)',
+                      backgroundImage: `url(${selectedUrl})`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: `${viewerImgRef.current.getBoundingClientRect().width * MAG_FACTOR}px auto`,
+                      backgroundPosition: `${bgPos.x}px ${bgPos.y}px`,
+                      pointerEvents: 'none', zIndex: 10,
+                    }}>
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                        <div style={{ width: '1px', height: '100%', background: 'rgba(16,185,129,0.4)', position: 'absolute' }} />
+                        <div style={{ height: '1px', width: '100%', background: 'rgba(16,185,129,0.4)', position: 'absolute' }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Zoom badge */}
+                  <div className="absolute top-6 left-6 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold pointer-events-none select-none"
+                    style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)' }}>
+                    {zoom}%
+                  </div>
+
+                  {/* Hover hint */}
+                  {!hovering && (
+                    <div className="absolute bottom-6 right-6 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium pointer-events-none select-none"
+                      style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)' }}>
+                      <ZoomIn size={10} /> Hover to magnify
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full w-full gap-2 text-gray-400 select-none">
+                  <BookOpen size={52} className="opacity-20" />
+                  <p className="text-xs opacity-50">Select a letter from the list</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Footer ── */}
+        <div className="flex-shrink-0 px-5 py-2 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center justify-between">
+          <span className="text-[11px] text-gray-400 dark:text-gray-500">
+            Lab No:&nbsp;<span className="font-mono text-gray-600 dark:text-gray-300">{labno}</span>
+            {files.length > 0 && (
+              <>
+                <span className="mx-2 opacity-40">·</span>
+                <span>{files.length} document{files.length !== 1 ? 's' : ''}</span>
+                {selectedFile && (
+                  <>
+                    <span className="mx-2 opacity-40">·</span>
+                    <span className="font-mono">{selectedFile}</span>
+                  </>
+                )}
+              </>
+            )}
+          </span>
+          <button onClick={onClose}
+            className="h-7 px-4 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════
 // PATIENT RECORD MODAL
 // ═══════════════════════════════════════════════
 
@@ -563,11 +932,13 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
   const [showAudit,          setShowAudit]          = useState(false);
   const [includePatientInfo, setIncludePatientInfo] = useState(false);
   const [showEmail,          setShowEmail]          = useState(false);
+  const [showLetters,        setShowLetters]        = useState(false);
+
   // ── Notes state ──────────────────────────────────────────────────────────
   const [showNotes,    setShowNotes]    = useState(false);
   const [notes,        setNotes]        = useState<NoteRow[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
-  const [notesFetched, setNotesFetched] = useState(false); // track if already fetched for this labno
+  const [notesFetched, setNotesFetched] = useState(false);
 
   // Image states
   const [imageUrl,     setImageUrl]     = useState<string | null>(null);
@@ -616,7 +987,6 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
   // ── Reset notes when labno changes ───────────────────────────────────────
   useEffect(() => {
     setNotes([]); setNotesFetched(false);
-    // Don't close the panel — just clear so it refetches if open
   }, [currentLabno]);
 
   // ── Fetch notes when panel opens (lazy) ──────────────────────────────────
@@ -633,15 +1003,16 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
   useEffect(() => {
     const esc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (showAudit)  { setShowAudit(false);  return; }
-        if (showEmail)  { setShowEmail(false);   return; }
-        if (showNotes)  { setShowNotes(false);   return; }
+        if (showAudit)   { setShowAudit(false);   return; }
+        if (showEmail)   { setShowEmail(false);    return; }
+        if (showNotes)   { setShowNotes(false);    return; }
+        if (showLetters) { setShowLetters(false);  return; }
         onClose();
       }
     };
     window.addEventListener('keydown', esc);
     return () => window.removeEventListener('keydown', esc);
-  }, [onClose, showAudit, showEmail, showNotes]);
+  }, [onClose, showAudit, showEmail, showNotes, showLetters]);
 
   if (!record) return null;
   if (!currentRecord) return null;
@@ -715,17 +1086,6 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
   const disposition = val(d?.DISPOSITION);
   const dispdate    = val(d?.DISPDATE);
   const closedBy    = val(d?.CLOSED_BY_NAME);
-
-  // ── Priority badge helper ─────────────────────────────────────────────────
-  const notePriorityBadge = (p: string | null) => {
-    if (!p || !p.trim()) return null;
-    const cls = p === '1'
-      ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700'
-      : p === '2'
-      ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700'
-      : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
-    return <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${cls}`}>P{p}</span>;
-  };
 
   return (
     <>
@@ -901,101 +1261,112 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
             {/* BOTTOM: Specimen image + Right sidebar */}
             <div className="flex flex-1 overflow-hidden min-h-0">
 
-              {/* ── Image viewer + Notes panel stacked ── */}
+              {/* ── Image viewer + Notes panel ── */}
               <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-                {/* Image viewer — shrinks when notes panel is open */}
-                <div
-                  className={`bg-gray-200 dark:bg-gray-800 flex items-center justify-center overflow-hidden relative transition-all duration-300 ${showNotes ? 'flex-shrink-0' : 'flex-1'}`}
-                  style={showNotes ? { height: '50%' } : {}}>
-                  {imageLoading ? (
-                    <div className="flex flex-col items-center gap-3 text-gray-400 dark:text-gray-500 select-none">
-                      <div className="w-9 h-9 border-[3px] border-blue-500 border-t-transparent rounded-full animate-spin" />
-                      <p className="text-xs font-medium">Loading image…</p>
-                      <p className="text-[10px] opacity-60 font-mono">{currentLabno}</p>
-                    </div>
-                  ) : imageUrl ? (
-                    <MagnifierViewer src={imageUrl} zoom={zoom} labno={currentLabno} />
-                  ) : (
-                    <div className="text-center text-gray-400 dark:text-gray-600 select-none pointer-events-none">
-                      <ImageIcon size={52} className="mx-auto mb-2.5 opacity-20" />
-                      <p className="text-xs font-medium opacity-50">
-                        {imageError === 'not_found' ? 'No specimen image found' : imageError === 'error' ? 'Failed to load image' : 'Specimen scan image'}
-                      </p>
-                      <p className="text-[10px] opacity-30 mt-1 font-mono">{currentLabno}</p>
-                    </div>
-                  )}
-                  {imageUrl && !imageLoading && (
-                    <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-mono font-bold pointer-events-none select-none"
-                      style={{ background: 'rgba(0,0,0,0.4)', color: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(4px)' }}>
-                      {zoom}%
-                    </div>
-                  )}
-                </div>
+                {/* Image viewer — hidden when notes is open */}
+                {!showNotes && (
+                  <div className="flex-1 bg-gray-200 dark:bg-gray-800 flex items-center justify-center overflow-hidden relative">
+                    {imageLoading ? (
+                      <div className="flex flex-col items-center gap-3 text-gray-400 dark:text-gray-500 select-none">
+                        <div className="w-9 h-9 border-[3px] border-blue-500 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-xs font-medium">Loading image…</p>
+                        <p className="text-[10px] opacity-60 font-mono">{currentLabno}</p>
+                      </div>
+                    ) : imageUrl ? (
+                      <MagnifierViewer src={imageUrl} zoom={zoom} labno={currentLabno} />
+                    ) : (
+                      <div className="text-center text-gray-400 dark:text-gray-600 select-none pointer-events-none">
+                        <ImageIcon size={52} className="mx-auto mb-2.5 opacity-20" />
+                        <p className="text-xs font-medium opacity-50">
+                          {imageError === 'not_found' ? 'No specimen image found' : imageError === 'error' ? 'Failed to load image' : 'Specimen scan image'}
+                        </p>
+                        <p className="text-[10px] opacity-30 mt-1 font-mono">{currentLabno}</p>
+                      </div>
+                    )}
+                    {imageUrl && !imageLoading && (
+                      <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-mono font-bold pointer-events-none select-none"
+                        style={{ background: 'rgba(0,0,0,0.4)', color: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(4px)' }}>
+                        {zoom}%
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                {/* ── Notes panel (shown when showNotes is true) ── */}
+                {/* ── Notes panel — takes full area when open ── */}
                 {showNotes && (
                   <div className="flex-1 flex flex-col overflow-hidden border-t-2 border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-900/10">
-                    {/* Notes panel header */}
-                    <div className="flex-shrink-0 flex items-center justify-between px-3 py-1.5 bg-amber-100 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-800/60">
+                    <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-amber-100 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-800/60">
                       <div className="flex items-center gap-2">
-                        <FileText size={11} className="text-amber-600 dark:text-amber-400" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-300">Sample Notes</span>
+                        <FileText size={13} className="text-amber-600 dark:text-amber-400" />
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-300">Sample Notes</span>
                         {!notesLoading && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-800 dark:bg-amber-800/60 dark:text-amber-300">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-800 dark:bg-amber-800/60 dark:text-amber-300">
                             {notes.length} note{notes.length !== 1 ? 's' : ''}
                           </span>
                         )}
                       </div>
                       <button onClick={() => setShowNotes(false)}
-                        className="w-5 h-5 rounded flex items-center justify-center text-amber-500 hover:bg-amber-200 dark:hover:bg-amber-800/60 transition-colors">
-                        <X size={10} />
+                        className="w-6 h-6 rounded flex items-center justify-center text-amber-500 hover:bg-amber-200 dark:hover:bg-amber-800/60 transition-colors">
+                        <X size={12} />
                       </button>
                     </div>
-
-                    {/* Notes list */}
                     <div className="flex-1 overflow-y-auto">
                       {notesLoading ? (
                         <div className="flex items-center justify-center h-full gap-2 text-amber-500">
-                          <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-                          <span className="text-xs">Loading notes…</span>
+                          <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                          <span className="text-sm">Loading notes…</span>
                         </div>
                       ) : notes.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-400 dark:text-gray-600">
-                          <FileText size={28} className="opacity-20" />
-                          <p className="text-xs">No notes found for this record</p>
+                          <FileText size={32} className="opacity-20" />
+                          <p className="text-sm">No notes found for this record</p>
                         </div>
                       ) : (
                         <div className="divide-y divide-amber-100 dark:divide-amber-900/30">
-                          {notes.map((note, i) => (
-                            <div key={i} className="px-3 py-2.5 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors">
-                              {/* Note meta row */}
-                              <div className="flex items-start justify-between gap-2 mb-1.5">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {notePriorityBadge(note.NOTEPRIORITY)}
-                                  {note.ERROR && note.ERROR.trim() && (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700">ERR</span>
-                                  )}
-                                  <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 uppercase">
-                                    {note.USER_FIRSTNAME && note.USER_LASTNAME
-                                      ? `${note.USER_FIRSTNAME} ${note.USER_LASTNAME}`
-                                      : note.USER_ID ? `User #${note.USER_ID}` : '—'}
-                                  </span>
+                          {notes.map((note, i) => {
+                            const fmtDT = (raw: string | null | undefined): string => {
+                              if (!raw) return '—';
+                              const d = new Date(raw);
+                              if (isNaN(d.getTime())) return raw;
+                              const date = d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+                              const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+                              return `${date} ${time}`;
+                            };
+                            const creatorName  = note.CREATE_FIRSTNAME && note.CREATE_LASTNAME ? `${note.CREATE_FIRSTNAME} ${note.CREATE_LASTNAME}` : note.CREATE_USER_ID ? `User #${note.CREATE_USER_ID}` : '—';
+                            const modifierName = note.USER_FIRSTNAME   && note.USER_LASTNAME   ? `${note.USER_FIRSTNAME} ${note.USER_LASTNAME}`     : note.USER_ID         ? `User #${note.USER_ID}`         : '—';
+                            const isModified   = note.LASTMOD && note.LASTMOD !== note.CREATE_DT;
+                            const samePerson   = creatorName === modifierName;
+                            return (
+                              <div key={note.NOTEID ?? i} className="px-4 py-3 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors">
+                                {note.NOTEPRIORITY && (
+                                  <div className="mb-2">
+                                    {note.NOTEPRIORITY === '1' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700">HIGH PRIORITY</span>}
+                                    {note.NOTEPRIORITY === '2' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700">MEDIUM</span>}
+                                  </div>
+                                )}
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-amber-600 dark:text-amber-500 font-semibold uppercase tracking-wide">Created by</span>
+                                    <span className="text-[12px] font-bold text-gray-800 dark:text-gray-200 uppercase">{creatorName}</span>
+                                  </div>
+                                  <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 whitespace-nowrap flex-shrink-0">{fmtDT(note.CREATE_DT)}</span>
                                 </div>
-                                {/* Timestamps */}
-                                <div className="flex flex-col items-end flex-shrink-0 gap-0.5">
-                                  <span className="text-[9px] font-mono text-amber-600 dark:text-amber-400 whitespace-nowrap">{note.CREATE_DT}</span>
-                                  {note.LASTMOD && note.LASTMOD !== note.CREATE_DT && (
-                                    <span className="text-[9px] font-mono text-gray-400 dark:text-gray-500 whitespace-nowrap">mod: {note.LASTMOD}</span>
-                                  )}
-                                </div>
+                                {isModified && (
+                                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Modified by</span>
+                                      <span className={`text-[12px] font-bold uppercase ${samePerson ? 'text-gray-600 dark:text-gray-400' : 'text-orange-600 dark:text-orange-400'}`}>{modifierName}</span>
+                                    </div>
+                                    <span className="text-[11px] font-mono text-gray-400 dark:text-gray-500 whitespace-nowrap flex-shrink-0">{fmtDT(note.LASTMOD)}</span>
+                                  </div>
+                                )}
+                                <p className="text-[13px] text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap break-words mt-1.5">
+                                  {note.NOTES || <span className="italic text-gray-400">No content</span>}
+                                </p>
                               </div>
-                              {/* Note text */}
-                              <p className="text-[11px] text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap break-words">
-                                {note.NOTES}
-                              </p>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -1056,7 +1427,7 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                   {/* Email button */}
                   <ABtn icon={<Mail size={11} />} label="Email" onClick={() => setShowEmail(true)} />
 
-                  {/* ── Show Notes — toggle button ── */}
+                  {/* Show Notes toggle */}
                   <button onClick={() => setShowNotes(v => !v)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all duration-150 ${
                       showNotes
@@ -1072,7 +1443,12 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                     )}
                   </button>
 
-                  <ABtn icon={<BookOpen size={11} />} label="Show Letters" />
+                  {/* Show Letters button */}
+                  <button onClick={() => setShowLetters(true)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all duration-150 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400 dark:hover:border-emerald-700">
+                    <BookOpen size={11} className="flex-shrink-0" />
+                    Show Letters
+                  </button>
                 </div>
 
                 {/* Patient Filter Cards */}
@@ -1102,7 +1478,7 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                         </div>
                       ) : filterCards.map((card, i) => {
                         const cardStatus = card.DTRPTD && card.DTRPTD.trim() ? 'MAILED' : 'UNMAILED';
-                        const isActive = card.LABNO === activeLabno;
+                        const isActive   = card.LABNO === activeLabno;
                         return (
                           <div key={i} className={`flex items-center border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${isActive ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-white dark:bg-gray-900'}`}>
                             <span className={`px-1.5 py-1 font-mono border-r border-gray-200 dark:border-gray-700 truncate ${isActive ? 'text-blue-700 dark:text-blue-300 font-bold' : 'text-gray-700 dark:text-gray-200'}`} style={{ width: '72px', flexShrink: 0 }}>{card.LABNO}</span>
@@ -1153,8 +1529,9 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
       `}} />
     </div>
 
-    {showAudit && <AuditTrailModal labno={currentLabno} patientName={fullName} onClose={() => setShowAudit(false)} />}
-    {showEmail && currentRecord && <EmailModal detail={detail} record={currentRecord} includePatientInfo={includePatientInfo} onClose={() => setShowEmail(false)} />}
+    {showAudit   && <AuditTrailModal labno={currentLabno} patientName={fullName} onClose={() => setShowAudit(false)} />}
+    {showEmail   && currentRecord && <EmailModal detail={detail} record={currentRecord} includePatientInfo={includePatientInfo} onClose={() => setShowEmail(false)} />}
+    {showLetters && <LettersModal labno={currentLabno} patientName={fullName} onClose={() => setShowLetters(false)} />}
     </>
   );
 };

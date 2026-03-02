@@ -198,3 +198,49 @@ export const getNotes = async (labno: string): Promise<PISNotesResponse> => {
     throw error;
   }
 };
+
+// ==================== LETTERS ====================
+// Add these to your existing pisServices.ts
+
+export interface PISLettersResponse {
+  success:   boolean;
+  labno:     string;
+  count:     number;
+  files:     string[];   // array of filenames e.g. ["20260580130_2026058_041656PM.jpg"]
+  timestamp: string;
+}
+
+/**
+ * Fetch list of letter filenames for a LABNO
+ * GET /api/laboratory/pis/letters?labno=:labno
+ */
+export const fetchPatientLetters = async (labno: string): Promise<PISLettersResponse> => {
+  try {
+    const response = await api.get('/laboratory/pis/letters', {
+      params: { labno: labno.trim() },
+    });
+    return response.data;
+  } catch (error: any) {
+    if (error?.response?.status === 404) throw new Error('NOT_FOUND');
+    console.error('[pisService] fetchPatientLetters error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Fetch a single letter image as a blob URL
+ * GET /api/laboratory/pis/letter-image?labno=:labno&filename=:filename
+ */
+export const fetchLetterImage = async (labno: string, filename: string): Promise<string> => {
+  try {
+    const response = await api.get('/laboratory/pis/letter-image', {
+      params:       { labno: labno.trim(), filename },
+      responseType: 'blob',
+    });
+    return URL.createObjectURL(response.data);
+  } catch (error: any) {
+    if (error?.response?.status === 404) throw new Error('NOT_FOUND');
+    console.error('[pisService] fetchLetterImage error:', error);
+    throw error;
+  }
+};
