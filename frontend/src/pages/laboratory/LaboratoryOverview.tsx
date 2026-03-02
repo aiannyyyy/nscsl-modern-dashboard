@@ -5,11 +5,8 @@ import { TrackingSystemTable } from './components/TrackingSystemTable';
 import { YTDComparisonChart } from './components/YTDComparisonChart';
 import { CumulativeMonthlyChart } from './components/CumulativeMonthlyChart';
 import { CumulativeAnnualChart } from './components/CumulativeAnnualChart';
-import { LaboratorySupplies } from './components/LaboratorySupplies';
-import { ReagentSupplies } from './components/ReagentSupplies';
 
 export const LaboratoryOverview: React.FC = () => {
-  // Expand states
   const [row1Expanded, setRow1Expanded] = useState<"daily" | "ytd" | null>(null);
   const [row3Expanded, setRow3Expanded] = useState<"cumMonthly" | "cumAnnual" | null>(null);
 
@@ -18,7 +15,7 @@ export const LaboratoryOverview: React.FC = () => {
       {/* Summary Cards Section */}
       <SummaryCards />
 
-      {/* Row 1: Daily + YTD — expands col-span like SampleReceived */}
+      {/* Row 1: Daily + YTD */}
       <div className="grid grid-cols-12 gap-6">
         <div
           className={`transition-all duration-300
@@ -53,14 +50,12 @@ export const LaboratoryOverview: React.FC = () => {
         </div>
       </div>
 
-      {/* Row 2: Tracking + Supplies horizontal (3 equal columns) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Row 2: Tracking System Table — full width */}
+      <div className="grid grid-cols-1 gap-6">
         <TrackingSystemTable />
-        <LaboratorySupplies />
-        <ReagentSupplies />
       </div>
 
-      {/* Row 3: Cumulative Monthly + Cumulative Annual — same col-span expand pattern */}
+      {/* Row 3: Cumulative Monthly + Cumulative Annual */}
       <div className="grid grid-cols-12 gap-6">
         <div
           className={`transition-all duration-300
@@ -94,13 +89,6 @@ export const LaboratoryOverview: React.FC = () => {
           />
         </div>
       </div>
-
-      {/* Row 4: Unsat Rate — full width 
-      <UnsatRateChart
-        expanded={false}
-        onExpand={() => {}}
-      />
-      */}
     </div>
   );
 };

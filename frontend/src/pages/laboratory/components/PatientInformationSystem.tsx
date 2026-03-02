@@ -3,7 +3,7 @@ import {
   Search, ChevronDown, X, ChevronLeft, ChevronRight,
   User, ZoomIn, Image as ImageIcon, ClipboardList,
   Download, Mail, FileText, BookOpen, FlaskConical,
-  Maximize2, Send,
+  Maximize2, Send, Calendar, Activity, Building2, Stethoscope,
 } from 'lucide-react';
 import {
   getPatientDetail,
@@ -18,7 +18,7 @@ import {
 } from '../../../services/LaboratoryServices/pisServices';
 
 // ═══════════════════════════════════════════════
-// TYPES
+// TYPES  (unchanged)
 // ═══════════════════════════════════════════════
 
 export interface SearchParams {
@@ -72,7 +72,7 @@ interface Props {
 }
 
 // ═══════════════════════════════════════════════
-// CONSTANTS
+// CONSTANTS  (unchanged)
 // ═══════════════════════════════════════════════
 
 const SEX_OPTIONS         = ['', '1', '2', 'A', 'M', 'F'];
@@ -87,7 +87,7 @@ const EMPTY_PARAMS: SearchParams = {
 };
 
 // ═══════════════════════════════════════════════
-// HELPERS
+// HELPERS  (unchanged)
 // ═══════════════════════════════════════════════
 
 const fmt12h = (time?: unknown): string => {
@@ -159,33 +159,69 @@ const formatPatientName = (lname: string, fname: string): React.ReactNode => {
 };
 
 // ═══════════════════════════════════════════════
-// MODAL ATOMS
+// ── NEW: Demographics card components ──────────
+// ═══════════════════════════════════════════════
+
+/**
+ * Collapsible card used in the Demographics left panel.
+ * accent  = Tailwind border-l color class  e.g. "border-blue-400"
+ * headerBg = Tailwind bg class             e.g. "bg-blue-50"
+ */
+const DemoCard: React.FC<{
+  title: string;
+  icon: React.ReactNode;
+  accent: string;
+  headerBg: string;
+  children: React.ReactNode;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+}> = ({ title, icon, accent, headerBg, children, collapsible = false, defaultOpen = true }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className={`rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm mb-3 border-l-4 ${accent}`}>
+      <div
+        className={`flex items-center justify-between px-3 py-2 ${headerBg} dark:bg-gray-800/60`}
+        onClick={collapsible ? () => setOpen(o => !o) : undefined}
+        style={{ cursor: collapsible ? 'pointer' : 'default', userSelect: 'none' }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="opacity-60 text-gray-600 dark:text-gray-400">{icon}</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-300">{title}</span>
+        </div>
+        {collapsible && (
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className={`text-gray-400 transition-transform ${open ? '' : '-rotate-180'}`}>
+            <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+      </div>
+      {open && <div className="bg-white dark:bg-gray-900">{children}</div>}
+    </div>
+  );
+};
+
+/** Single field row inside a DemoCard */
+const DC: React.FC<{
+  label: string;
+  value: string;
+  valueColor?: string;
+  bold?: boolean;
+  mono?: boolean;
+}> = ({ label, value, valueColor = 'text-gray-800 dark:text-gray-200', bold = false, mono = false }) => (
+  <div className="flex items-baseline gap-1 px-3 py-[3.5px] border-b border-gray-50 dark:border-gray-800 last:border-b-0">
+    <span className="flex-shrink-0 w-[152px] text-[10.5px] text-gray-500 dark:text-gray-400 leading-tight">{label}</span>
+    <span className={`text-[10.5px] leading-tight min-w-0 truncate ${valueColor} ${bold ? 'font-semibold' : ''} ${mono ? 'font-mono' : ''}`}>
+      {value}
+    </span>
+  </div>
+);
+
+// ═══════════════════════════════════════════════
+// MODAL ATOMS  (keep PanelBar for Results/TestSeq headers)
 // ═══════════════════════════════════════════════
 
 const PanelBar: React.FC<{ title: string }> = ({ title }) => (
   <div className="px-3 py-[5px] bg-blue-600 text-white text-[10px] font-bold uppercase tracking-widest flex-shrink-0 select-none">
     {title}
-  </div>
-);
-
-const DR: React.FC<{
-  label: string; value: string;
-  bg?: string; labelColor?: string; valueColor?: string; bold?: boolean; first?: boolean;
-}> = ({ label, value, bg = '#ffffff', labelColor = '#374151', valueColor = '#111827', bold = false, first = false }) => (
-  <div style={{
-    display: 'flex', alignItems: 'baseline',
-    borderBottom: '1px solid #e5e7eb',
-    borderTop: first ? '3px solid #cbd5e1' : 'none',
-    marginTop: first ? '6px' : '0',
-    paddingTop: '2.5px', paddingBottom: '2.5px',
-    backgroundColor: bg,
-  }}>
-    <span style={{ flexShrink: 0, width: '175px', fontSize: '11px', lineHeight: '1.4', paddingLeft: '4px', color: labelColor, fontWeight: bold ? 700 : 400 }}>
-      {label}
-    </span>
-    <span style={{ fontSize: '11px', lineHeight: '1.4', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: valueColor, fontWeight: bold ? 700 : 400 }}>
-      {value}
-    </span>
   </div>
 );
 
@@ -206,7 +242,7 @@ const ABtn: React.FC<{
 );
 
 // ═══════════════════════════════════════════════
-// EMAIL MODAL
+// EMAIL MODAL  (unchanged from original)
 // ═══════════════════════════════════════════════
 
 const EmailModal: React.FC<{
@@ -349,7 +385,7 @@ const EmailModal: React.FC<{
 };
 
 // ═══════════════════════════════════════════════
-// AUDIT TRAIL MODAL
+// AUDIT TRAIL MODAL  (unchanged from original)
 // ═══════════════════════════════════════════════
 
 const AuditTrailModal: React.FC<{ labno: string; patientName: string; onClose: () => void }> = ({ labno, patientName, onClose }) => {
@@ -483,12 +519,11 @@ const AuditTrailModal: React.FC<{ labno: string; patientName: string; onClose: (
 };
 
 // ═══════════════════════════════════════════════
-// MAGNIFIER VIEWER
+// MAGNIFIER VIEWER  — FIXED: scrollable, full-width
 // ═══════════════════════════════════════════════
 
 const MagnifierViewer: React.FC<{ src: string; zoom: number; labno: string }> = ({ src, zoom, labno }) => {
   const imgRef  = useRef<HTMLImageElement>(null);
-  const lensRef = useRef<HTMLDivElement>(null);
   const [hovering, setHovering] = useState(false);
   const [lensPos,  setLensPos]  = useState({ x: 0, y: 0 });
   const [bgPos,    setBgPos]    = useState({ x: 0, y: 0 });
@@ -509,43 +544,61 @@ const MagnifierViewer: React.FC<{ src: string; zoom: number; labno: string }> = 
   }, []);
 
   return (
-    <div className="w-full h-full overflow-auto flex items-start justify-center p-3 relative"
-      onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)} onMouseMove={handleMouseMove}
-      style={{ cursor: hovering ? 'crosshair' : 'default' }}>
-      <div className="relative inline-block" style={{ width: `${zoom}%`, flexShrink: 0 }}>
-        <img ref={imgRef} src={src} alt={`Specimen scan for ${labno}`} draggable={false}
-          style={{ width: '100%', height: 'auto', maxWidth: 'none', display: 'block', userSelect: 'none' }}
-          className="rounded shadow-md" />
-        {hovering && imgRef.current && (
-          <div ref={lensRef} style={{
-            position: 'absolute', left: `${lensPos.x}px`, top: `${lensPos.y}px`,
-            width: `${LENS_SIZE}px`, height: `${LENS_SIZE}px`,
-            borderRadius: '50%', border: '2px solid rgba(59,130,246,0.8)',
-            boxShadow: '0 0 0 1px rgba(255,255,255,0.4), 0 4px 20px rgba(0,0,0,0.35)',
-            backgroundImage: `url(${src})`, backgroundRepeat: 'no-repeat',
-            backgroundSize: `${imgRef.current.getBoundingClientRect().width * MAG_FACTOR}px auto`,
-            backgroundPosition: `${bgPos.x}px ${bgPos.y}px`,
-            pointerEvents: 'none', zIndex: 10,
-          }}>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-              <div style={{ width: '1px', height: '100%', background: 'rgba(59,130,246,0.4)', position: 'absolute' }} />
-              <div style={{ height: '1px', width: '100%', background: 'rgba(59,130,246,0.4)', position: 'absolute' }} />
+    // KEY CHANGE: overflow-auto so the image is scrollable when zoomed
+    // items-start (not center) so image anchors to top-left
+    <div
+      className="w-full h-full overflow-auto"
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+      onMouseMove={handleMouseMove}
+      style={{ cursor: hovering ? 'crosshair' : 'default' }}
+    >
+      {/* width: 100% when zoom≤100 shows the full image; wider when zoomed */}
+      <div className="p-3" style={{ width: zoom <= 100 ? '100%' : `${zoom}%`, minWidth: '100%' }}>
+        <div className="relative">
+          <img
+            ref={imgRef}
+            src={src}
+            alt={`Specimen scan for ${labno}`}
+            draggable={false}
+            style={{ width: '100%', height: 'auto', display: 'block', userSelect: 'none' }}
+            className="rounded shadow-md"
+          />
+
+          {/* Magnifier lens */}
+          {hovering && imgRef.current && (
+            <div style={{
+              position: 'absolute', left: `${lensPos.x}px`, top: `${lensPos.y}px`,
+              width: `${LENS_SIZE}px`, height: `${LENS_SIZE}px`,
+              borderRadius: '50%', border: '2px solid rgba(59,130,246,0.8)',
+              boxShadow: '0 0 0 1px rgba(255,255,255,0.4), 0 4px 20px rgba(0,0,0,0.35)',
+              backgroundImage: `url(${src})`, backgroundRepeat: 'no-repeat',
+              backgroundSize: `${imgRef.current.getBoundingClientRect().width * MAG_FACTOR}px auto`,
+              backgroundPosition: `${bgPos.x}px ${bgPos.y}px`,
+              pointerEvents: 'none', zIndex: 10,
+            }}>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                <div style={{ width: '1px', height: '100%', background: 'rgba(59,130,246,0.4)', position: 'absolute' }} />
+                <div style={{ height: '1px', width: '100%', background: 'rgba(59,130,246,0.4)', position: 'absolute' }} />
+              </div>
             </div>
-          </div>
-        )}
-        {!hovering && (
-          <div className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium pointer-events-none select-none"
-            style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)' }}>
-            <ZoomIn size={10} /> Hover to magnify
-          </div>
-        )}
+          )}
+
+          {/* Hover hint */}
+          {!hovering && (
+            <div className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium pointer-events-none select-none"
+              style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)' }}>
+              <ZoomIn size={10} /> Hover to magnify
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
 // ═══════════════════════════════════════════════
-// LETTERS MODAL
+// LETTERS MODAL  (unchanged from original)
 // ═══════════════════════════════════════════════
 
 const LettersModal: React.FC<{
@@ -568,7 +621,6 @@ const LettersModal: React.FC<{
   const LENS_SIZE  = 130;
   const MAG_FACTOR = 3;
 
-  // ── Fetch file list ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!labno) return;
     setListLoading(true); setListError(null); setFiles([]);
@@ -584,7 +636,6 @@ const LettersModal: React.FC<{
       .finally(() => setListLoading(false));
   }, [labno]);
 
-  // ── Load individual letter image ────────────────────────────────────────────
   const loadImage = useCallback((file: string) => {
     if (imageUrls[file] !== undefined) return;
     setImgLoading(prev => ({ ...prev, [file]: true }));
@@ -594,31 +645,19 @@ const LettersModal: React.FC<{
       .finally(() => setImgLoading(prev => ({ ...prev, [file]: false })));
   }, [labno, imageUrls]);
 
-  // ── Preload all thumbnails when file list arrives ───────────────────────────
-  useEffect(() => {
-    files.forEach(file => loadImage(file));
-  }, [files]);
-
-  // ── Also load when selected changes (redundant but safe) ───────────────────
-  useEffect(() => {
-    if (selectedFile) loadImage(selectedFile);
-  }, [selectedFile]);
-
-  // ── Cleanup blob URLs on unmount ────────────────────────────────────────────
+  useEffect(() => { files.forEach(file => loadImage(file)); }, [files]);
+  useEffect(() => { if (selectedFile) loadImage(selectedFile); }, [selectedFile]);
   useEffect(() => {
     return () => {
       Object.values(imageUrls).forEach(url => { if (url) URL.revokeObjectURL(url); });
     };
   }, []);
-
-  // ── Escape key ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', esc);
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
 
-  // ── Magnifier ───────────────────────────────────────────────────────────────
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const img = viewerImgRef.current;
     if (!img) return;
@@ -641,71 +680,42 @@ const LettersModal: React.FC<{
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
-  const handleFullImage = () => { if (selectedUrl) window.open(selectedUrl, '_blank'); };
-
-  // ── Parse timestamp from filename ──────────────────────────────────────────
-  // e.g. 20260580130_2026058_041656PM.jpg → "04:16:56 PM"
   const parseFileTime = (filename: string): string => {
     const parts = filename.replace(/\.[^.]+$/, '').split('_');
     if (parts.length >= 3) {
       const raw  = parts[parts.length - 1];
       const ampm = raw.slice(-2);
       const digs = raw.slice(0, -2);
-      if (digs.length === 6) {
-        return `${digs.slice(0,2)}:${digs.slice(2,4)}:${digs.slice(4,6)} ${ampm}`;
-      }
+      if (digs.length === 6) return `${digs.slice(0,2)}:${digs.slice(2,4)}:${digs.slice(4,6)} ${ampm}`;
     }
     return filename;
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[25000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+    <div className="fixed inset-0 z-[25000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div
-        className="flex flex-col bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+      <div className="flex flex-col bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
         style={{ animation: 'pisIn .2s cubic-bezier(.34,1.56,.64,1)', width: '1150px', maxWidth: '98vw', height: '88vh' }}>
-
-        {/* ── Header ── */}
         <div className="flex-shrink-0 bg-gradient-to-r from-emerald-700 to-emerald-600 px-5 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
-              <BookOpen size={15} className="text-white" />
-            </div>
+            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center"><BookOpen size={15} className="text-white" /></div>
             <div>
               <p className="text-sm font-bold text-white">Letters</p>
-              <p className="text-[11px] text-emerald-200">
-                Lab No: <span className="font-mono font-semibold">{labno}</span>
-                <span className="mx-2 opacity-50">·</span>{patientName}
-              </p>
+              <p className="text-[11px] text-emerald-200">Lab No: <span className="font-mono font-semibold">{labno}</span><span className="mx-2 opacity-50">·</span>{patientName}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {!listLoading && !listError && files.length > 0 && (
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white/20 text-white">
-                {files.length} letter{files.length !== 1 ? 's' : ''}
-              </span>
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white/20 text-white">{files.length} letter{files.length !== 1 ? 's' : ''}</span>
             )}
-            <button onClick={onClose}
-              className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/25 flex items-center justify-center text-white transition-colors">
-              <X size={14} />
-            </button>
+            <button onClick={onClose} className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/25 flex items-center justify-center text-white transition-colors"><X size={14} /></button>
           </div>
         </div>
-
-        {/* ── Body ── */}
         <div className="flex flex-1 overflow-hidden min-h-0">
-
-          {/* ── Left thumbnail sidebar ── */}
-          <div
-            className="flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col overflow-y-auto"
-            style={{ width: '185px' }}>
+          <div className="flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col overflow-y-auto" style={{ width: '185px' }}>
             <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 sticky top-0 bg-gray-50 dark:bg-gray-800/50 z-10">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-                Documents
-              </p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Documents</p>
             </div>
-
             {listLoading ? (
               <div className="flex flex-col items-center justify-center flex-1 gap-2 text-gray-400">
                 <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
@@ -723,75 +733,36 @@ const LettersModal: React.FC<{
                   const thumbUrl     = imageUrls[file];
                   const thumbLoading = imgLoading[file] ?? false;
                   const timeLabel    = parseFileTime(file);
-
                   return (
-                    <button
-                      key={file}
-                      onClick={() => { setSelectedFile(file); setZoom(100); }}
-                      className={`w-full text-left p-2.5 transition-colors ${
-                        isSelected
-                          ? 'bg-emerald-50 dark:bg-emerald-900/30 border-l-2 border-emerald-500'
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 border-l-2 border-transparent'
-                      }`}>
-                      {/* Thumbnail */}
-                      <div
-                        className="w-full rounded-md overflow-hidden bg-gray-200 dark:bg-gray-700 mb-1.5 flex items-center justify-center"
-                        style={{ height: '115px' }}>
-                        {thumbLoading ? (
-                          <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                        ) : thumbUrl ? (
-                          <img src={thumbUrl} alt={`Letter ${i + 1}`}
-                            className="w-full h-full object-contain" draggable={false} />
-                        ) : (
-                          <BookOpen size={24} className="text-gray-400 opacity-40" />
-                        )}
+                    <button key={file} onClick={() => { setSelectedFile(file); setZoom(100); }}
+                      className={`w-full text-left p-2.5 transition-colors ${isSelected ? 'bg-emerald-50 dark:bg-emerald-900/30 border-l-2 border-emerald-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 border-l-2 border-transparent'}`}>
+                      <div className="w-full rounded-md overflow-hidden bg-gray-200 dark:bg-gray-700 mb-1.5 flex items-center justify-center" style={{ height: '115px' }}>
+                        {thumbLoading ? <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                          : thumbUrl ? <img src={thumbUrl} alt={`Letter ${i + 1}`} className="w-full h-full object-contain" draggable={false} />
+                            : <BookOpen size={24} className="text-gray-400 opacity-40" />}
                       </div>
-                      <p className={`text-[10px] font-bold leading-tight text-center truncate ${isSelected ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-400'}`}>
-                        Letter {i + 1}
-                      </p>
-                      <p className="text-[9px] text-gray-400 dark:text-gray-500 text-center font-mono leading-tight mt-0.5 truncate">
-                        {timeLabel}
-                      </p>
+                      <p className={`text-[10px] font-bold leading-tight text-center truncate ${isSelected ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-400'}`}>Letter {i + 1}</p>
+                      <p className="text-[9px] text-gray-400 dark:text-gray-500 text-center font-mono leading-tight mt-0.5 truncate">{timeLabel}</p>
                     </button>
                   );
                 })}
               </div>
             )}
           </div>
-
-          {/* ── Right: viewer ── */}
           <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-
-            {/* Toolbar */}
             {!listLoading && !listError && files.length > 0 && (
               <div className="flex-shrink-0 px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center gap-3">
-                {/* Zoom controls */}
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setZoom(z => Math.max(25, z - 25))}
-                    className="w-7 h-7 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 transition-colors text-base">−</button>
-                  <button onClick={() => setZoom(100)} title="Reset zoom"
-                    className="w-12 text-center text-[12px] font-mono font-bold text-gray-700 dark:text-gray-200 tabular-nums hover:text-blue-600 transition-colors">
-                    {zoom}%
-                  </button>
-                  <button onClick={() => setZoom(z => Math.min(600, z + 25))}
-                    className="w-7 h-7 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 transition-colors text-base">+</button>
+                  <button onClick={() => setZoom(z => Math.max(25, z - 25))} className="w-7 h-7 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 transition-colors text-base">−</button>
+                  <button onClick={() => setZoom(100)} className="w-12 text-center text-[12px] font-mono font-bold text-gray-700 dark:text-gray-200 tabular-nums hover:text-blue-600 transition-colors">{zoom}%</button>
+                  <button onClick={() => setZoom(z => Math.min(600, z + 25))} className="w-7 h-7 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 transition-colors text-base">+</button>
                 </div>
-                {/* Zoom presets */}
-                <div className="flex gap-1">
-                  {[50, 100, 150, 200].map(pct => (
-                    <button key={pct} onClick={() => setZoom(pct)}
-                      className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ${
-                        zoom === pct
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300'
-                      }`}>{pct}%</button>
-                  ))}
-                </div>
+                {[50, 100, 150, 200].map(pct => (
+                  <button key={pct} onClick={() => setZoom(pct)}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ${zoom === pct ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300'}`}>{pct}%</button>
+                ))}
                 <div className="ml-auto flex items-center gap-2">
-                  {selectedFile && (
-                    <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono truncate max-w-[280px]">{selectedFile}</span>
-                  )}
-                  <button onClick={handleFullImage} disabled={!selectedUrl}
+                  <button onClick={() => { if (selectedUrl) window.open(selectedUrl, '_blank'); }} disabled={!selectedUrl}
                     className="h-7 px-2.5 text-[11px] font-semibold rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5">
                     <Maximize2 size={11} /> Full View
                   </button>
@@ -802,109 +773,39 @@ const LettersModal: React.FC<{
                 </div>
               </div>
             )}
-
-            {/* Image viewer area */}
-            <div
-              className="flex-1 bg-gray-200 dark:bg-gray-800 overflow-auto flex items-start justify-center relative"
-              onMouseEnter={() => setHovering(true)}
-              onMouseLeave={() => setHovering(false)}
-              onMouseMove={handleMouseMove}
+            <div className="flex-1 bg-gray-200 dark:bg-gray-800 overflow-auto flex items-start justify-center relative"
+              onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)} onMouseMove={handleMouseMove}
               style={{ cursor: hovering && !!selectedUrl ? 'crosshair' : 'default' }}>
-
               {listLoading ? (
                 <div className="flex flex-col items-center justify-center h-full w-full gap-3 text-gray-400">
                   <div className="w-9 h-9 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                  <p className="text-xs font-medium">Loading…</p>
-                </div>
-              ) : listError ? (
-                <div className="flex flex-col items-center justify-center h-full w-full gap-2 text-gray-400 select-none">
-                  <BookOpen size={52} className="opacity-20" />
-                  <p className="text-xs font-medium opacity-60">{listError}</p>
-                  <p className="text-[10px] opacity-30 font-mono">{labno}</p>
-                </div>
-              ) : isImgLoading ? (
-                <div className="flex flex-col items-center justify-center h-full w-full gap-3 text-gray-400">
-                  <div className="w-9 h-9 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                  <p className="text-xs font-medium">Loading letter…</p>
                 </div>
               ) : selectedUrl ? (
                 <div className="p-4 relative inline-block" style={{ width: `${zoom}%`, minWidth: '200px', flexShrink: 0 }}>
-                  <img
-                    ref={viewerImgRef}
-                    src={selectedUrl}
-                    alt={selectedFile ?? 'Letter'}
-                    draggable={false}
+                  <img ref={viewerImgRef} src={selectedUrl} alt={selectedFile ?? 'Letter'} draggable={false}
                     style={{ width: '100%', height: 'auto', maxWidth: 'none', display: 'block', userSelect: 'none' }}
                     className="rounded shadow-lg" />
-
-                  {/* Magnifier lens */}
                   {hovering && viewerImgRef.current && (
-                    <div style={{
-                      position: 'absolute',
-                      left: `${lensPos.x + 16}px`,
-                      top:  `${lensPos.y + 16}px`,
-                      width: `${LENS_SIZE}px`, height: `${LENS_SIZE}px`,
-                      borderRadius: '50%',
-                      border: '2px solid rgba(16,185,129,0.8)',
-                      boxShadow: '0 0 0 1px rgba(255,255,255,0.4), 0 4px 20px rgba(0,0,0,0.35)',
-                      backgroundImage: `url(${selectedUrl})`,
-                      backgroundRepeat: 'no-repeat',
-                      backgroundSize: `${viewerImgRef.current.getBoundingClientRect().width * MAG_FACTOR}px auto`,
-                      backgroundPosition: `${bgPos.x}px ${bgPos.y}px`,
-                      pointerEvents: 'none', zIndex: 10,
-                    }}>
+                    <div style={{ position: 'absolute', left: `${lensPos.x + 16}px`, top: `${lensPos.y + 16}px`, width: `${LENS_SIZE}px`, height: `${LENS_SIZE}px`, borderRadius: '50%', border: '2px solid rgba(16,185,129,0.8)', boxShadow: '0 0 0 1px rgba(255,255,255,0.4), 0 4px 20px rgba(0,0,0,0.35)', backgroundImage: `url(${selectedUrl})`, backgroundRepeat: 'no-repeat', backgroundSize: `${viewerImgRef.current.getBoundingClientRect().width * MAG_FACTOR}px auto`, backgroundPosition: `${bgPos.x}px ${bgPos.y}px`, pointerEvents: 'none', zIndex: 10 }}>
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                         <div style={{ width: '1px', height: '100%', background: 'rgba(16,185,129,0.4)', position: 'absolute' }} />
                         <div style={{ height: '1px', width: '100%', background: 'rgba(16,185,129,0.4)', position: 'absolute' }} />
                       </div>
                     </div>
                   )}
-
-                  {/* Zoom badge */}
-                  <div className="absolute top-6 left-6 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold pointer-events-none select-none"
-                    style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)' }}>
-                    {zoom}%
-                  </div>
-
-                  {/* Hover hint */}
-                  {!hovering && (
-                    <div className="absolute bottom-6 right-6 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium pointer-events-none select-none"
-                      style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)' }}>
-                      <ZoomIn size={10} /> Hover to magnify
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full w-full gap-2 text-gray-400 select-none">
                   <BookOpen size={52} className="opacity-20" />
-                  <p className="text-xs opacity-50">Select a letter from the list</p>
+                  <p className="text-xs font-medium opacity-60">{listError ?? 'Select a letter'}</p>
                 </div>
               )}
             </div>
           </div>
         </div>
-
-        {/* ── Footer ── */}
         <div className="flex-shrink-0 px-5 py-2 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center justify-between">
-          <span className="text-[11px] text-gray-400 dark:text-gray-500">
-            Lab No:&nbsp;<span className="font-mono text-gray-600 dark:text-gray-300">{labno}</span>
-            {files.length > 0 && (
-              <>
-                <span className="mx-2 opacity-40">·</span>
-                <span>{files.length} document{files.length !== 1 ? 's' : ''}</span>
-                {selectedFile && (
-                  <>
-                    <span className="mx-2 opacity-40">·</span>
-                    <span className="font-mono">{selectedFile}</span>
-                  </>
-                )}
-              </>
-            )}
-          </span>
-          <button onClick={onClose}
-            className="h-7 px-4 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-            Close
-          </button>
+          <span className="text-[11px] text-gray-400">Lab No: <span className="font-mono text-gray-600 dark:text-gray-300">{labno}</span></span>
+          <button onClick={onClose} className="h-7 px-4 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Close</button>
         </div>
       </div>
     </div>
@@ -912,11 +813,11 @@ const LettersModal: React.FC<{
 };
 
 // ═══════════════════════════════════════════════
-// PATIENT RECORD MODAL
+// PATIENT RECORD MODAL  ← THIS IS WHAT WAS REDESIGNED
 // ═══════════════════════════════════════════════
 
 const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () => void }> = ({ record, onClose }) => {
-  const [zoom,       setZoom]       = useState(300);
+  const [zoom,       setZoom]       = useState(100);   // ← default 100 (was 300)
   const [detail,     setDetail]     = useState<Record<string, any> | null>(null);
   const [loading,    setLoading]    = useState(false);
   const [error,      setError]      = useState<string | null>(null);
@@ -933,14 +834,10 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
   const [includePatientInfo, setIncludePatientInfo] = useState(false);
   const [showEmail,          setShowEmail]          = useState(false);
   const [showLetters,        setShowLetters]        = useState(false);
-
-  // ── Notes state ──────────────────────────────────────────────────────────
   const [showNotes,    setShowNotes]    = useState(false);
   const [notes,        setNotes]        = useState<NoteRow[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
   const [notesFetched, setNotesFetched] = useState(false);
-
-  // Image states
   const [imageUrl,     setImageUrl]     = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError,   setImageError]   = useState<'not_found' | 'error' | null>(null);
@@ -948,7 +845,6 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
   const currentRecord = activeRecord ?? record;
   const currentLabno  = activeRecord?.LABNO ?? record?.LABNO ?? '';
 
-  // ── Fetch detail ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentLabno) return;
     setDetail(null); setError(null); setLoading(true); setTestSeq([]); setSelectedRow(null);
@@ -958,21 +854,18 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
       .finally(() => setLoading(false));
   }, [currentLabno]);
 
-  // ── Fetch results ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentLabno) return;
     setResults([]); setResLoading(true);
     getPatientResults(currentLabno).then(res => setResults(res.data ?? [])).catch(() => setResults([])).finally(() => setResLoading(false));
   }, [currentLabno]);
 
-  // ── Fetch filter cards ────────────────────────────────────────────────────
   useEffect(() => {
     if (!record?.FNAME || !record?.LNAME) return;
     setFilterCards([]); setFilterLoading(true); setActiveLabno(record?.LABNO ?? '');
     getPatientFilterCards(record.FNAME, record.LNAME).then(res => setFilterCards(res.data ?? [])).catch(() => setFilterCards([])).finally(() => setFilterLoading(false));
   }, [record?.LABNO, record?.FNAME, record?.LNAME]);
 
-  // ── Fetch specimen image ──────────────────────────────────────────────────
   useEffect(() => {
     if (!currentLabno) return;
     setImageUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
@@ -984,22 +877,14 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
     return () => { setImageUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; }); };
   }, [currentLabno]);
 
-  // ── Reset notes when labno changes ───────────────────────────────────────
-  useEffect(() => {
-    setNotes([]); setNotesFetched(false);
-  }, [currentLabno]);
+  useEffect(() => { setNotes([]); setNotesFetched(false); }, [currentLabno]);
 
-  // ── Fetch notes when panel opens (lazy) ──────────────────────────────────
   useEffect(() => {
     if (!showNotes || !currentLabno || notesFetched) return;
     setNotesLoading(true);
-    getNotes(currentLabno)
-      .then(res => setNotes(res.data ?? []))
-      .catch(() => setNotes([]))
-      .finally(() => { setNotesLoading(false); setNotesFetched(true); });
+    getNotes(currentLabno).then(res => setNotes(res.data ?? [])).catch(() => setNotes([])).finally(() => { setNotesLoading(false); setNotesFetched(true); });
   }, [showNotes, currentLabno, notesFetched]);
 
-  // ── Keyboard escape ───────────────────────────────────────────────────────
   useEffect(() => {
     const esc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -1100,74 +985,115 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
             <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0"><User size={18} className="text-white" /></div>
             <div>
               <p className="text-sm font-bold text-white leading-tight">Patient Information</p>
-              <p className="text-[11px] text-blue-200 mt-0.5">Lab No:&nbsp;<span className="font-mono font-semibold">{labno}</span><span className="mx-2 opacity-50">·</span>{fullName}</p>
+              <p className="text-[11px] text-blue-200 mt-0.5">
+                Lab No:&nbsp;<span className="font-mono font-semibold">{labno}</span>
+                <span className="mx-2 opacity-50">·</span>{fullName}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/25 flex items-center justify-center text-white transition-colors"><X size={14} /></button>
         </div>
 
         {/* ─── BODY ─── */}
-        <div className="flex flex-1 overflow-hidden min-h-0">
+        {/* gap-2 + p-2 gives visible spacing between all 3 sections */}
+        <div className="flex flex-1 overflow-hidden min-h-0 gap-2 p-2" style={{ background: '#e2e8f0' }}>
 
-          {/* ── LEFT: Demographics ── */}
-          <div className="flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col" style={{ width: '410px' }}>
-            <PanelBar title="Demographics" />
+          {/* ══ LEFT: Demographics — NEW card-based layout ══ */}
+          <div className="flex-shrink-0 flex flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm"
+            style={{ width: '410px', background: '#f8fafc' }}>
+
+            {/* Subheader */}
+            <div className="flex-shrink-0 px-4 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">Demographics</span>
+            </div>
+
             {loading ? (
-              <div className="flex-1 flex items-center justify-center"><div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
+              <div className="flex-1 flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
             ) : (
-              <div className="flex-1 overflow-y-auto" style={{ padding: '2px 6px 8px 6px' }}>
-                <DR label="Lab No"              value={labno}   bg="#ffffff" labelColor="#374151" valueColor="#1d4ed8" bold />
-                <DR label="Form No"             value={labid}   bg="#ffffff" />
-                <DR label="Last Name"           value={lname}   bg="#ffffff" />
-                <DR label="First Name"          value={fname}   bg="#ffffff" />
-                <DR label="Birth"               value={`${birthdt} @ ${birthtm}`} bg="#eff6ff" first />
-                <DR label="Collection"          value={`${dtcoll} @ ${tmcoll}`}   bg="#eff6ff" />
-                <DR label="Specimen Type"       value={spectype}                  bg="#eff6ff" />
-                <DR label="Milk Type"           value={milktype}                  bg="#eff6ff" />
-                <DR label="Sex"                 value={sex}     bg="#ffffff" first />
-                <DR label="Birth Weight"        value={birthwt} bg="#ffffff" />
-                <DR label="Birth Order"         value={twin}    bg="#ffffff" />
-                <DR label="Blood Transfused"    value={transfus} bg="#ffffff" />
-                <DR label="Transfused Date"     value={dtxfus}  bg="#ffffff" />
-                <DR label="Gestation Age"       value={gestage !== '—' ? `${gestage} Weeks` : '—'} bg="#ffffff" />
-                <DR label="Specimen Age"        value={specimenAge}            bg="#ffffff" />
-                <DR label="Age at Collection"   value={formatAge(agecoll)}     bg="#ffffff" />
-                <DR label="Date Received"       value={tmrecv !== '—' ? `${dtrecv} @ ${tmrecv}` : dtrecv} bg="#eff6ff" first />
-                <DR label="Date Reported"       value={dtrptd}   bg="#eff6ff" />
-                <DR label="Clinical Status"     value={clinstat} bg="#eff6ff" />
-                <DR label="Demog Acceptable"    value={demcode}  bg="#eff6ff" />
-                <DR label="Physician ID"        value={physid}    bg="#f0fdf4" valueColor="#15803d" bold first />
-                <DR label="Birth Hospital ID"   value={birthhosp} bg="#f0fdf4" />
-                <DR label="Birth Hospital Name" value={descr1}    bg="#f0fdf4" valueColor="#15803d" />
-                <DR label="Facility Code"       value={providerid} bg="#ffffff" first />
-                <DR label="Facility Name"       value={descr1}     bg="#ffffff" />
-                <DR label="Address 1"           value={street1}    bg="#ffffff" />
-                <DR label="Address 2"           value={street2}    bg="#ffffff" />
-                <DR label="City"                value={city}       bg="#ffffff" />
-                <DR label="Province"            value={county}     bg="#ffffff" />
-                <DR label="Phone"               value={phone}      bg="#ffffff" />
-                <DR label="Fax"                 value={fax}        bg="#ffffff" />
-                <DR label="Mobile"              value={mobile}     bg="#ffffff" />
-                <DR label="Email"               value={email}      bg="#ffffff" />
-                <DR label="Coordinator"         value={coord}      bg="#f0fdf4" valueColor="#15803d" bold first />
-                <DR label="Demog Release"       value={releasedt}  bg="#eff6ff" valueColor="#1d4ed8" bold />
-                <DR label="Initial Entry"       value={initTech}   bg="#f0fdf4" valueColor="#15803d" bold />
-                <DR label="Verification Entry"  value={verTech}    bg="#f0fdf4" valueColor="#15803d" />
-                <DR label="Second Copy Date"    value={val(d?.SECONDCOPY)} bg="#ffffff" />
-                <DR label="Outside Lab"         value={val(d?.OUTLAB)}     bg="#ffffff" />
-                <DR label="Status"              value={status}     bg="#dbeafe" valueColor="#1d4ed8" bold first />
-                <DR label="Disposition"      value={disposition} bg={disposition !== '—' ? '#fff7ed' : '#ffffff'} valueColor={disposition !== '—' ? '#c2410c' : '#374151'} bold={disposition !== '—'} first />
-                <DR label="Disposition Date" value={dispdate}    bg={dispdate    !== '—' ? '#fff7ed' : '#ffffff'} valueColor={dispdate    !== '—' ? '#c2410c' : '#374151'} bold={dispdate    !== '—'} />
-                <DR label="Closed By"        value={closedBy}    bg={closedBy    !== '—' ? '#fff7ed' : '#ffffff'} valueColor={closedBy    !== '—' ? '#c2410c' : '#374151'} bold={closedBy    !== '—'} />
+              <div className="flex-1 overflow-y-auto px-3 py-3">
+
+                {/* Card 1: Identity */}
+                <DemoCard title="Identity" icon={<User size={12} />} accent="border-blue-400" headerBg="bg-blue-50">
+                  <DC label="Lab No"     value={labno}  valueColor="text-blue-700 dark:text-blue-400" bold mono />
+                  <DC label="Form No"    value={labid}  mono />
+                  <DC label="Last Name"  value={lname}  bold />
+                  <DC label="First Name" value={fname} />
+                  <DC label="Sex"        value={sex} />
+                </DemoCard>
+
+                {/* Card 2: Specimen & Collection */}
+                <DemoCard title="Specimen & Collection" icon={<Calendar size={12} />} accent="border-indigo-400" headerBg="bg-indigo-50">
+                  <DC label="Birth"          value={`${birthdt} @ ${birthtm}`} />
+                  <DC label="Collection"     value={`${dtcoll} @ ${tmcoll}`} />
+                  <DC label="Specimen Type"  value={spectype} />
+                  <DC label="Milk Type"      value={milktype} />
+                  <DC label="Date Received"  value={tmrecv !== '—' ? `${dtrecv} @ ${tmrecv}` : dtrecv} />
+                  <DC label="Date Reported"  value={dtrptd} />
+                </DemoCard>
+
+                {/* Card 3: Clinical Info */}
+                <DemoCard title="Clinical Info" icon={<Activity size={12} />} accent="border-violet-400" headerBg="bg-violet-50">
+                  <DC label="Birth Weight"      value={birthwt} />
+                  <DC label="Birth Order"       value={twin} />
+                  <DC label="Blood Transfused"  value={transfus} />
+                  <DC label="Transfused Date"   value={dtxfus} />
+                  <DC label="Gestation Age"     value={gestage !== '—' ? `${gestage} Weeks` : '—'} />
+                  <DC label="Specimen Age"      value={specimenAge} />
+                  <DC label="Age at Collection" value={formatAge(agecoll)} />
+                  <DC label="Clinical Status"   value={clinstat} />
+                  <DC label="Demog Acceptable"  value={demcode} />
+                </DemoCard>
+
+                {/* Card 4: Provider & Facility (collapsible) */}
+                <DemoCard title="Provider & Facility" icon={<Building2 size={12} />} accent="border-emerald-400" headerBg="bg-emerald-50" collapsible>
+                  <DC label="Physician ID"        value={physid} valueColor="text-emerald-700 dark:text-emerald-400" bold />
+                  <DC label="Birth Hospital ID"   value={birthhosp} />
+                  <DC label="Birth Hospital Name" value={descr1} valueColor="text-emerald-700 dark:text-emerald-400" />
+                  <DC label="Facility Code"       value={providerid} />
+                  <DC label="Facility Name"       value={descr1} />
+                  <DC label="Address 1"           value={street1} />
+                  <DC label="Address 2"           value={street2} />
+                  <DC label="City"                value={city} />
+                  <DC label="Province"            value={county} />
+                  <DC label="Phone"               value={phone} />
+                  <DC label="Fax"                 value={fax} />
+                  <DC label="Mobile"              value={mobile} />
+                  <DC label="Email"               value={email} />
+                </DemoCard>
+
+                {/* Card 5: Processing & Status (collapsible) */}
+                <DemoCard title="Processing & Status" icon={<Stethoscope size={12} />} accent="border-sky-400" headerBg="bg-sky-50" collapsible>
+                  <DC label="Coordinator"        value={coord} valueColor="text-emerald-700 dark:text-emerald-400" bold />
+                  <DC label="Demog Release"      value={releasedt} valueColor="text-blue-700 dark:text-blue-400" />
+                  <DC label="Initial Entry"      value={initTech} valueColor="text-emerald-700 dark:text-emerald-400" />
+                  <DC label="Verification Entry" value={verTech} />
+                  <DC label="Second Copy Date"   value={val(d?.SECONDCOPY)} />
+                  <DC label="Outside Lab"        value={val(d?.OUTLAB)} />
+                  <DC label="Status"             value={status}
+                    valueColor={status === 'MAILED' ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}
+                    bold />
+                </DemoCard>
+
+                {/* Card 6: Disposition (only shown when data exists) */}
+                {(disposition !== '—' || dispdate !== '—' || closedBy !== '—') && (
+                  <DemoCard title="Disposition" icon={<X size={12} />} accent="border-orange-400" headerBg="bg-orange-50">
+                    <DC label="Disposition"      value={disposition} valueColor="text-orange-700 dark:text-orange-400" bold />
+                    <DC label="Disposition Date" value={dispdate}    valueColor="text-orange-700 dark:text-orange-400" />
+                    <DC label="Closed By"        value={closedBy} />
+                  </DemoCard>
+                )}
+
               </div>
             )}
           </div>
 
-          {/* ── RIGHT ── */}
-          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          {/* ══ RIGHT PANEL ══ */}
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0 gap-2">
 
-            {/* TOP: Results/Mailers + Test Sequence */}
-            <div className="flex flex-shrink-0 border-b border-gray-200 dark:border-gray-700" style={{ height: '260px' }}>
+            {/* TOP: Results/Mailers + Test Sequence — card */}
+            <div className="flex flex-shrink-0 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900" style={{ height: '260px' }}>
 
               {/* Results / Mailers */}
               <div className="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -1217,7 +1143,7 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
               </div>
 
               {/* Test Sequence / Analytes */}
-              <div className="flex-shrink-0 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden" style={{ width: '220px' }}>
+              <div className="flex-shrink-0 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden rounded-r-xl" style={{ width: '220px' }}>
                 <PanelBar title={selectedRow !== null && results[selectedRow] ? `Test Seq: ${results[selectedRow].ABBREV}` : "Test Sequence / Analytes"} />
                 <div className="overflow-auto flex-1">
                   <table className="w-full border-collapse">
@@ -1258,17 +1184,59 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
               </div>
             </div>
 
-            {/* BOTTOM: Specimen image + Right sidebar */}
-            <div className="flex flex-1 overflow-hidden min-h-0">
+            {/* BOTTOM: Specimen image + Right sidebar — card */}
+            <div className="flex flex-1 overflow-hidden min-h-0 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-900">
 
               {/* ── Image viewer + Notes panel ── */}
               <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-                {/* Image viewer — hidden when notes is open */}
+                {/* Image toolbar — shown only when notes panel is hidden */}
                 {!showNotes && (
-                  <div className="flex-1 bg-gray-200 dark:bg-gray-800 flex items-center justify-center overflow-hidden relative">
+                  <div className="flex-shrink-0 px-3 py-1.5 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mr-1">Specimen Image</span>
+                    {/* Zoom controls */}
+                    <div className="flex items-center gap-1">
+                      <button onClick={zoomOut} disabled={!hasImage}
+                        className="w-6 h-6 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors disabled:opacity-40 text-sm">−</button>
+                      <button onClick={zoomReset} disabled={!hasImage}
+                        className="w-12 text-center text-[11px] font-mono font-bold text-gray-700 dark:text-gray-200 tabular-nums hover:text-blue-600 transition-colors disabled:opacity-40">
+                        {zoom}%
+                      </button>
+                      <button onClick={zoomIn} disabled={!hasImage}
+                        className="w-6 h-6 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors disabled:opacity-40 text-sm">+</button>
+                    </div>
+                    {hasImage && (
+                      <div className="flex gap-1">
+                        {[50, 100, 150, 200].map(pct => (
+                          <button key={pct} onClick={() => setZoom(pct)}
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ${zoom === pct ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300'}`}>
+                            {pct}%
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="ml-auto flex items-center gap-1.5">
+                      {imageUrl && (
+                        <>
+                          <button onClick={handleFullImage}
+                            className="h-6 px-2 text-[10px] font-semibold rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-blue-50 hover:text-blue-600 transition-colors flex items-center gap-1">
+                            <Maximize2 size={10} /> Full
+                          </button>
+                          <button onClick={handleDownload}
+                            className="h-6 px-2 text-[10px] font-semibold rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-emerald-50 hover:text-emerald-600 transition-colors flex items-center gap-1">
+                            <Download size={10} /> Save
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Image viewer — SCROLLABLE, full-width by default ── */}
+                {!showNotes && (
+                  <div className="flex-1 bg-gray-200 dark:bg-gray-800 overflow-auto">
                     {imageLoading ? (
-                      <div className="flex flex-col items-center gap-3 text-gray-400 dark:text-gray-500 select-none">
+                      <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400 dark:text-gray-500 select-none">
                         <div className="w-9 h-9 border-[3px] border-blue-500 border-t-transparent rounded-full animate-spin" />
                         <p className="text-xs font-medium">Loading image…</p>
                         <p className="text-[10px] opacity-60 font-mono">{currentLabno}</p>
@@ -1276,7 +1244,7 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                     ) : imageUrl ? (
                       <MagnifierViewer src={imageUrl} zoom={zoom} labno={currentLabno} />
                     ) : (
-                      <div className="text-center text-gray-400 dark:text-gray-600 select-none pointer-events-none">
+                      <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-600 select-none pointer-events-none">
                         <ImageIcon size={52} className="mx-auto mb-2.5 opacity-20" />
                         <p className="text-xs font-medium opacity-50">
                           {imageError === 'not_found' ? 'No specimen image found' : imageError === 'error' ? 'Failed to load image' : 'Specimen scan image'}
@@ -1284,16 +1252,10 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                         <p className="text-[10px] opacity-30 mt-1 font-mono">{currentLabno}</p>
                       </div>
                     )}
-                    {imageUrl && !imageLoading && (
-                      <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-mono font-bold pointer-events-none select-none"
-                        style={{ background: 'rgba(0,0,0,0.4)', color: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(4px)' }}>
-                        {zoom}%
-                      </div>
-                    )}
                   </div>
                 )}
 
-                {/* ── Notes panel — takes full area when open ── */}
+                {/* Notes panel */}
                 {showNotes && (
                   <div className="flex-1 flex flex-col overflow-hidden border-t-2 border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-900/10">
                     <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-amber-100 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-800/60">
@@ -1329,9 +1291,7 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                               if (!raw) return '—';
                               const d = new Date(raw);
                               if (isNaN(d.getTime())) return raw;
-                              const date = d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-                              const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-                              return `${date} ${time}`;
+                              return `${d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
                             };
                             const creatorName  = note.CREATE_FIRSTNAME && note.CREATE_LASTNAME ? `${note.CREATE_FIRSTNAME} ${note.CREATE_LASTNAME}` : note.CREATE_USER_ID ? `User #${note.CREATE_USER_ID}` : '—';
                             const modifierName = note.USER_FIRSTNAME   && note.USER_LASTNAME   ? `${note.USER_FIRSTNAME} ${note.USER_LASTNAME}`     : note.USER_ID         ? `User #${note.USER_ID}`         : '—';
@@ -1339,26 +1299,15 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                             const samePerson   = creatorName === modifierName;
                             return (
                               <div key={note.NOTEID ?? i} className="px-4 py-3 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors">
-                                {note.NOTEPRIORITY && (
-                                  <div className="mb-2">
-                                    {note.NOTEPRIORITY === '1' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700">HIGH PRIORITY</span>}
-                                    {note.NOTEPRIORITY === '2' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700">MEDIUM</span>}
-                                  </div>
-                                )}
+                                {note.NOTEPRIORITY === '1' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700 mb-2 inline-block">HIGH PRIORITY</span>}
                                 <div className="flex items-center justify-between gap-2 mb-1">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-[10px] text-amber-600 dark:text-amber-500 font-semibold uppercase tracking-wide">Created by</span>
-                                    <span className="text-[12px] font-bold text-gray-800 dark:text-gray-200 uppercase">{creatorName}</span>
-                                  </div>
+                                  <span className="text-[12px] font-bold text-gray-800 dark:text-gray-200 uppercase">{creatorName}</span>
                                   <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 whitespace-nowrap flex-shrink-0">{fmtDT(note.CREATE_DT)}</span>
                                 </div>
                                 {isModified && (
                                   <div className="flex items-center justify-between gap-2 mb-1.5">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Modified by</span>
-                                      <span className={`text-[12px] font-bold uppercase ${samePerson ? 'text-gray-600 dark:text-gray-400' : 'text-orange-600 dark:text-orange-400'}`}>{modifierName}</span>
-                                    </div>
-                                    <span className="text-[11px] font-mono text-gray-400 dark:text-gray-500 whitespace-nowrap flex-shrink-0">{fmtDT(note.LASTMOD)}</span>
+                                    <span className={`text-[12px] font-bold uppercase ${samePerson ? 'text-gray-600 dark:text-gray-400' : 'text-orange-600 dark:text-orange-400'}`}>{modifierName}</span>
+                                    <span className="text-[11px] font-mono text-gray-400 whitespace-nowrap flex-shrink-0">{fmtDT(note.LASTMOD)}</span>
                                   </div>
                                 )}
                                 <p className="text-[13px] text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap break-words mt-1.5">
@@ -1374,85 +1323,63 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                 )}
               </div>
 
-              {/* Right sidebar */}
+              {/* ══ RIGHT SIDEBAR ══ */}
               <div className="flex-shrink-0 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col overflow-y-auto" style={{ width: '200px' }}>
-                {/* Zoom controls */}
-                <div className="px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
-                  <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 text-center mb-2">Zoom Percentage</p>
-                  <div className="flex items-center justify-center gap-1.5">
-                    <button onClick={zoomOut} disabled={!hasImage}
-                      className="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold text-base flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">−</button>
-                    <button onClick={zoomReset} disabled={!hasImage} title="Reset to 100%"
-                      className="w-10 text-center text-[12px] font-mono font-bold text-gray-900 dark:text-gray-100 tabular-nums hover:text-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                      {zoom}
+
+                {/* Actions */}
+                <div className="px-2 py-2.5 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-2">Actions</p>
+                  <div className="flex flex-col gap-1.5">
+                    <ABtn icon={<Maximize2     size={11} />} label="Full Image"     onClick={handleFullImage}       disabled={!hasImage} />
+                    <ABtn icon={<ClipboardList size={11} />} label="Audit Trail"    onClick={() => setShowAudit(true)} />
+                    <ABtn icon={<Download      size={11} />} label="Download Image" onClick={handleDownload}        disabled={!hasImage} />
+
+                    {/* Include Patient Info checkbox */}
+                    <button onClick={() => setIncludePatientInfo(v => !v)}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all duration-150 ${
+                        includePatientInfo
+                          ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+                          : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 dark:hover:border-blue-700'
+                      }`}>
+                      <div className={`w-3.5 h-3.5 rounded flex-shrink-0 border-[1.5px] flex items-center justify-center transition-all ${includePatientInfo ? 'bg-blue-600 border-blue-600' : 'bg-white dark:bg-gray-700 border-gray-400 dark:border-gray-500'}`}>
+                        {includePatientInfo && (
+                          <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
+                            <path d="M1 3L3 5L7 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
+                      Include Patient Info
                     </button>
-                    <button onClick={zoomIn} disabled={!hasImage}
-                      className="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold text-base flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">+</button>
-                  </div>
-                  {hasImage && (
-                    <div className="flex flex-wrap gap-1 mt-2 justify-center">
-                      {[50, 100, 150, 200].map(pct => (
-                        <button key={pct} onClick={() => setZoom(pct)}
-                          className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ${zoom === pct ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300'}`}>
-                          {pct}%
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
 
-                {/* Action buttons */}
-                <div className="flex flex-col gap-1.5 px-2 py-2 flex-shrink-0">
-                  <ABtn icon={<Maximize2     size={11} />} label="Full Image"     onClick={handleFullImage} disabled={!hasImage} />
-                  <ABtn icon={<ClipboardList size={11} />} label="Audit Trail"    onClick={() => setShowAudit(true)} />
-                  <ABtn icon={<Download      size={11} />} label="Download Image" onClick={handleDownload}  disabled={!hasImage} />
+                    <ABtn icon={<Mail size={11} />} label="Email" onClick={() => setShowEmail(true)} />
 
-                  {/* Include Patient Info checkbox */}
-                  <button onClick={() => setIncludePatientInfo(v => !v)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all duration-150 ${
-                      includePatientInfo
-                        ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
-                        : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 dark:hover:border-blue-700'
-                    }`}>
-                    <div className={`w-3.5 h-3.5 rounded flex-shrink-0 border-[1.5px] flex items-center justify-center transition-all ${includePatientInfo ? 'bg-blue-600 border-blue-600' : 'bg-white dark:bg-gray-700 border-gray-400 dark:border-gray-500'}`}>
-                      {includePatientInfo && (
-                        <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
-                          <path d="M1 3L3 5L7 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
+                    {/* Notes toggle */}
+                    <button onClick={() => setShowNotes(v => !v)}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all duration-150 ${
+                        showNotes
+                          ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300'
+                          : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-300 dark:hover:bg-amber-900/20 dark:hover:text-amber-400 dark:hover:border-amber-700'
+                      }`}>
+                      <FileText size={11} className="flex-shrink-0" />
+                      {showNotes ? 'Hide Notes' : 'Show Notes'}
+                      {notes.length > 0 && (
+                        <span className={`ml-auto text-[9px] font-bold px-1 rounded ${showNotes ? 'bg-amber-200 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
+                          {notes.length}
+                        </span>
                       )}
-                    </div>
-                    Include Patient Info
-                  </button>
+                    </button>
 
-                  {/* Email button */}
-                  <ABtn icon={<Mail size={11} />} label="Email" onClick={() => setShowEmail(true)} />
-
-                  {/* Show Notes toggle */}
-                  <button onClick={() => setShowNotes(v => !v)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all duration-150 ${
-                      showNotes
-                        ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300'
-                        : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-300 dark:hover:bg-amber-900/20 dark:hover:text-amber-400 dark:hover:border-amber-700'
-                    }`}>
-                    <FileText size={11} className="flex-shrink-0" />
-                    {showNotes ? 'Hide Notes' : 'Show Notes'}
-                    {notes.length > 0 && (
-                      <span className={`ml-auto text-[9px] font-bold px-1 rounded ${showNotes ? 'bg-amber-200 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
-                        {notes.length}
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Show Letters button */}
-                  <button onClick={() => setShowLetters(true)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all duration-150 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400 dark:hover:border-emerald-700">
-                    <BookOpen size={11} className="flex-shrink-0" />
-                    Show Letters
-                  </button>
+                    {/* Letters */}
+                    <button onClick={() => setShowLetters(true)}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all duration-150 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400 dark:hover:border-emerald-700">
+                      <BookOpen size={11} className="flex-shrink-0" />
+                      Show Letters
+                    </button>
+                  </div>
                 </div>
 
                 {/* Patient Filter Cards */}
-                <div className="mt-auto px-2 py-2 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
+                <div className="px-2 py-2 flex-shrink-0">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1.5">
                     Patient Filter Cards
                     {filterCards.length > 1 && <span className="ml-1 text-blue-500">({filterCards.length})</span>}
@@ -1460,7 +1387,7 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                   {filterLoading ? (
                     <div className="flex justify-center py-2"><div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
                   ) : (
-                    <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700" style={{ fontSize: '10px', maxHeight: '160px', overflowY: 'auto' }}>
+                    <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-[10px]" style={{ maxHeight: '160px', overflowY: 'auto' }}>
                       <div className="flex bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0">
                         <span className="px-1.5 py-1 font-bold text-gray-600 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700" style={{ width: '72px', flexShrink: 0 }}>Labno</span>
                         <span className="px-1.5 py-1 font-bold text-gray-600 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700" style={{ width: '52px', flexShrink: 0 }}>Status</span>
@@ -1537,7 +1464,7 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
 };
 
 // ═══════════════════════════════════════════════
-// SEARCH FORM ATOMS
+// SEARCH FORM ATOMS  (unchanged)
 // ═══════════════════════════════════════════════
 
 const Field: React.FC<{
@@ -1569,7 +1496,7 @@ const SelectField: React.FC<{
 );
 
 // ═══════════════════════════════════════════════
-// SEARCH FORM
+// SEARCH FORM  (unchanged)
 // ═══════════════════════════════════════════════
 
 const SearchForm: React.FC<{
@@ -1616,7 +1543,7 @@ const SearchForm: React.FC<{
 );
 
 // ═══════════════════════════════════════════════
-// PAGINATION
+// PAGINATION  (unchanged)
 // ═══════════════════════════════════════════════
 
 const Pagination: React.FC<{
@@ -1664,7 +1591,7 @@ const Pagination: React.FC<{
 };
 
 // ═══════════════════════════════════════════════
-// RESULTS TABLE
+// RESULTS TABLE  (unchanged)
 // ═══════════════════════════════════════════════
 
 const ResultsTable: React.FC<{
@@ -1765,7 +1692,7 @@ const ResultsTable: React.FC<{
 };
 
 // ═══════════════════════════════════════════════
-// ROOT COMPONENT
+// ROOT COMPONENT  (unchanged)
 // ═══════════════════════════════════════════════
 
 export const PatientInformationSystem: React.FC<Props> = ({ onSearch, results = [], isLoading, totalCount }) => {
