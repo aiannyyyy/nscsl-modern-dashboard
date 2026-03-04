@@ -19,6 +19,7 @@ import AccountingOverview from './pages/admin/AccountingOverview';
 import { ITJobOrderSummary } from './pages/it-job-order/ITJobOrderSummary';
 import { PatientInformationSystemContainer } from './pages/laboratory/PatientInformationSystemContainer';
 import { LaboratoryInventoryOverview } from './pages/laboratory/LaboratoryInventoryOverview';
+import { LopezQuezonOverview } from './pages/pdo/LopezQuezonOverview';
 
 // Create a QueryClient instance
 const queryClient = new QueryClient({
@@ -56,6 +57,7 @@ function App() {
               <Route path="pdo/unsatisfactory" element={<Unsatisfactory />} />
               <Route path="pdo/nsf-performance" element={<NSFPerformance />} />
               <Route path="pdo/list-of-car" element={<ListCar />} />
+              <Route path="pdo/lopez-quezon" element={<LopezQuezonOverview />} />
 
               {/* Admin Routes */}
               <Route path="admin" element={<AdminOverview />} />

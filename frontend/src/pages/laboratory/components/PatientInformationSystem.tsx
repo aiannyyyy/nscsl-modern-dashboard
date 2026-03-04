@@ -523,10 +523,19 @@ const AuditTrailModal: React.FC<{ labno: string; patientName: string; onClose: (
 // ═══════════════════════════════════════════════
 
 const MagnifierViewer: React.FC<{ src: string; zoom: number; labno: string }> = ({ src, zoom, labno }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const imgRef  = useRef<HTMLImageElement>(null);
   const [hovering, setHovering] = useState(false);
   const [lensPos,  setLensPos]  = useState({ x: 0, y: 0 });
   const [bgPos,    setBgPos]    = useState({ x: 0, y: 0 });
+
+  // Reset scroll to top-left whenever zoom changes
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop  = 0;
+      containerRef.current.scrollLeft = 0;
+    }
+  }, [zoom]);
 
   const LENS_SIZE  = 120;
   const MAG_FACTOR = 3;
@@ -543,18 +552,24 @@ const MagnifierViewer: React.FC<{ src: string; zoom: number; labno: string }> = 
     setBgPos({ x: -(lx * MAG_FACTOR - LENS_SIZE / 2), y: -(ly * MAG_FACTOR - LENS_SIZE / 2) });
   }, []);
 
+  const isZoomed = zoom > 100;
+
   return (
-    // KEY CHANGE: overflow-auto so the image is scrollable when zoomed
-    // items-start (not center) so image anchors to top-left
     <div
-      className="w-full h-full overflow-auto"
+      ref={containerRef}
+      style={{
+        position: 'absolute', inset: 0,
+        overflow: isZoomed ? 'auto' : 'hidden',
+        display: isZoomed ? 'block' : 'flex',
+        alignItems: isZoomed ? undefined : 'center',
+        justifyContent: isZoomed ? undefined : 'center',
+        cursor: hovering ? 'crosshair' : 'default',
+      }}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
       onMouseMove={handleMouseMove}
-      style={{ cursor: hovering ? 'crosshair' : 'default' }}
     >
-      {/* width: 100% when zoom≤100 shows the full image; wider when zoomed */}
-      <div className="p-3" style={{ width: zoom <= 100 ? '100%' : `${zoom}%`, minWidth: '100%' }}>
+      <div style={{ padding: '12px', width: isZoomed ? `${zoom}%` : '100%', boxSizing: 'border-box', flexShrink: 0 }}>
         <div className="relative">
           <img
             ref={imgRef}
@@ -757,7 +772,7 @@ const LettersModal: React.FC<{
                   <button onClick={() => setZoom(100)} className="w-12 text-center text-[12px] font-mono font-bold text-gray-700 dark:text-gray-200 tabular-nums hover:text-blue-600 transition-colors">{zoom}%</button>
                   <button onClick={() => setZoom(z => Math.min(600, z + 25))} className="w-7 h-7 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-600 transition-colors text-base">+</button>
                 </div>
-                {[50, 100, 150, 200].map(pct => (
+                {[50, 100, 125, 150, 175, 200].map(pct => (
                   <button key={pct} onClick={() => setZoom(pct)}
                     className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ${zoom === pct ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300'}`}>{pct}%</button>
                 ))}
@@ -1207,7 +1222,7 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                     </div>
                     {hasImage && (
                       <div className="flex gap-1">
-                        {[50, 100, 150, 200].map(pct => (
+                        {[50, 100, 125, 150, 175, 200].map(pct => (
                           <button key={pct} onClick={() => setZoom(pct)}
                             className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ${zoom === pct ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300'}`}>
                             {pct}%
@@ -1234,9 +1249,9 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
 
                 {/* ── Image viewer — SCROLLABLE, full-width by default ── */}
                 {!showNotes && (
-                  <div className="flex-1 bg-gray-200 dark:bg-gray-800 overflow-auto">
+                  <div className="flex-1 bg-gray-200 dark:bg-gray-800 overflow-hidden" style={{ position: 'relative', minHeight: 0 }}>
                     {imageLoading ? (
-                      <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400 dark:text-gray-500 select-none">
+                      <div style={{ position: 'absolute', inset: 0 }} className="flex flex-col items-center justify-center gap-3 text-gray-400 dark:text-gray-500 select-none">
                         <div className="w-9 h-9 border-[3px] border-blue-500 border-t-transparent rounded-full animate-spin" />
                         <p className="text-xs font-medium">Loading image…</p>
                         <p className="text-[10px] opacity-60 font-mono">{currentLabno}</p>
@@ -1244,7 +1259,7 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                     ) : imageUrl ? (
                       <MagnifierViewer src={imageUrl} zoom={zoom} labno={currentLabno} />
                     ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-600 select-none pointer-events-none">
+                      <div style={{ position: 'absolute', inset: 0 }} className="flex flex-col items-center justify-center text-gray-400 dark:text-gray-600 select-none pointer-events-none">
                         <ImageIcon size={52} className="mx-auto mb-2.5 opacity-20" />
                         <p className="text-xs font-medium opacity-50">
                           {imageError === 'not_found' ? 'No specimen image found' : imageError === 'error' ? 'Failed to load image' : 'Specimen scan image'}
@@ -1261,7 +1276,7 @@ const PatientRecordModal: React.FC<{ record: SampleRecord | null; onClose: () =>
                     <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-amber-100 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-800/60">
                       <div className="flex items-center gap-2">
                         <FileText size={13} className="text-amber-600 dark:text-amber-400" />
-                        <span className="text-[11px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-300">Sample Notes</span>
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-300">Notebook Entries</span>
                         {!notesLoading && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-800 dark:bg-amber-800/60 dark:text-amber-300">
                             {notes.length} note{notes.length !== 1 ? 's' : ''}

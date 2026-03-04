@@ -188,6 +188,9 @@ app.use("/api/sample-receive", require("./routes/PDORoutes/sampleReceiveRoutes")
 // Sample Screened
 app.use("/api/sample-screened", require("./routes/PDORoutes/sampleScreenedRoutes"));
 
+// Lopez Purchase Filter Cards
+app.use("/api/pdo", require("./routes/PDORoutes/lopezFilterCardRoutes"));
+
 
 // Laboratory Card Summary
 app.use("/api/laboratory/card-summary", require("./routes/LaboratoryRoutes/cardSummaryRoutes"));
