@@ -15,6 +15,8 @@ exports.getLopezPurchasedFilterCards = async (req, res) => {
     const query = `
       SELECT
         rpa.CITY,
+        rpa.PROVIDERID  AS SUBMID,
+        rpa.DESCR1,
         COUNT(frm.LABID) AS TOTAL_COUNT
       FROM PHMSDS.FILTER_REG_MASTER frm
       JOIN PHMSDS.REF_PROVIDER_ADDRESS rpa
@@ -23,8 +25,8 @@ exports.getLopezPurchasedFilterCards = async (req, res) => {
         AND rpa.ADRS_TYPE = '1'
         AND frm.DATE_RELEASED >= TO_TIMESTAMP(:date_from, 'YYYY-MM-DD HH24:MI:SS')
         AND frm.DATE_RELEASED <  TO_TIMESTAMP(:date_to,   'YYYY-MM-DD HH24:MI:SS')
-      GROUP BY rpa.CITY
-      ORDER BY rpa.CITY
+      GROUP BY rpa.CITY, rpa.PROVIDERID, rpa.DESCR1
+      ORDER BY rpa.CITY, rpa.PROVIDERID
     `;
 
     const result = await connection.execute(query, {
@@ -34,9 +36,27 @@ exports.getLopezPurchasedFilterCards = async (req, res) => {
       outFormat: oracleDb.OUT_FORMAT_OBJECT,
     });
 
+    // Group by CITY with breakdown array
+    const grouped = {};
+    for (const row of result.rows) {
+      if (!grouped[row.CITY]) {
+        grouped[row.CITY] = {
+          city: row.CITY,
+          total_count: 0,
+          breakdown: [],
+        };
+      }
+      grouped[row.CITY].total_count += row.TOTAL_COUNT;
+      grouped[row.CITY].breakdown.push({
+        submid: row.SUBMID,
+        descr1: row.DESCR1,
+        total_count: row.TOTAL_COUNT,
+      });
+    }
+
     return res.status(200).json({
       success: true,
-      data: result.rows,
+      data: Object.values(grouped),
     });
 
   } catch (err) {

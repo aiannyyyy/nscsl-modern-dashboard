@@ -1,8 +1,15 @@
 import api from '../api';
 
+export interface BreakdownItem {
+  submid: string;
+  descr1: string;
+  total_count: number;
+}
+
 export interface FilterCardResult {
-  CITY: string;
-  TOTAL_COUNT: number;
+  city: string;
+  total_count: number;
+  breakdown: BreakdownItem[];
 }
 
 export interface FilterCardResponse {
